@@ -1,0 +1,18 @@
+export type Density = 'LOW' | 'NORMAL' | 'HIGH';
+export type Point = [number, number];
+export type Place = {node: string; name: string; lat: number; lng: number};
+export type User = {id: number; name: string; email: string; role: 'user'|'analyst'|'admin'; active: boolean; created_at: string};
+export type Config = {google_routes_available: boolean; maps_browser_key: string; video_available: boolean; max_upload_mb: number; observation_ttl_minutes: number; password_reset_available: boolean};
+export type Observation = {id: number; segment_id: number; density: Density; score: number; count: number; source: string; note: string; observed_at: string; created_at: string};
+export type Segment = {id: number; name: string; start_node: string; end_node: string; distance_km: number; geometry: Point[]; active: boolean; is_demo: boolean; observation: Observation|null};
+export type Camera = {id: number; name: string; segment_id: number; active: boolean; capacity: number; low_threshold: number; high_threshold: number; roi: number[]};
+export type RouteRequest = {origin: Omit<Place,'node'> & {node?: string}; destination: Omit<Place,'node'> & {node?: string}; mode: 'DRIVE'|'TWO_WHEELER'; provider: 'demo'|'google'; departure_at: string|null; weights: Record<'time'|'distance'|'density',number>};
+export type Route = {id: string; name: string; duration_seconds: number; distance_km: number; risk: number; high_share: number; unknown_share: number; score: number; recommended: boolean; dominated: boolean; badges: string[]; geometry: Point[]; segments: {id: number; name: string; distance_km: number; density: Density|null; geometry: Point[]; source: string|null}[]; traffic_intervals: {start: number; end: number; speed: string}[]};
+export type RouteResult = {provider: string; generated_at: string; routes: Route[]; recommendation: {route_id: string; reason: string}; notice: string; future_notice: string|null};
+export type Favorite = {id: number; name: string; request: RouteRequest};
+export type Sample = {second: number; count: number; occupancy: number; score: number; density: Density; width: number; height: number; boxes: {box: number[]; label: string; confidence: number}[]};
+export type VideoJob = {id: string; camera_id: number; filename: string; status: string; progress: number; error: string|null; observed_at: string|null; created_at: string; camera_config: Camera; result: {density: Density; score: number; average_count: number; peak_count: number; duration_seconds: number; distribution: Record<Density,number>; samples: Sample[]; model: string; note: string}|null};
+export type AlertData = {rules: {id: number; segment_id: number; density: Density; active: boolean}[]; notifications: {id: number; message: string; read: boolean; created_at: string}[]};
+export const densityLabel = {LOW:'Thấp', NORMAL:'Bình thường', HIGH:'Cao'};
+export const densityColor = {LOW:'#16a780', NORMAL:'#e7a42d', HIGH:'#e45b64'};
+export const dateTime = (value: string) => new Date(value).toLocaleString('vi-VN', {timeZone:'Asia/Bangkok', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
