@@ -5,119 +5,119 @@
 BEGIN;
 
 CREATE TABLE segments (
-	id SERIAL NOT NULL, 
-	name VARCHAR(120) NOT NULL, 
-	start_node VARCHAR(80) NOT NULL, 
-	end_node VARCHAR(80) NOT NULL, 
-	distance_km FLOAT NOT NULL, 
-	geometry JSON NOT NULL, 
-	is_demo BOOLEAN NOT NULL, 
-	active BOOLEAN NOT NULL, 
+	id SERIAL NOT NULL,
+	name VARCHAR(120) NOT NULL,
+	start_node VARCHAR(80) NOT NULL,
+	end_node VARCHAR(80) NOT NULL,
+	distance_km FLOAT NOT NULL,
+	geometry JSON NOT NULL,
+	is_demo BOOLEAN NOT NULL,
+	active BOOLEAN NOT NULL,
 	PRIMARY KEY (id)
 );
 
 CREATE TABLE users (
-	id SERIAL NOT NULL, 
-	email VARCHAR(254) NOT NULL, 
-	name VARCHAR(100) NOT NULL, 
-	password VARCHAR(300) NOT NULL, 
-	role VARCHAR(20) NOT NULL, 
-	active BOOLEAN NOT NULL, 
-	created_at VARCHAR NOT NULL, 
-	PRIMARY KEY (id), 
+	id SERIAL NOT NULL,
+	email VARCHAR(254) NOT NULL,
+	name VARCHAR(100) NOT NULL,
+	password VARCHAR(300) NOT NULL,
+	role VARCHAR(20) NOT NULL,
+	active BOOLEAN NOT NULL,
+	created_at VARCHAR NOT NULL,
+	PRIMARY KEY (id),
 	UNIQUE (email)
 );
 
 CREATE TABLE alert_rules (
-	id SERIAL NOT NULL, 
-	user_id INTEGER NOT NULL, 
-	segment_id INTEGER NOT NULL, 
-	density VARCHAR(10) NOT NULL, 
-	active BOOLEAN NOT NULL, 
-	last_sent VARCHAR(40), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(user_id) REFERENCES users (id), 
+	id SERIAL NOT NULL,
+	user_id INTEGER NOT NULL,
+	segment_id INTEGER NOT NULL,
+	density VARCHAR(10) NOT NULL,
+	active BOOLEAN NOT NULL,
+	last_sent VARCHAR(40),
+	PRIMARY KEY (id),
+	FOREIGN KEY(user_id) REFERENCES users (id),
 	FOREIGN KEY(segment_id) REFERENCES segments (id)
 );
 
 CREATE TABLE audit (
-	id SERIAL NOT NULL, 
-	user_id INTEGER, 
-	action VARCHAR(100) NOT NULL, 
-	detail VARCHAR(300) NOT NULL, 
-	created_at VARCHAR NOT NULL, 
-	PRIMARY KEY (id), 
+	id SERIAL NOT NULL,
+	user_id INTEGER,
+	action VARCHAR(100) NOT NULL,
+	detail VARCHAR(300) NOT NULL,
+	created_at VARCHAR NOT NULL,
+	PRIMARY KEY (id),
 	FOREIGN KEY(user_id) REFERENCES users (id)
 );
 
 CREATE TABLE cameras (
-	id SERIAL NOT NULL, 
-	name VARCHAR(120) NOT NULL, 
-	segment_id INTEGER NOT NULL, 
-	active BOOLEAN NOT NULL, 
-	capacity INTEGER NOT NULL, 
-	low_threshold FLOAT NOT NULL, 
-	high_threshold FLOAT NOT NULL, 
-	roi JSON NOT NULL, 
-	PRIMARY KEY (id), 
+	id SERIAL NOT NULL,
+	name VARCHAR(120) NOT NULL,
+	segment_id INTEGER NOT NULL,
+	active BOOLEAN NOT NULL,
+	capacity INTEGER NOT NULL,
+	low_threshold FLOAT NOT NULL,
+	high_threshold FLOAT NOT NULL,
+	roi JSON NOT NULL,
+	PRIMARY KEY (id),
 	FOREIGN KEY(segment_id) REFERENCES segments (id)
 );
 
 CREATE TABLE favorites (
-	id SERIAL NOT NULL, 
-	user_id INTEGER NOT NULL, 
-	name VARCHAR(100) NOT NULL, 
-	request JSON NOT NULL, 
-	created_at VARCHAR NOT NULL, 
-	PRIMARY KEY (id), 
+	id SERIAL NOT NULL,
+	user_id INTEGER NOT NULL,
+	name VARCHAR(100) NOT NULL,
+	request JSON NOT NULL,
+	created_at VARCHAR NOT NULL,
+	PRIMARY KEY (id),
 	FOREIGN KEY(user_id) REFERENCES users (id)
 );
 
 CREATE INDEX ix_favorites_user_id ON favorites (user_id);
 
 CREATE TABLE notifications (
-	id SERIAL NOT NULL, 
-	user_id INTEGER NOT NULL, 
-	message VARCHAR(400) NOT NULL, 
-	read BOOLEAN NOT NULL, 
-	created_at VARCHAR NOT NULL, 
-	PRIMARY KEY (id), 
+	id SERIAL NOT NULL,
+	user_id INTEGER NOT NULL,
+	message VARCHAR(400) NOT NULL,
+	read BOOLEAN NOT NULL,
+	created_at VARCHAR NOT NULL,
+	PRIMARY KEY (id),
 	FOREIGN KEY(user_id) REFERENCES users (id)
 );
 
 CREATE TABLE reset_tokens (
-	token_hash VARCHAR(64) NOT NULL, 
-	user_id INTEGER NOT NULL, 
-	expires_at VARCHAR(40) NOT NULL, 
-	PRIMARY KEY (token_hash), 
+	token_hash VARCHAR(64) NOT NULL,
+	user_id INTEGER NOT NULL,
+	expires_at VARCHAR(40) NOT NULL,
+	PRIMARY KEY (token_hash),
 	FOREIGN KEY(user_id) REFERENCES users (id)
 );
 
 CREATE TABLE sessions (
-	token_hash VARCHAR(64) NOT NULL, 
-	user_id INTEGER NOT NULL, 
-	expires_at VARCHAR(40) NOT NULL, 
-	PRIMARY KEY (token_hash), 
+	token_hash VARCHAR(64) NOT NULL,
+	user_id INTEGER NOT NULL,
+	expires_at VARCHAR(40) NOT NULL,
+	PRIMARY KEY (token_hash),
 	FOREIGN KEY(user_id) REFERENCES users (id)
 );
 
 CREATE TABLE observations (
-	id SERIAL NOT NULL, 
-	segment_id INTEGER NOT NULL, 
-	camera_id INTEGER, 
-	user_id INTEGER NOT NULL, 
-	job_id VARCHAR(36), 
-	density VARCHAR(10) NOT NULL, 
-	score FLOAT NOT NULL, 
-	count INTEGER NOT NULL, 
-	source VARCHAR(30) NOT NULL, 
-	note VARCHAR(300) NOT NULL, 
-	observed_at VARCHAR(40) NOT NULL, 
-	created_at VARCHAR NOT NULL, 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(segment_id) REFERENCES segments (id), 
-	FOREIGN KEY(camera_id) REFERENCES cameras (id), 
-	FOREIGN KEY(user_id) REFERENCES users (id), 
+	id SERIAL NOT NULL,
+	segment_id INTEGER NOT NULL,
+	camera_id INTEGER,
+	user_id INTEGER NOT NULL,
+	job_id VARCHAR(36),
+	density VARCHAR(10) NOT NULL,
+	score FLOAT NOT NULL,
+	count INTEGER NOT NULL,
+	source VARCHAR(30) NOT NULL,
+	note VARCHAR(300) NOT NULL,
+	observed_at VARCHAR(40) NOT NULL,
+	created_at VARCHAR NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY(segment_id) REFERENCES segments (id),
+	FOREIGN KEY(camera_id) REFERENCES cameras (id),
+	FOREIGN KEY(user_id) REFERENCES users (id),
 	UNIQUE (job_id)
 );
 
@@ -126,19 +126,19 @@ CREATE INDEX ix_observations_observed_at ON observations (observed_at);
 CREATE INDEX ix_observations_segment_id ON observations (segment_id);
 
 CREATE TABLE video_jobs (
-	id VARCHAR(36) NOT NULL, 
-	user_id INTEGER NOT NULL, 
-	camera_id INTEGER NOT NULL, 
-	filename VARCHAR(180) NOT NULL, 
-	status VARCHAR(20) NOT NULL, 
-	progress INTEGER NOT NULL, 
-	error TEXT, 
-	result JSON, 
-	camera_config JSON NOT NULL, 
-	observed_at VARCHAR(40), 
-	created_at VARCHAR NOT NULL, 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(user_id) REFERENCES users (id), 
+	id VARCHAR(36) NOT NULL,
+	user_id INTEGER NOT NULL,
+	camera_id INTEGER NOT NULL,
+	filename VARCHAR(180) NOT NULL,
+	status VARCHAR(20) NOT NULL,
+	progress INTEGER NOT NULL,
+	error TEXT,
+	result JSON,
+	camera_config JSON NOT NULL,
+	observed_at VARCHAR(40),
+	created_at VARCHAR NOT NULL,
+	PRIMARY KEY (id),
+	FOREIGN KEY(user_id) REFERENCES users (id),
 	FOREIGN KEY(camera_id) REFERENCES cameras (id)
 );
 

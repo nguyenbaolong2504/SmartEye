@@ -32,6 +32,12 @@ def sql_literal(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def write_sql(path, parts):
+    # SQLAlchemy DDL can include spaces after commas at end of line.
+    text = '\n'.join(line.rstrip() for line in '\n'.join(parts).splitlines()) + '\n'
+    path.write_text(text, encoding='utf-8', newline='\n')
+
+
 def build(output_directory):
     output_directory = Path(output_directory)
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -67,7 +73,7 @@ def build(output_directory):
                 for index in sorted(table.indexes, key=lambda i:i.name):
                     schema.append(str(CreateIndex(index).compile(dialect=dialect)).strip() + ';\n')
             schema.append('COMMIT;\n')
-            (output_directory / f'schema.{name}.sql').write_text('\n'.join(schema), encoding='utf-8')
+            write_sql(output_directory / f'schema.{name}.sql', schema)
 
             seed = [header, '-- PUBLIC DEMO ACCOUNTS ONLY. Never import into a production database.\n', 'BEGIN;\n']
             for table in tables:
@@ -79,7 +85,7 @@ def build(output_directory):
                     maximum = max(row['id'] for row in records[table.name])
                     seed.append(f"SELECT setval(pg_get_serial_sequence('{table.name}', 'id'), {maximum}, true);")
             seed.append('\nCOMMIT;\n')
-            (output_directory / f'seed.demo.{name}.sql').write_text('\n'.join(seed), encoding='utf-8')
+            write_sql(output_directory / f'seed.demo.{name}.sql', seed)
     return {table:len(rows) for table,rows in records.items()}
 
 
