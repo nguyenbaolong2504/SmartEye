@@ -1,7 +1,7 @@
 import os
 from sqlalchemy import select
 from .models import User, Segment, Camera
-from .security import hash_password
+from .passwords import hash_password
 from .config import SEED_DEMO
 
 PLACES = [
@@ -16,13 +16,9 @@ PLACES = [
     {'node':'hai_ba_trung','name':'Hai Bà Trưng','lat':21.0080,'lng':105.8490},
 ]
 
-def seed(db):
-    email, password = os.getenv('ADMIN_EMAIL'), os.getenv('ADMIN_PASSWORD')
-    if email and password and not db.scalar(select(User).where(User.email == email.lower())):
-        if len(password) < 10:
-            raise RuntimeError('ADMIN_PASSWORD cần ít nhất 10 ký tự')
-        db.add(User(email=email.lower(), name='Quản trị SmartEye', password=hash_password(password), role='admin'))
-    if SEED_DEMO and not db.scalar(select(Segment.id).limit(1)):
+def seed_demo_roads(db):
+    """Add synthetic road/camera fixtures without reading administrator secrets."""
+    if not db.scalar(select(Segment.id).limit(1)):
         places = {p['node']:p for p in PLACES}
         edges = [('Tràng Thi – Điện Biên Phủ','hoankiem','badinh',2.7),('Kim Mã','badinh','kimma',2.4),('Cầu Giấy','kimma','caugiay',2.3),('Tôn Đức Thắng','hoankiem','dongda',3.0),('La Thành – Láng','dongda','lang',2.6),('Đường Láng – Cầu Giấy','lang','caugiay',2.4),('Thanh Niên – Tây Hồ','badinh','tayho',3.6),('Võ Chí Công – Bưởi','tayho','caugiay',4.0),('Xuân Thủy – Hồ Tùng Mậu','caugiay','mydinh',3.4),('Trần Duy Hưng – Phạm Hùng','lang','mydinh',4.6),('Phố Huế','hoankiem','hai_ba_trung',2.7),('Đại Cồ Việt','hai_ba_trung','dongda',2.8),('Nguyễn Thái Học','dongda','kimma',2.5)]
         for name, start, end, distance in edges:
@@ -31,4 +27,14 @@ def seed(db):
         db.flush()
         for seg in db.scalars(select(Segment).limit(4)):
             db.add(Camera(name='Camera ' + seg.name, segment_id=seg.id))
+
+
+def seed(db):
+    email, password = os.getenv('ADMIN_EMAIL'), os.getenv('ADMIN_PASSWORD')
+    if email and password and not db.scalar(select(User).where(User.email == email.lower())):
+        if len(password) < 10:
+            raise RuntimeError('ADMIN_PASSWORD cần ít nhất 10 ký tự')
+        db.add(User(email=email.lower(), name='Quản trị SmartEye', password=hash_password(password), role='admin'))
+    if SEED_DEMO:
+        seed_demo_roads(db)
     db.commit()

@@ -17,6 +17,8 @@ Hệ thống hỗ trợ lựa chọn tuyến đường tại Hà Nội dựa tr�
 
 Yêu cầu Python 3.11+, Node.js 22+, Git. Chạy từ thư mục repo:
 
+**Đã kèm DB mẫu và tài khoản:** xem [database/README.md](database/README.md) để mở file SQLite ngay, xem 11 bảng hoặc gắn PostgreSQL + pgAdmin. Cài riêng `backend/requirements-db.txt` và chạy `scripts/init_db.py --demo-accounts` nếu muốn chuẩn bị DB trước, chưa tải các thư viện video nặng.
+
 ```powershell
 Copy-Item .env.example .env
 python -m venv .venv
@@ -27,6 +29,8 @@ npm ci
 ```
 
 `create_admin.py` hỏi email và mật khẩu bằng nhập ẩn. Hoặc đặt `ADMIN_EMAIL`/`ADMIN_PASSWORD` trong `.env` trước lần chạy đầu. **Không có mật khẩu Admin mặc định.** Đăng ký qua web luôn tạo User.
+
+Demo local có thể thay bước `create_admin.py` bằng `.venv\Scripts\python.exe scripts/init_db.py --demo-accounts` để tạo ba tài khoản công khai được liệt kê trong tài liệu DB. Chúng không được tự tạo khi server startup và không dùng để triển khai thật.
 
 ```powershell
 # Terminal 1

@@ -5,16 +5,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from .db import get_db, stamp, now
 from .models import User, LoginSession, Audit
-
-def hash_password(password):
-    salt = secrets.token_hex(16)
-    digest = hashlib.scrypt(password.encode(), salt=salt.encode(), n=16384, r=8, p=1).hex()
-    return salt + ':' + digest
-
-def verify_password(password, encoded):
-    salt, expected = encoded.split(':')
-    actual = hashlib.scrypt(password.encode(), salt=salt.encode(), n=16384, r=8, p=1).hex()
-    return secrets.compare_digest(actual, expected)
+from .passwords import hash_password, verify_password
 
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()

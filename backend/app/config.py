@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from .database_config import resolve_database_url
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / '.env')
@@ -8,7 +9,7 @@ DATA = ROOT / 'backend' / 'data'
 DATA.mkdir(parents=True, exist_ok=True)
 UPLOADS = DATA / 'uploads'
 UPLOADS.mkdir(exist_ok=True)
-DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{(DATA / "smarteye.db").as_posix()}')
+DATABASE_URL = resolve_database_url(os.environ, DATA)
 PRODUCTION = os.getenv('APP_ENV', 'development') == 'production'
 COOKIE_SECURE = os.getenv('COOKIE_SECURE', 'true' if PRODUCTION else 'false').lower() == 'true'
 SEED_DEMO = os.getenv('SEED_DEMO', 'true').lower() == 'true'

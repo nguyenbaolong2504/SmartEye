@@ -1,0 +1,6 @@
+# Optional override: expose PostgreSQL only on this computer for pgAdmin/local API.
+# docker compose -f docker-compose.yml -f deploy/compose.db-local.yml up -d database
+services:
+  database:
+    ports:
+      - "127.0.0.1:5432:5432"

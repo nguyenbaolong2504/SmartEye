@@ -7,7 +7,7 @@ from sqlalchemy import select
 from backend.app.db import Base,engine,SessionLocal
 from backend.app.models import User
 from backend.app.schemas import Register
-from backend.app.security import hash_password
+from backend.app.passwords import hash_password
 from backend.app.migrations import upgrade
 
 if __name__ == '__main__':

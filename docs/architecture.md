@@ -35,6 +35,8 @@ Geometry JSON `[lat,lng]`. Google matching yêu cầu các điểm của đoạn
 
 `Base.metadata.create_all` tạo schema; migration thêm `is_demo` hỗ trợ DB đã tạo trước đó. Thay đổi schema sau cần migration mới. PostgreSQL lưu JSON; chưa dùng PostGIS.
 
+DB/SQL mẫu nằm trong `database/`, builder lấy từ metadata và fixture sạch. `scripts/init_db.py` khởi tạo DB đã cấu hình, có `--demo-accounts` riêng cho development và không ghi đè tài khoản cũ. Schema có 11 bảng; xem `database/README.md` cho cột/quan hệ, tài khoản mẫu và hướng dẫn pgAdmin. Mật khẩu web là scrypt hash, độc lập tài khoản PostgreSQL. `database_config.py` hỗ trợ URL đầy đủ hoặc các trường PostgreSQL và mã hóa ký tự đặc biệt qua SQLAlchemy URL.create.
+
 Một ThreadPoolExecutor và model có lock; tên file UUID, không dùng đường dẫn user. Kết quả samples JSON; ảnh mỗi 10 giây. Worker cập nhật progress và kiểm tra cancel từng frame. Deploy một process; nâng Celery/Redis khi cần nhiều máy/phục hồi jobs. Process kill có thể để orphan JPEG: cần chính sách dọn storage khi vận hành dài hạn.
 
 Demo heap tìm tối đa 3 simple paths theo ETA trong graph nhỏ, không phải optimizer toàn Hà Nội. Google chỉ so route candidates provider trả; risk traffic theo độ dài polyline, camera bổ sung risk, giữ ETA. Score chỉ so trong một yêu cầu, không so tuyệt đối giữa các lần khác thời điểm.

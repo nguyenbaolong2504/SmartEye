@@ -18,7 +18,13 @@ services:
       dockerfile: Dockerfile.backend
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://smarteye:${POSTGRES_PASSWORD}@database:5432/smarteye
+      DATABASE_URL: ""
+      DB_ENGINE: postgresql
+      POSTGRES_HOST: database
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: smarteye
+      POSTGRES_USER: smarteye
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       YOLO_MODEL_PATH: /app/backend/data/models/yolo11n.pt
     volumes:
       - ./backend/data:/app/backend/data
