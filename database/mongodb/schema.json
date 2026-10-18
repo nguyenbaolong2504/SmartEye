@@ -1,0 +1,467 @@
+{
+  "users": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "email",
+        "name",
+        "password",
+        "role",
+        "active",
+        "created_at"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "email": {
+          "bsonType": "string"
+        },
+        "name": {
+          "bsonType": "string"
+        },
+        "password": {
+          "bsonType": "string"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "analyst",
+            "admin"
+          ]
+        },
+        "active": {
+          "bsonType": "bool"
+        },
+        "auth_version": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "created_at": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
+  "segments": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "name",
+        "start_node",
+        "end_node",
+        "distance_km",
+        "geometry",
+        "active",
+        "is_demo"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "name": {
+          "bsonType": "string"
+        },
+        "start_node": {
+          "bsonType": "string"
+        },
+        "end_node": {
+          "bsonType": "string"
+        },
+        "distance_km": {
+          "bsonType": [
+            "int",
+            "long",
+            "double",
+            "decimal"
+          ],
+          "minimum": 0.05
+        },
+        "geometry": {
+          "bsonType": "array",
+          "minItems": 2
+        },
+        "active": {
+          "bsonType": "bool"
+        },
+        "is_demo": {
+          "bsonType": "bool"
+        }
+      }
+    }
+  },
+  "cameras": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "name",
+        "segment_id",
+        "capacity",
+        "roi",
+        "low_threshold",
+        "high_threshold",
+        "active"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "name": {
+          "bsonType": "string"
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "capacity": {
+          "bsonType": [
+            "int",
+            "long"
+          ],
+          "minimum": 1
+        },
+        "roi": {
+          "bsonType": "array",
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "low_threshold": {
+          "bsonType": [
+            "int",
+            "long",
+            "double",
+            "decimal"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "high_threshold": {
+          "bsonType": [
+            "int",
+            "long",
+            "double",
+            "decimal"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "active": {
+          "bsonType": "bool"
+        }
+      }
+    }
+  },
+  "observations": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "segment_id",
+        "user_id",
+        "density",
+        "score",
+        "observed_at",
+        "source"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "density": {
+          "enum": [
+            "LOW",
+            "NORMAL",
+            "HIGH"
+          ]
+        },
+        "score": {
+          "bsonType": [
+            "int",
+            "long",
+            "double",
+            "decimal"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "observed_at": {
+          "bsonType": "string"
+        },
+        "source": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
+  "video_jobs": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "camera_id",
+        "filename",
+        "status",
+        "progress",
+        "camera_config"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "camera_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "filename": {
+          "bsonType": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "processing",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "progress": {
+          "bsonType": [
+            "int",
+            "long"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "camera_config": {
+          "bsonType": "object"
+        }
+      }
+    }
+  },
+  "sessions": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "expires_at"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "expires_at": {
+          "bsonType": "string"
+        },
+        "expires_on": {
+          "bsonType": "date"
+        }
+      }
+    }
+  },
+  "reset_tokens": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "expires_at"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "expires_at": {
+          "bsonType": "string"
+        },
+        "expires_on": {
+          "bsonType": "date"
+        }
+      }
+    }
+  },
+  "favorites": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "name",
+        "request"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "name": {
+          "bsonType": "string"
+        },
+        "request": {
+          "bsonType": "object"
+        }
+      }
+    }
+  },
+  "alert_rules": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "segment_id",
+        "density",
+        "active"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "density": {
+          "enum": [
+            "LOW",
+            "NORMAL",
+            "HIGH"
+          ]
+        },
+        "active": {
+          "bsonType": "bool"
+        }
+      }
+    }
+  },
+  "notifications": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "message",
+        "read"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "message": {
+          "bsonType": "string"
+        },
+        "read": {
+          "bsonType": "bool"
+        }
+      }
+    }
+  },
+  "audit": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "action",
+        "detail",
+        "created_at"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "action": {
+          "bsonType": "string"
+        },
+        "detail": {
+          "bsonType": "string"
+        },
+        "created_at": {
+          "bsonType": "string"
+        }
+      }
+    }
+  }
+}

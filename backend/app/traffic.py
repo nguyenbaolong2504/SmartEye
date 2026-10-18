@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from sqlalchemy import select
 from .db import now
 from .models import Observation, AlertRule, Notification, Segment
 from .config import TTL_MINUTES
@@ -11,7 +10,7 @@ def classify(score, low=.25, high=.6):
 
 def latest_observations(db):
     cutoff = (now() - timedelta(minutes=TTL_MINUTES)).isoformat()
-    rows = db.scalars(select(Observation).where(Observation.observed_at >= cutoff, Observation.observed_at <= now().isoformat()).order_by(Observation.observed_at.desc(), Observation.id.desc()))
+    rows = db.find(Observation,{'observed_at':{'$gte':cutoff,'$lte':now().isoformat()}},sort=[('observed_at',-1),('id',-1)])
     result = {}
     for row in rows:
         result.setdefault(row.segment_id, row)
@@ -26,8 +25,8 @@ def emit_alerts(db, observation):
     if not latest or latest.id != observation.id:
         return
     segment = db.get(Segment, observation.segment_id)
-    for rule in db.scalars(select(AlertRule).where(AlertRule.active.is_(True), AlertRule.segment_id == observation.segment_id, AlertRule.density == observation.density)):
-        if rule.last_sent and (now() - datetime.fromisoformat(rule.last_sent)).total_seconds() < 600:
-            continue
+    for rule in db.find(AlertRule,{'active':True,'segment_id':observation.segment_id,'density':observation.density}):
+        cutoff=(now()-timedelta(minutes=10)).isoformat()
+        claimed=db.update(AlertRule,rule.id,{'last_sent':now().isoformat()},condition={'$or':[{'last_sent':None},{'last_sent':{'$lte':cutoff}}]})
+        if not claimed: continue
         db.add(Notification(user_id=rule.user_id, message=f'{segment.name}: mật độ {LABELS[observation.density].lower()} lúc {observation.observed_at}. Nguồn: {observation.source}.'))
-        rule.last_sent = now().isoformat()

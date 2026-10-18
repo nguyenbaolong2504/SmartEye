@@ -1,0 +1,249 @@
+[
+  {
+    "name": "Tràng Thi – Điện Biên Phủ",
+    "start_node": "hoankiem",
+    "end_node": "badinh",
+    "distance_km": 2.7,
+    "geometry": [
+      [
+        21.0287,
+        105.8524
+      ],
+      [
+        21.0368,
+        105.8346
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 1
+  },
+  {
+    "name": "Kim Mã",
+    "start_node": "badinh",
+    "end_node": "kimma",
+    "distance_km": 2.4,
+    "geometry": [
+      [
+        21.0368,
+        105.8346
+      ],
+      [
+        21.0309,
+        105.8182
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 2
+  },
+  {
+    "name": "Cầu Giấy",
+    "start_node": "kimma",
+    "end_node": "caugiay",
+    "distance_km": 2.3,
+    "geometry": [
+      [
+        21.0309,
+        105.8182
+      ],
+      [
+        21.0333,
+        105.7984
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 3
+  },
+  {
+    "name": "Tôn Đức Thắng",
+    "start_node": "hoankiem",
+    "end_node": "dongda",
+    "distance_km": 3.0,
+    "geometry": [
+      [
+        21.0287,
+        105.8524
+      ],
+      [
+        21.0177,
+        105.8292
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 4
+  },
+  {
+    "name": "La Thành – Láng",
+    "start_node": "dongda",
+    "end_node": "lang",
+    "distance_km": 2.6,
+    "geometry": [
+      [
+        21.0177,
+        105.8292
+      ],
+      [
+        21.014,
+        105.808
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 5
+  },
+  {
+    "name": "Đường Láng – Cầu Giấy",
+    "start_node": "lang",
+    "end_node": "caugiay",
+    "distance_km": 2.4,
+    "geometry": [
+      [
+        21.014,
+        105.808
+      ],
+      [
+        21.0333,
+        105.7984
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 6
+  },
+  {
+    "name": "Thanh Niên – Tây Hồ",
+    "start_node": "badinh",
+    "end_node": "tayho",
+    "distance_km": 3.6,
+    "geometry": [
+      [
+        21.0368,
+        105.8346
+      ],
+      [
+        21.0628,
+        105.8183
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 7
+  },
+  {
+    "name": "Võ Chí Công – Bưởi",
+    "start_node": "tayho",
+    "end_node": "caugiay",
+    "distance_km": 4.0,
+    "geometry": [
+      [
+        21.0628,
+        105.8183
+      ],
+      [
+        21.0333,
+        105.7984
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 8
+  },
+  {
+    "name": "Xuân Thủy – Hồ Tùng Mậu",
+    "start_node": "caugiay",
+    "end_node": "mydinh",
+    "distance_km": 3.4,
+    "geometry": [
+      [
+        21.0333,
+        105.7984
+      ],
+      [
+        21.0281,
+        105.7723
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 9
+  },
+  {
+    "name": "Trần Duy Hưng – Phạm Hùng",
+    "start_node": "lang",
+    "end_node": "mydinh",
+    "distance_km": 4.6,
+    "geometry": [
+      [
+        21.014,
+        105.808
+      ],
+      [
+        21.0281,
+        105.7723
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 10
+  },
+  {
+    "name": "Phố Huế",
+    "start_node": "hoankiem",
+    "end_node": "hai_ba_trung",
+    "distance_km": 2.7,
+    "geometry": [
+      [
+        21.0287,
+        105.8524
+      ],
+      [
+        21.008,
+        105.849
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 11
+  },
+  {
+    "name": "Đại Cồ Việt",
+    "start_node": "hai_ba_trung",
+    "end_node": "dongda",
+    "distance_km": 2.8,
+    "geometry": [
+      [
+        21.008,
+        105.849
+      ],
+      [
+        21.0177,
+        105.8292
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 12
+  },
+  {
+    "name": "Nguyễn Thái Học",
+    "start_node": "dongda",
+    "end_node": "kimma",
+    "distance_km": 2.5,
+    "geometry": [
+      [
+        21.0177,
+        105.8292
+      ],
+      [
+        21.0309,
+        105.8182
+      ]
+    ],
+    "is_demo": true,
+    "active": true,
+    "_id": 13
+  }
+]

@@ -5,27 +5,24 @@ import uuid
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import cv2
-from sqlalchemy import select
-from backend.app.db import Base,engine,SessionLocal
+from backend.app.db import initialize_database,SessionLocal
 from backend.app.models import VideoJob,Camera,User
 from backend.app.seed import seed
 from backend.app.security import hash_password
 from backend.app.config import UPLOADS
 from backend.app.video import analyze
-from backend.app.migrations import upgrade
 
 if __name__ == '__main__':
     if len(sys.argv)!=2: raise SystemExit('Usage: python scripts/smoke_video.py /path/to/vehicle-image.jpg')
     image=cv2.imread(sys.argv[1])
     if image is None: raise SystemExit('Cannot read fixture image')
-    Base.metadata.create_all(engine)
-    upgrade()
+    initialize_database()
     with SessionLocal() as db:
         seed(db)
-        user=db.scalar(select(User).where(User.email=='smoke-fixture@example.invalid'))
+        user=db.find_one(User,{'email':'smoke-fixture@example.invalid'})
         if not user:
             user=User(name='Video smoke fixture',email='smoke-fixture@example.invalid',password=hash_password(uuid.uuid4().hex),role='user');db.add(user);db.flush()
-        camera=db.scalar(select(Camera).where(Camera.active.is_(True)).limit(1))
+        camera=db.find_one(Camera,{'active':True})
         if not camera: raise SystemExit('At least one camera is required')
         ident=str(uuid.uuid4())
         config={k:getattr(camera,k) for k in ('segment_id','capacity','low_threshold','high_threshold','roi')}

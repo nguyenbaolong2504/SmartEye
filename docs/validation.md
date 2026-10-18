@@ -5,6 +5,28 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Chuyển MongoDB, ngày 18/10/2026
+
+Đây là kết quả của runtime MongoDB hiện tại; các mục SQLite/PostgreSQL phía dưới là lịch sử phiên bản cũ.
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Pytest với MongoDB 8.0.32 thật (portable Windows, localhost:27019) | **49 passed** |
+| Playwright với MongoDB thật, desktop + mobile Chromium | **10 passed**, có YOLO inference thật |
+| TypeScript strict + Vite production build | Passed |
+| pip check | No broken requirements found |
+| Compose đầy đủ và override DB local: config --quiet | Passed |
+| MongoDB CLI check/init/demo | Passed; lần đầu tạo 3 user, lần sau giữ cả 3; từ chối demo ở production |
+| MongoDB portable download | Tải riêng mongod.exe từ ZIP chính thức; ZIP CRC đúng; executable xác nhận v8.0.32 |
+
+Kiểm tra mới gồm JSONSchema trên server thật, unique email/công bố video/alert, TTL index token, counters sau import Compass, restore JSON và đăng ký ID kế tiếp, login/RBAC ba tài khoản mẫu, session auth_version, reset token một lần, và cập nhật video không ghi đè trạng thái cancelled. Setup env giữ API key, sao lưu file cũ và giữ password Docker khi chuyển local rồi quay lại.
+
+Lượt E2E đầu timeout ở page.goto đợi load trên desktop; trace cho thấy Vite tải lạnh và Google Fonts chưa trả lời. Lượt đầy đủ sau khởi động lại server qua 10/10, không tăng timeout hoặc bỏ bài kiểm thử. Cold start phụ thuộc mạng/ổ đĩa; đây không phải phép đo hiệu năng.
+
+Docker Desktop lỗi quyền truy cập Windows socket dockerInference rồi docker-secrets-engine/engine.sock; Engine chưa hoạt động nên **chưa build/run ba container**. Không suy kết quả Compose runtime từ config validation hoặc MongoDB portable. Google/SMTP thật và Atlas chưa cấu hình nên chưa kiểm tra live; đường tích hợp Google dùng mock. CI đã chuyển sang MongoDB 8.0 service; kết quả CI cần xem trên GitHub sau push.
+
+MongoDB kiểm thử có DB riêng; không dùng tài khoản/token/video cá nhân làm fixture. `database/mongodb/` chỉ chứa dữ liệu demo công khai; dữ liệu SQL cũ giữ ở `database/legacy-sql/`, không có migration tự động sang MongoDB.
+
 ## Kết quả ngày 15/10/2026 (giờ Việt Nam)
 
 | Kiểm tra | Kết quả |

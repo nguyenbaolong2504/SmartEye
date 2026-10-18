@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Camera Tràng Thi – Điện Biên Phủ",
+    "segment_id": 1,
+    "active": true,
+    "capacity": 30,
+    "low_threshold": 0.25,
+    "high_threshold": 0.6,
+    "roi": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "_id": 1
+  },
+  {
+    "name": "Camera Kim Mã",
+    "segment_id": 2,
+    "active": true,
+    "capacity": 30,
+    "low_threshold": 0.25,
+    "high_threshold": 0.6,
+    "roi": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "_id": 2
+  },
+  {
+    "name": "Camera Cầu Giấy",
+    "segment_id": 3,
+    "active": true,
+    "capacity": 30,
+    "low_threshold": 0.25,
+    "high_threshold": 0.6,
+    "roi": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "_id": 3
+  },
+  {
+    "name": "Camera Tôn Đức Thắng",
+    "segment_id": 4,
+    "active": true,
+    "capacity": 30,
+    "low_threshold": 0.25,
+    "high_threshold": 0.6,
+    "roi": [
+      0,
+      0,
+      1,
+      1
+    ],
+    "_id": 4
+  }
+]

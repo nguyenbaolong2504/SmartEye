@@ -77,7 +77,7 @@ def test_historical_video_cannot_publish(admin_client):
     with SessionLocal() as db:
         db.add(VideoJob(id='historical',user_id=1,camera_id=1,filename='old.mp4',status='completed',observed_at=(now()-timedelta(hours=2)).isoformat(),camera_config={'segment_id':1},result={'density':'HIGH','score':.9,'average_count':30,'model':'test'}));db.commit()
     assert admin_client.post('/api/videos/historical/publish').status_code==422
-    with SessionLocal() as db: assert db.query(Observation).count()==0
+    with SessionLocal() as db: assert db.count(Observation)==0
 
 def test_video_publishes_once(admin_client):
     with SessionLocal() as db:

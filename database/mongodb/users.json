@@ -1,0 +1,32 @@
+[
+  {
+    "email": "admin@smarteye.test",
+    "name": "Admin Demo",
+    "password": "b57abd4b8913cfb45f981208fc35ad75:395578d5d6c92c93c76831df5b03b305b7d711427cdd41a9e0f15d9a93b64729f87fccd4c2f0294607f556eb8610606d2c6aabc16134974ad0a45cbf9a230461",
+    "role": "admin",
+    "active": true,
+    "auth_version": 0,
+    "created_at": "2026-10-17T05:59:57.754413+00:00",
+    "_id": 1
+  },
+  {
+    "email": "analyst@smarteye.test",
+    "name": "Analyst Demo",
+    "password": "ac57ca495e1e31a69992d2b80f828134:e628eb3fd5dd5c6c292eb49d03433a3f230c86b4492823e597cac553df11d787222aa01286f4b0fe955225ba4b8de98ade807f5ff6cdcadde41ad1025a58293e",
+    "role": "analyst",
+    "active": true,
+    "auth_version": 0,
+    "created_at": "2026-10-17T05:59:57.804053+00:00",
+    "_id": 2
+  },
+  {
+    "email": "user@smarteye.test",
+    "name": "User Demo",
+    "password": "1a3cf339acf7f0283023d1e8640bf88d:ed3ee941a527a704fbb3cbb5bd4ffcbdbb95bd9dd34aed1e6ccadb8100e8518090aaa764e86f7eb782a02c095ddf03a00bd209c6e5855dcc1419a4e95bfd1af6",
+    "role": "user",
+    "active": true,
+    "auth_version": 0,
+    "created_at": "2026-10-17T05:59:57.869816+00:00",
+    "_id": 3
+  }
+]

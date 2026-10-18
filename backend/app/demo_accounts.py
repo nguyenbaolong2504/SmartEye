@@ -1,5 +1,4 @@
 """Public local-demo credentials; never automatically seeded by API startup."""
-from sqlalchemy import select
 from .models import User
 from .passwords import hash_password
 
@@ -13,7 +12,7 @@ DEMO_ACCOUNTS = (
 def seed_demo_accounts(db):
     created, skipped = [], []
     for account in DEMO_ACCOUNTS:
-        if db.scalar(select(User.id).where(User.email == account['email'])):
+        if db.find_one(User,{'email':account['email']}):
             skipped.append(account['email'])
             continue
         db.add(User(**{k:v for k,v in account.items() if k != 'password'}, password=hash_password(account['password'])))

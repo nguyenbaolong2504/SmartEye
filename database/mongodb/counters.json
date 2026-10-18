@@ -1,0 +1,34 @@
+[
+  {
+    "_id": "users",
+    "seq": 3
+  },
+  {
+    "_id": "segments",
+    "seq": 13
+  },
+  {
+    "_id": "cameras",
+    "seq": 4
+  },
+  {
+    "_id": "observations",
+    "seq": 0
+  },
+  {
+    "_id": "favorites",
+    "seq": 0
+  },
+  {
+    "_id": "alert_rules",
+    "seq": 0
+  },
+  {
+    "_id": "notifications",
+    "seq": 0
+  },
+  {
+    "_id": "audit",
+    "seq": 0
+  }
+]

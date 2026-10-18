@@ -2,7 +2,6 @@ import hashlib
 import secrets
 from datetime import timedelta
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import select
 from .db import get_db, stamp, now
 from .models import User, LoginSession, Audit
 from .passwords import hash_password, verify_password
@@ -12,7 +11,7 @@ def token_hash(token):
 
 def create_session(db, user):
     token = secrets.token_urlsafe(32)
-    db.add(LoginSession(token_hash=token_hash(token), user_id=user.id, expires_at=(now() + timedelta(days=7)).isoformat()))
+    db.add(LoginSession(token_hash=token_hash(token), user_id=user.id, auth_version=user.auth_version, expires_at=(now() + timedelta(days=7)).isoformat()))
     db.commit()
     return token
 
@@ -22,7 +21,7 @@ def optional_user(request: Request, db=Depends(get_db)):
     if not session or session.expires_at <= stamp():
         return None
     user = db.get(User, session.user_id)
-    return user if user and user.active else None
+    return user if user and user.active and session.auth_version == user.auth_version else None
 
 def require_user(user=Depends(optional_user)):
     if not user:

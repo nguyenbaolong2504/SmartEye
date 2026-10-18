@@ -1,31 +1,57 @@
 import os
-import tempfile
-from pathlib import Path
+import uuid
 import pytest
 
-TEST_DIR=Path(tempfile.mkdtemp(prefix='smarteye-tests-'))
-os.environ['DATABASE_URL']=f'sqlite:///{(TEST_DIR/"tests.db").as_posix()}'
+os.environ['MONGODB_DB']='smarteye_test_suite'
 os.environ['SEED_DEMO']='true'
-os.environ.pop('ADMIN_PASSWORD',None)
+os.environ['APP_ENV']='development'
+os.environ['COOKIE_SECURE']='false'
+os.environ['ADMIN_EMAIL']=''
+os.environ['ADMIN_PASSWORD']=''
+
 from fastapi.testclient import TestClient
 from backend.app.main import app, _requests
-from backend.app.db import Base, engine, SessionLocal
-from backend.app.models import User
-from backend.app.security import hash_password
+from backend.app import db as storage
+from backend.app.db import SessionLocal
+from backend.app.models import ALL_MODELS, User
+from backend.app.passwords import hash_password
+
 
 @pytest.fixture
-def client():
-    Base.metadata.drop_all(engine); Base.metadata.create_all(engine); _requests.clear()
-    with TestClient(app) as c:
-        with SessionLocal() as db:
-            db.add(User(email='admin@test.vn',name='Test Admin',role='admin',password=hash_password('test-password-only')))
-            db.commit()
-        yield c
+def client(monkeypatch):
+    live_uri=os.getenv('SMARTEYE_TEST_MONGODB_URI')
+    if live_uri:
+        from pymongo import MongoClient
+        mongo=MongoClient(live_uri,serverSelectionTimeoutMS=5000,tz_aware=True)
+        mongo.admin.command('ping')
+    else:
+        import mongomock
+        mongo=mongomock.MongoClient(tz_aware=True)
+    name='smarteye_test_'+uuid.uuid4().hex
+    monkeypatch.setattr(storage,'_client',mongo)
+    monkeypatch.setattr(storage,'MONGODB_DB',name)
+    if not live_uri:
+        # Mock cannot enforce server JSONSchema. Live CI tests create validators.
+        for model in ALL_MODELS: mongo[name].create_collection(model.collection)
+        mongo[name].create_collection('counters')
+    _requests.clear()
+    try:
+        with TestClient(app) as c:
+            with SessionLocal() as db:
+                db.add(User(email='admin@test.vn',name='Test Admin',role='admin',password=hash_password('test-password-only')))
+                db.commit()
+            yield c
+    finally:
+        assert name.startswith('smarteye_test_') and name[14:].isalnum()
+        mongo.drop_database(name)
+        mongo.close()
+
 
 @pytest.fixture
 def admin_client(client):
     assert client.post('/api/auth/login',json={'email':'admin@test.vn','password':'test-password-only'}).status_code==200
     return client
+
 
 @pytest.fixture
 def route_request():

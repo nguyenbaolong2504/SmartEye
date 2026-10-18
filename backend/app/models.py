@@ -1,109 +1,155 @@
-from sqlalchemy import String, Integer, Float, Boolean, ForeignKey, JSON, Text
-from sqlalchemy.orm import Mapped, mapped_column
-from .db import Base, stamp
+"""MongoDB documents. Public IDs stay integers/UUIDs for the existing API."""
+from copy import deepcopy
+from dataclasses import dataclass, field, fields
+from typing import ClassVar
+from datetime import datetime, timezone
 
-class User(Base):
-    __tablename__ = 'users'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(254), unique=True)
-    name: Mapped[str] = mapped_column(String(100))
-    password: Mapped[str] = mapped_column(String(300))
-    role: Mapped[str] = mapped_column(String(20), default='user')
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[str] = mapped_column(default=stamp)
 
-class LoginSession(Base):
-    __tablename__ = 'sessions'
-    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
-    expires_at: Mapped[str] = mapped_column(String(40))
+def timestamp():
+    return datetime.now(timezone.utc).isoformat()
 
-class ResetToken(Base):
-    __tablename__ = 'reset_tokens'
-    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
-    expires_at: Mapped[str] = mapped_column(String(40))
 
-class Segment(Base):
-    __tablename__ = 'segments'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120))
-    start_node: Mapped[str] = mapped_column(String(80))
-    end_node: Mapped[str] = mapped_column(String(80))
-    distance_km: Mapped[float] = mapped_column(Float)
-    geometry: Mapped[list] = mapped_column(JSON)
-    is_demo: Mapped[bool] = mapped_column(default=True)
-    active: Mapped[bool] = mapped_column(default=True)
+@dataclass(kw_only=True)
+class Document:
+    collection: ClassVar[str]
+    primary: ClassVar[str] = 'id'
+    id: int | str | None = None
 
-class Camera(Base):
-    __tablename__ = 'cameras'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(120))
-    segment_id: Mapped[int] = mapped_column(ForeignKey('segments.id'))
-    active: Mapped[bool] = mapped_column(default=True)
-    capacity: Mapped[int] = mapped_column(Integer, default=30)
-    low_threshold: Mapped[float] = mapped_column(Float, default=.25)
-    high_threshold: Mapped[float] = mapped_column(Float, default=.6)
-    roi: Mapped[list] = mapped_column(JSON, default=lambda: [0, 0, 1, 1])
+    def values(self):
+        return {f.name:deepcopy(getattr(self, f.name)) for f in fields(self)
+                if f.name != 'id' or self.primary == 'id'}
 
-class Observation(Base):
-    __tablename__ = 'observations'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    segment_id: Mapped[int] = mapped_column(ForeignKey('segments.id'), index=True)
-    camera_id: Mapped[int | None] = mapped_column(ForeignKey('cameras.id'), nullable=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
-    job_id: Mapped[str | None] = mapped_column(String(36), nullable=True, unique=True)
-    density: Mapped[str] = mapped_column(String(10))
-    score: Mapped[float] = mapped_column(Float)
-    count: Mapped[int] = mapped_column(Integer, default=0)
-    source: Mapped[str] = mapped_column(String(30))
-    note: Mapped[str] = mapped_column(String(300), default='')
-    observed_at: Mapped[str] = mapped_column(String(40), index=True)
-    created_at: Mapped[str] = mapped_column(default=stamp)
+    @classmethod
+    def from_mongo(cls, value):
+        value = dict(value)
+        value[cls.primary] = value.pop('_id')
+        allowed = {f.name for f in fields(cls)}
+        return cls(**{k:v for k,v in value.items() if k in allowed})
 
-class VideoJob(Base):
-    __tablename__ = 'video_jobs'
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
-    camera_id: Mapped[int] = mapped_column(ForeignKey('cameras.id'))
-    filename: Mapped[str] = mapped_column(String(180))
-    status: Mapped[str] = mapped_column(String(20), default='queued')
-    progress: Mapped[int] = mapped_column(Integer, default=0)
-    error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    camera_config: Mapped[dict] = mapped_column(JSON)
-    observed_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    created_at: Mapped[str] = mapped_column(default=stamp)
 
-class Favorite(Base):
-    __tablename__ = 'favorites'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
-    name: Mapped[str] = mapped_column(String(100))
-    request: Mapped[dict] = mapped_column(JSON)
-    created_at: Mapped[str] = mapped_column(default=stamp)
+@dataclass(kw_only=True)
+class User(Document):
+    collection: ClassVar[str] = 'users'
+    email: str
+    name: str
+    password: str
+    role: str = 'user'
+    active: bool = True
+    auth_version: int = 0
+    created_at: str = field(default_factory=timestamp)
 
-class AlertRule(Base):
-    __tablename__ = 'alert_rules'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
-    segment_id: Mapped[int] = mapped_column(ForeignKey('segments.id'))
-    density: Mapped[str] = mapped_column(String(10), default='HIGH')
-    active: Mapped[bool] = mapped_column(default=True)
-    last_sent: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
-class Notification(Base):
-    __tablename__ = 'notifications'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
-    message: Mapped[str] = mapped_column(String(400))
-    read: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[str] = mapped_column(default=stamp)
+@dataclass(kw_only=True)
+class LoginSession(Document):
+    collection: ClassVar[str] = 'sessions'
+    primary: ClassVar[str] = 'token_hash'
+    token_hash: str
+    user_id: int
+    expires_at: str
+    auth_version: int = 0
 
-class Audit(Base):
-    __tablename__ = 'audit'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'), nullable=True)
-    action: Mapped[str] = mapped_column(String(100))
-    detail: Mapped[str] = mapped_column(String(300))
-    created_at: Mapped[str] = mapped_column(default=stamp)
+
+@dataclass(kw_only=True)
+class ResetToken(Document):
+    collection: ClassVar[str] = 'reset_tokens'
+    primary: ClassVar[str] = 'token_hash'
+    token_hash: str
+    user_id: int
+    expires_at: str
+    auth_version: int = 0
+
+
+@dataclass(kw_only=True)
+class Segment(Document):
+    collection: ClassVar[str] = 'segments'
+    name: str
+    start_node: str
+    end_node: str
+    distance_km: float
+    geometry: list
+    is_demo: bool = True
+    active: bool = True
+
+
+@dataclass(kw_only=True)
+class Camera(Document):
+    collection: ClassVar[str] = 'cameras'
+    name: str
+    segment_id: int
+    active: bool = True
+    capacity: int = 30
+    low_threshold: float = .25
+    high_threshold: float = .6
+    roi: list = field(default_factory=lambda:[0,0,1,1])
+
+
+@dataclass(kw_only=True)
+class Observation(Document):
+    collection: ClassVar[str] = 'observations'
+    segment_id: int
+    user_id: int
+    density: str
+    score: float
+    observed_at: str
+    camera_id: int | None = None
+    job_id: str | None = None
+    count: int = 0
+    source: str = 'manual'
+    note: str = ''
+    created_at: str = field(default_factory=timestamp)
+
+
+@dataclass(kw_only=True)
+class VideoJob(Document):
+    collection: ClassVar[str] = 'video_jobs'
+    user_id: int
+    camera_id: int
+    filename: str
+    camera_config: dict
+    status: str = 'queued'
+    progress: int = 0
+    error: str | None = None
+    result: dict | None = None
+    observed_at: str | None = None
+    created_at: str = field(default_factory=timestamp)
+
+
+@dataclass(kw_only=True)
+class Favorite(Document):
+    collection: ClassVar[str] = 'favorites'
+    user_id: int
+    name: str
+    request: dict
+    created_at: str = field(default_factory=timestamp)
+
+
+@dataclass(kw_only=True)
+class AlertRule(Document):
+    collection: ClassVar[str] = 'alert_rules'
+    user_id: int
+    segment_id: int
+    density: str = 'HIGH'
+    active: bool = True
+    last_sent: str | None = None
+
+
+@dataclass(kw_only=True)
+class Notification(Document):
+    collection: ClassVar[str] = 'notifications'
+    user_id: int
+    message: str
+    read: bool = False
+    created_at: str = field(default_factory=timestamp)
+
+
+@dataclass(kw_only=True)
+class Audit(Document):
+    collection: ClassVar[str] = 'audit'
+    action: str
+    user_id: int | None = None
+    detail: str = ''
+    created_at: str = field(default_factory=timestamp)
+
+
+ALL_MODELS = (User, LoginSession, ResetToken, Segment, Camera, Observation,
+              VideoJob, Favorite, AlertRule, Notification, Audit)

@@ -3,6 +3,7 @@ import hashlib
 import io
 import logging
 import os
+import re
 import secrets
 import smtplib
 import threading
@@ -16,37 +17,45 @@ from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from sqlalchemy import select, delete, func
-from sqlalchemy.exc import IntegrityError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 from . import schemas as S
 from .config import COOKIE_SECURE, PRODUCTION, UPLOADS, MAX_UPLOAD, MODEL_PATH, TTL_MINUTES
-from .db import Base, engine, get_db, SessionLocal, stamp, now
+from .db import initialize_database, get_database, get_db, SessionLocal, stamp, now
 from .models import User, LoginSession, ResetToken, Segment, Camera, Observation, VideoJob, Favorite, AlertRule, Notification, Audit
 from .security import optional_user, require_user, operator, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
 from .seed import seed, PLACES
 from .traffic import classify, latest_observations, observation_dict, emit_alerts
 from .routing import search_routes
 from .video import submit
-from .migrations import upgrade
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('smarteye')
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(engine)
-    upgrade()
+    try:
+        initialize_database()
+    except PyMongoError:
+        raise RuntimeError('Không kết nối được MongoDB. Chạy MongoDB Server/Docker và kiểm tra MONGODB_URI, MONGODB_DB trong .env.') from None
     with SessionLocal() as db:
         seed(db)
-        for job in db.scalars(select(VideoJob).where(VideoJob.status.in_(['queued','processing']))):
+        for job in db.find(VideoJob,{'status':{'$in':['queued','processing']}}):
             job.status = 'failed'; job.error = 'Tác vụ bị gián đoạn do máy chủ khởi động lại. Vui lòng tải lại video.'
             (UPLOADS / f'{job.id}.video').unlink(missing_ok=True)
-        db.execute(delete(LoginSession).where(LoginSession.expires_at < stamp()))
-        db.execute(delete(ResetToken).where(ResetToken.expires_at < stamp()))
+        db.delete_many(LoginSession,{'expires_at':{'$lt':stamp()}})
+        db.delete_many(ResetToken,{'expires_at':{'$lt':stamp()}})
         db.commit()
     yield
 
 app = FastAPI(title='SmartEye API', version='1.0.0', lifespan=lifespan)
+
+@app.exception_handler(DuplicateKeyError)
+async def duplicate_record(request,exc):
+    return JSONResponse({'detail':'Dữ liệu đã tồn tại hoặc tác vụ đã được thực hiện. Vui lòng tải lại.'},status_code=409)
+
+@app.exception_handler(PyMongoError)
+async def mongo_unavailable(request,exc):
+    return JSONResponse({'detail':'MongoDB chưa sẵn sàng. Kiểm tra dịch vụ database và thử lại.'},status_code=503)
 _requests = defaultdict(deque)
 _rate_lock = threading.Lock()
 
@@ -102,8 +111,8 @@ def cookie(response, token):
 
 @app.get('/api/health')
 def health():
-    with SessionLocal() as db: db.execute(select(1))
-    return {'status':'ok','time':stamp()}
+    get_database().command('ping')
+    return {'status':'ok','database':'mongodb','time':stamp()}
 
 @app.get('/api/config')
 def config():
@@ -114,7 +123,7 @@ def register(body:S.Register,response:Response,db=Depends(get_db)):
     user = User(**body.model_dump(exclude={'password'}),password=hash_password(body.password))
     db.add(user)
     try: db.commit()
-    except IntegrityError:
+    except DuplicateKeyError:
         db.rollback(); raise HTTPException(409,'Email đã được đăng ký.')
     cookie(response,create_session(db,user))
     audit(db,user.id,'register'); db.commit()
@@ -122,7 +131,7 @@ def register(body:S.Register,response:Response,db=Depends(get_db)):
 
 @app.post('/api/auth/login')
 def login(body:S.Login,response:Response,db=Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
+    user = db.find_one(User,{'email':body.email.strip().lower()})
     if not user or not verify_password(body.password,user.password) or not user.active:
         raise HTTPException(401,'Email hoặc mật khẩu không đúng, hoặc tài khoản bị khóa.')
     cookie(response,create_session(db,user)); audit(db,user.id,'login'); db.commit()
@@ -130,7 +139,7 @@ def login(body:S.Login,response:Response,db=Depends(get_db)):
 
 @app.post('/api/auth/logout')
 def logout(request:Request,response:Response,db=Depends(get_db)):
-    db.execute(delete(LoginSession).where(LoginSession.token_hash==token_hash(request.cookies.get('smarteye_session','')))); db.commit()
+    db.delete_many(LoginSession,{'token_hash':token_hash(request.cookies.get('smarteye_session',''))}); db.commit()
     response.delete_cookie('smarteye_session',path='/')
     return {'message':'Đã đăng xuất.'}
 
@@ -147,19 +156,19 @@ def profile(body:S.ProfileInput,user=Depends(require_user),db=Depends(get_db)):
 def change_password(body:S.PasswordChange,response:Response,user=Depends(require_user),db=Depends(get_db)):
     row = item(db,User,user.id)
     if not verify_password(body.current_password,row.password): raise HTTPException(400,'Mật khẩu hiện tại không đúng.')
-    row.password = hash_password(body.new_password)
-    db.execute(delete(LoginSession).where(LoginSession.user_id==user.id)); audit(db,user.id,'password_changed'); db.commit()
+    row = db.update(User,user.id,{'password':hash_password(body.new_password)},increment={'auth_version':1})
+    db.delete_many(LoginSession,{'user_id':user.id}); audit(db,user.id,'password_changed'); db.commit()
     cookie(response,create_session(db,row))
     return {'message':'Đã đổi mật khẩu và thu hồi các phiên cũ.'}
 
 @app.post('/api/auth/forgot-password')
 def forgot_password(body:S.ResetRequest,db=Depends(get_db)):
     if not os.getenv('SMTP_HOST'): raise HTTPException(503,'Hệ thống chưa cấu hình email đặt lại mật khẩu. Vui lòng liên hệ quản trị viên.')
-    row = db.scalar(select(User).where(User.email==body.email.strip().lower(),User.active.is_(True)))
+    row = db.find_one(User,{'email':body.email.strip().lower(),'active':True})
     if row:
         token = secrets.token_urlsafe(32)
-        db.execute(delete(ResetToken).where(ResetToken.user_id==row.id))
-        db.add(ResetToken(token_hash=token_hash(token),user_id=row.id,expires_at=(now()+timedelta(minutes=30)).isoformat())); db.commit()
+        db.delete_many(ResetToken,{'user_id':row.id})
+        db.add(ResetToken(token_hash=token_hash(token),user_id=row.id,auth_version=row.auth_version,expires_at=(now()+timedelta(minutes=30)).isoformat())); db.commit()
         msg = EmailMessage(); msg['Subject']='Đặt lại mật khẩu SmartEye'; msg['From']=os.getenv('SMTP_FROM',os.getenv('SMTP_USER','')); msg['To']=row.email
         msg.set_content(f'Mở liên kết sau trong 30 phút để đặt lại mật khẩu: {os.getenv("APP_BASE_URL","http://localhost:5173")}/?reset={token}\nNếu bạn không yêu cầu, hãy bỏ qua email này.')
         try:
@@ -173,12 +182,13 @@ def forgot_password(body:S.ResetRequest,db=Depends(get_db)):
 
 @app.post('/api/auth/reset-password')
 def reset_password(body:S.ResetPassword,db=Depends(get_db)):
-    token = db.get(ResetToken,token_hash(body.token))
-    if not token or token.expires_at < stamp(): raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
+    token = db.pop(ResetToken,{'token_hash':token_hash(body.token),'expires_at':{'$gt':stamp()}})
+    if not token: raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
     row = item(db,User,token.user_id)
     if not row.active: raise HTTPException(400,'Tài khoản đã bị khóa.')
-    row.password=hash_password(body.password)
-    db.execute(delete(LoginSession).where(LoginSession.user_id==row.id)); db.delete(token); audit(db,row.id,'password_reset'); db.commit()
+    changed=db.update(User,row.id,{'password':hash_password(body.password)},condition={'auth_version':token.auth_version},increment={'auth_version':1})
+    if not changed: raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
+    db.delete_many(LoginSession,{'user_id':row.id}); audit(db,row.id,'password_reset'); db.commit()
     return {'message':'Đã đặt lại mật khẩu. Vui lòng đăng nhập.'}
 
 @app.get('/api/places')
@@ -187,7 +197,7 @@ def places(): return PLACES
 @app.get('/api/segments')
 def segments(db=Depends(get_db)):
     latest = latest_observations(db)
-    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo')},'observation':observation_dict(latest[s.id]) if s.id in latest else None} for s in db.scalars(select(Segment).order_by(Segment.id))]
+    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo')},'observation':observation_dict(latest[s.id]) if s.id in latest else None} for s in db.find(Segment,sort=[('id',1)])]
 
 @app.post('/api/segments',status_code=201)
 def add_segment(body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):
@@ -197,7 +207,7 @@ def add_segment(body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):
 @app.put('/api/segments/{ident}')
 def edit_segment(ident:int,body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):
     row=item(db,Segment,ident)
-    if row.geometry != body.geometry and db.scalar(select(Observation.id).where(Observation.segment_id==ident).limit(1)):
+    if row.geometry != body.geometry and db.find_one(Observation,{'segment_id':ident}):
         raise HTTPException(409,'Đoạn đường đã có quan sát. Hãy ngừng đoạn cũ và tạo đoạn mới khi thay đổi vị trí để bảo toàn lịch sử.')
     for k,v in body.model_dump().items(): setattr(row,k,v)
     audit(db,user.id,'segment_updated',str(ident)); db.commit(); return {'id':row.id}
@@ -205,12 +215,12 @@ def edit_segment(ident:int,body:S.SegmentInput,user=Depends(admin),db=Depends(ge
 @app.delete('/api/segments/{ident}')
 def disable_segment(ident:int,user=Depends(admin),db=Depends(get_db)):
     row=item(db,Segment,ident); row.active=False
-    for camera in db.scalars(select(Camera).where(Camera.segment_id==ident)): camera.active=False
+    for camera in db.find(Camera,{'segment_id':ident}): camera.active=False
     audit(db,user.id,'segment_disabled',str(ident));db.commit();return {'message':'Đã ngừng đoạn đường và các camera liên quan.'}
 
 @app.get('/api/cameras')
 def cameras(db=Depends(get_db)):
-    return [camera_dict(c) for c in db.scalars(select(Camera).order_by(Camera.id))]
+    return [camera_dict(c) for c in db.find(Camera,sort=[('id',1)])]
 
 @app.post('/api/cameras',status_code=201)
 def add_camera(body:S.CameraInput,user=Depends(admin),db=Depends(get_db)):
@@ -249,7 +259,7 @@ async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),f
     if not camera.active: raise HTTPException(400,'Camera đã ngừng hoạt động.')
     if not item(db,Segment,camera.segment_id).active: raise HTTPException(400,'Đoạn đường đã ngừng theo dõi.')
     if not MODEL_PATH.is_file(): raise HTTPException(503,'Chưa có mô hình YOLO. Quản trị viên cần tải trọng số theo README.')
-    active_count = db.scalar(select(func.count()).select_from(VideoJob).where(VideoJob.status.in_(['queued','processing'])))
+    active_count = db.count(VideoJob,{'status':{'$in':['queued','processing']}})
     if active_count >= 5: raise HTTPException(429,'Hàng đợi phân tích đang đầy. Vui lòng chờ các video hiện tại hoàn tất.')
     filename = Path(file.filename or 'video.mp4').name[:180]
     if Path(filename).suffix.lower() not in ('.mp4','.avi','.mov','.mkv','.webm'):
@@ -279,9 +289,8 @@ async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),f
 
 @app.get('/api/videos')
 def videos(user=Depends(require_user),db=Depends(get_db)):
-    query=select(VideoJob).order_by(VideoJob.created_at.desc()).limit(50)
-    if user.role != 'admin': query=query.where(VideoJob.user_id==user.id)
-    return [job_dict(j,summary=True) for j in db.scalars(query)]
+    filters={} if user.role=='admin' else {'user_id':user.id}
+    return [job_dict(j,summary=True) for j in db.find(VideoJob,filters,sort=[('created_at',-1)],limit=50,exclude=['result.samples'])]
 
 @app.get('/api/videos/{ident}')
 def get_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
@@ -298,7 +307,9 @@ def frame(ident:str,second:int,user=Depends(require_user),db=Depends(get_db)):
 def cancel_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
     job=own(item(db,VideoJob,ident),user)
     if job.status not in ('queued','processing'): raise HTTPException(409,'Tác vụ đã kết thúc.')
-    job.status='cancelled'; db.commit(); return job_dict(job)
+    job=db.update(VideoJob,ident,{'status':'cancelled'},condition={'status':{'$in':['queued','processing']}})
+    if not job: raise HTTPException(409,'Tác vụ đã kết thúc.')
+    return job_dict(job)
 
 @app.delete('/api/videos/{ident}')
 def delete_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
@@ -313,7 +324,7 @@ def delete_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
 def publish_video(ident:str,user=Depends(operator),db=Depends(get_db)):
     job=own(item(db,VideoJob,ident),user)
     if job.status != 'completed' or not job.result: raise HTTPException(409,'Video chưa phân tích xong.')
-    if db.scalar(select(Observation.id).where(Observation.job_id==ident)): raise HTTPException(409,'Video này đã được công bố.')
+    if db.find_one(Observation,{'job_id':ident}): raise HTTPException(409,'Video này đã được công bố.')
     if not job.observed_at: raise HTTPException(422,'Video chưa có thời điểm ghi hình, chỉ có thể dùng để xem lại.')
     age=(now()-datetime.fromisoformat(job.observed_at)).total_seconds()
     if age < 0 or age > TTL_MINUTES*60: raise HTTPException(422,'Video đã quá cũ để cập nhật giao thông hiện tại.')
@@ -326,11 +337,11 @@ def publish_video(ident:str,user=Depends(operator),db=Depends(get_db)):
 
 @app.get('/api/favorites')
 def favorites(user=Depends(require_user),db=Depends(get_db)):
-    return [{'id':r.id,'name':r.name,'request':r.request} for r in db.scalars(select(Favorite).where(Favorite.user_id==user.id).order_by(Favorite.id.desc()))]
+    return [{'id':r.id,'name':r.name,'request':r.request} for r in db.find(Favorite,{'user_id':user.id},sort=[('id',-1)])]
 
 @app.post('/api/favorites',status_code=201)
 def add_favorite(body:S.FavoriteInput,user=Depends(require_user),db=Depends(get_db)):
-    if db.scalar(select(func.count()).select_from(Favorite).where(Favorite.user_id==user.id)) >= 50: raise HTTPException(422,'Mỗi tài khoản lưu tối đa 50 hành trình.')
+    if db.count(Favorite,{'user_id':user.id}) >= 50: raise HTTPException(422,'Mỗi tài khoản lưu tối đa 50 hành trình.')
     request=body.request.model_dump(mode='json'); request['departure_at']=None
     # Save user's inputs only; no Google geometry or provider results.
     row=Favorite(user_id=user.id,name=body.name,request=request); db.add(row); db.commit()
@@ -342,14 +353,14 @@ def delete_favorite(ident:int,user=Depends(require_user),db=Depends(get_db)):
 
 @app.get('/api/alerts')
 def alerts(user=Depends(require_user),db=Depends(get_db)):
-    rules=[{k:getattr(r,k) for k in ('id','segment_id','density','active')} for r in db.scalars(select(AlertRule).where(AlertRule.user_id==user.id))]
-    notices=[{k:getattr(n,k) for k in ('id','message','read','created_at')} for n in db.scalars(select(Notification).where(Notification.user_id==user.id).order_by(Notification.id.desc()).limit(100))]
+    rules=[{k:getattr(r,k) for k in ('id','segment_id','density','active')} for r in db.find(AlertRule,{'user_id':user.id})]
+    notices=[{k:getattr(n,k) for k in ('id','message','read','created_at')} for n in db.find(Notification,{'user_id':user.id},sort=[('id',-1)],limit=100)]
     return {'rules':rules,'notifications':notices}
 
 @app.post('/api/alerts',status_code=201)
 def add_alert(body:S.RuleInput,user=Depends(require_user),db=Depends(get_db)):
     item(db,Segment,body.segment_id)
-    if db.scalar(select(AlertRule.id).where(AlertRule.user_id==user.id,AlertRule.segment_id==body.segment_id,AlertRule.density==body.density)):
+    if db.find_one(AlertRule,{'user_id':user.id,'segment_id':body.segment_id,'density':body.density}):
         raise HTTPException(409,'Bạn đã theo dõi điều kiện này.')
     row=AlertRule(user_id=user.id,**body.model_dump()); db.add(row); db.commit(); return {'id':row.id}
 
@@ -362,8 +373,8 @@ def read_notification(ident:int,user=Depends(require_user),db=Depends(get_db)):
     row=own(item(db,Notification,ident),user); row.read=True; db.commit(); return {'message':'Đã đánh dấu đã đọc.'}
 
 def report_rows(db,segment_id=None,start=None,end=None):
-    query=select(Observation).order_by(Observation.observed_at.desc()).limit(5000)
-    if segment_id: query=query.where(Observation.segment_id==segment_id)
+    filters={}
+    if segment_id: filters['segment_id']=segment_id
     for value, comparator in ((start,True),(end,False)):
         if value:
             try:
@@ -371,8 +382,8 @@ def report_rows(db,segment_id=None,start=None,end=None):
                 if not parsed.tzinfo: raise ValueError()
             except ValueError: raise HTTPException(422,'Bộ lọc thời gian cần timestamp có múi giờ.')
             normalized=parsed.astimezone(timezone.utc).isoformat()
-            query=query.where(Observation.observed_at >= normalized if comparator else Observation.observed_at <= normalized)
-    return list(db.scalars(query))
+            filters.setdefault('observed_at',{})['$gte' if comparator else '$lte']=normalized
+    return db.find(Observation,filters,sort=[('observed_at',-1)],limit=5000)
 
 @app.get('/api/reports')
 def reports(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(operator),db=Depends(get_db)):
@@ -392,22 +403,22 @@ def export(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=D
 
 @app.get('/api/admin/users')
 def users(q:str='',user=Depends(admin),db=Depends(get_db)):
-    query=select(User).order_by(User.id).limit(200)
-    if q: query=query.where(User.email.ilike(f'%{q[:100]}%') | User.name.ilike(f'%{q[:100]}%'))
-    return [public_user(u) for u in db.scalars(query)]
+    filters={}
+    if q: filters={'$or':[{'email':{'$regex':re.escape(q[:100]),'$options':'i'}},{'name':{'$regex':re.escape(q[:100]),'$options':'i'}}]}
+    return [public_user(u) for u in db.find(User,filters,sort=[('id',1)],limit=200)]
 
 @app.patch('/api/admin/users/{ident}')
 def edit_user(ident:int,body:S.UserUpdate,user=Depends(admin),db=Depends(get_db)):
     row=item(db,User,ident)
     if ident == user.id and (body.role!='admin' or not body.active): raise HTTPException(422,'Không thể tự khóa hoặc hạ quyền quản trị của mình.')
-    row.role=body.role; row.active=body.active
-    db.execute(delete(LoginSession).where(LoginSession.user_id==ident)); audit(db,user.id,'user_updated',f'{ident}: {body.role}, active={body.active}'); db.commit()
+    row=db.update(User,ident,{'role':body.role,'active':body.active},increment={'auth_version':1})
+    db.delete_many(LoginSession,{'user_id':ident}); audit(db,user.id,'user_updated',f'{ident}: {body.role}, active={body.active}'); db.commit()
     return public_user(row)
 
 @app.post('/api/admin/users/{ident}/revoke')
 def revoke(ident:int,user=Depends(admin),db=Depends(get_db)):
-    item(db,User,ident); db.execute(delete(LoginSession).where(LoginSession.user_id==ident)); audit(db,user.id,'sessions_revoked',str(ident)); db.commit(); return {'message':'Đã thu hồi tất cả phiên đăng nhập.'}
+    item(db,User,ident); db.update(User,ident,{},increment={'auth_version':1}); db.delete_many(LoginSession,{'user_id':ident}); audit(db,user.id,'sessions_revoked',str(ident)); db.commit(); return {'message':'Đã thu hồi tất cả phiên đăng nhập.'}
 
 @app.get('/api/admin/system')
 def system(user=Depends(admin),db=Depends(get_db)):
-    return {'model_ready':MODEL_PATH.is_file(),'model_name':MODEL_PATH.name,'google_ready':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'active_jobs':db.scalar(select(func.count()).select_from(VideoJob).where(VideoJob.status.in_(['queued','processing']))),'audit':[{k:getattr(a,k) for k in ('id','user_id','action','detail','created_at')} for a in db.scalars(select(Audit).order_by(Audit.id.desc()).limit(100))]}
+    return {'model_ready':MODEL_PATH.is_file(),'model_name':MODEL_PATH.name,'google_ready':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'active_jobs':db.count(VideoJob,{'status':{'$in':['queued','processing']}}),'audit':[{k:getattr(a,k) for k in ('id','user_id','action','detail','created_at')} for a in db.find(Audit,sort=[('id',-1)],limit=100)]}

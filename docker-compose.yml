@@ -1,16 +1,23 @@
 services:
-  database:
-    image: postgres:16-alpine
+  mongo:
+    image: mongo:8.0
     environment:
-      POSTGRES_DB: smarteye
-      POSTGRES_USER: smarteye
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-smarteye_root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Run scripts/setup_env.py --mode docker first}
+      MONGO_INITDB_DATABASE: ${MONGODB_DB:-smarteye}
+      MONGODB_USERNAME: ${MONGODB_USERNAME:-smarteye_app}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:?Run scripts/setup_env.py --mode docker first}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongo_data:/data/db
+      - ./deploy/mongo-init.js:/docker-entrypoint-initdb.d/01-smarteye.js:ro
+    ports:
+      - "127.0.0.1:${MONGODB_DOCKER_PORT:-27018}:27017"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U smarteye"]
+      test: ["CMD-SHELL", "mongosh --quiet --host 127.0.0.1 --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"quit(db.adminCommand({ping:1}).ok ? 0 : 1)\""]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     restart: unless-stopped
   backend:
     build:
@@ -18,28 +25,38 @@ services:
       dockerfile: Dockerfile.backend
     env_file: .env
     environment:
-      DATABASE_URL: ""
-      DB_ENGINE: postgresql
-      POSTGRES_HOST: database
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: smarteye
-      POSTGRES_USER: smarteye
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      MONGODB_URI: ""
+      MONGODB_HOST: mongo
+      MONGODB_PORT: "27017"
+      MONGODB_DB: ${MONGODB_DB:-smarteye}
+      MONGODB_USERNAME: ${MONGODB_USERNAME:-smarteye_app}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:?Run scripts/setup_env.py --mode docker first}
+      MONGODB_AUTH_SOURCE: ${MONGODB_DB:-smarteye}
+      APP_BASE_URL: http://localhost:8080
       YOLO_MODEL_PATH: /app/backend/data/models/yolo11n.pt
     volumes:
       - ./backend/data:/app/backend/data
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     depends_on:
-      database:
+      mongo:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "8080:80"
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 volumes:
-  postgres_data:
+  mongo_data:

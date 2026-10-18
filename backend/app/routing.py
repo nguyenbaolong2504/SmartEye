@@ -3,7 +3,6 @@ import math
 import os
 import httpx
 from fastapi import HTTPException
-from sqlalchemy import select
 from .models import Segment
 from .traffic import latest_observations
 from .seed import PLACES
@@ -37,7 +36,7 @@ def demo_routes(db, req):
         raise HTTPException(422, 'Chế độ minh họa chỉ hỗ trợ các địa điểm có sẵn trong danh sách.')
     if req.origin.node == req.destination.node:
         raise HTTPException(422, 'Điểm đi và điểm đến phải khác nhau.')
-    segments = list(db.scalars(select(Segment).where(Segment.active.is_(True))))
+    segments = db.find(Segment,{'active':True})
     latest = latest_observations(db)
     adjacency = {}
     speeds = {'LOW':35 if req.mode == 'DRIVE' else 30,'NORMAL':22 if req.mode == 'DRIVE' else 24,'HIGH':9 if req.mode == 'DRIVE' else 12,None:25}
@@ -134,7 +133,7 @@ async def google_routes(db, req):
     if not raw_routes:
         raise HTTPException(404, 'Google không tìm thấy tuyến đường phù hợp.')
     latest = latest_observations(db)
-    segments = {s.id:s for s in db.scalars(select(Segment).where(Segment.active.is_(True),Segment.is_demo.is_(False)))}
+    segments = {s.id:s for s in db.find(Segment,{'active':True,'is_demo':False})}
     routes = []
     for i, raw in enumerate(raw_routes):
         geometry = decode_polyline(raw['polyline']['encodedPolyline'])

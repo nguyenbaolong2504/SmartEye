@@ -49,7 +49,7 @@ def analyze(job_id):
         with SessionLocal() as db:
             job = db.get(VideoJob,job_id)
             if not job or job.status == 'cancelled': return
-            job.status = 'processing'
+            if not db.update(VideoJob,job_id,{'status':'processing'},condition={'status':'queued'}): return
             config = job.camera_config
             db.commit()
         model = get_model()
@@ -93,8 +93,7 @@ def analyze(job_id):
             with SessionLocal() as db:
                 job = db.get(VideoJob,job_id)
                 if not job or job.status == 'cancelled': return
-                job.progress = min(99,round((index+1)/target_count*100))
-                db.commit()
+                db.update(VideoJob,job_id,{'progress':min(99,round((index+1)/target_count*100))},condition={'status':'processing'})
         if not samples: raise ValueError('Video không có khung hình hợp lệ.')
         score = float(np.median([s['score'] for s in samples]))
         distribution = {k:sum(s['density']==k for s in samples) for k in ('LOW','NORMAL','HIGH')}
@@ -102,16 +101,14 @@ def analyze(job_id):
         with SessionLocal() as db:
             job = db.get(VideoJob,job_id)
             if job and job.status != 'cancelled':
-                job.result = result; job.status = 'completed'; job.progress = 100
-                db.commit()
+                db.update(VideoJob,job_id,{'result':result,'status':'completed','progress':100},condition={'status':'processing'})
     except Exception as exc:
         logger.exception('Video analysis failed: %s',job_id)
         with SessionLocal() as db:
             job = db.get(VideoJob,job_id)
             if job and job.status != 'cancelled':
-                job.status = 'failed'
-                job.error = str(exc) if isinstance(exc,(ValueError,RuntimeError)) else 'Không xử lý được video. Kiểm tra trọng số YOLO, codec và bộ nhớ máy chủ.'
-                db.commit()
+                message = str(exc) if isinstance(exc,(ValueError,RuntimeError)) else 'Không xử lý được video. Kiểm tra trọng số YOLO, codec và bộ nhớ máy chủ.'
+                db.update(VideoJob,job_id,{'status':'failed','error':message},condition={'status':{'$in':['queued','processing']}})
     finally:
         if cap: cap.release()
         (UPLOADS / f'{job_id}.video').unlink(missing_ok=True)
