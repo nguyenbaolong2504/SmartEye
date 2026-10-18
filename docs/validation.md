@@ -25,6 +25,8 @@ Lượt E2E đầu timeout ở page.goto đợi load trên desktop; trace cho th
 
 Docker Desktop lỗi quyền truy cập Windows socket dockerInference rồi docker-secrets-engine/engine.sock; Engine chưa hoạt động nên **chưa build/run ba container**. Không suy kết quả Compose runtime từ config validation hoặc MongoDB portable. Google/SMTP thật và Atlas chưa cấu hình nên chưa kiểm tra live; đường tích hợp Google dùng mock. CI đã chuyển sang MongoDB 8.0 service; kết quả CI cần xem trên GitHub sau push.
 
+**Cập nhật khi Docker Engine đã hoạt động, cùng ngày 18/10:** image đã được build trên máy. Kiểm tra thực tế thấy MongoDB/backend healthy, frontend còn Created do cổng 8080 bị process khác sử dụng. Chuyển FRONTEND_PORT sang 8081, ghép APP_BASE_URL backend theo cổng frontend rồi chạy `docker compose up -d --wait` thành công; không đổi MongoDB volume/credentials. Cả ba container Running, MongoDB/backend healthy. Xác minh frontend HTML HTTP 200, `/api/health` qua Nginx HTTP 200/database mongodb, video_available true và đăng nhập/logout đủ ba tài khoản demo với Origin `http://localhost:8081`. Đã mở giao diện thật trong browser và thấy 13 đường/4 camera. Kết quả này thay thế giới hạn chưa chạy Docker ở đoạn trên; chưa xác minh Google/SMTP/Atlas live.
+
 MongoDB kiểm thử có DB riêng; không dùng tài khoản/token/video cá nhân làm fixture. `database/mongodb/` chỉ chứa dữ liệu demo công khai; dữ liệu SQL cũ giữ ở `database/legacy-sql/`, không có migration tự động sang MongoDB.
 
 ## Kết quả ngày 15/10/2026 (giờ Việt Nam)

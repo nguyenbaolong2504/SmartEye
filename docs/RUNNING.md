@@ -202,10 +202,11 @@ Tiếp tục mục 4–5. Host backend/Compass dùng cổng 27018 và auth DB `s
 | Không login được | Đúng origin trong hướng dẫn, COOKIE_SECURE=false khi HTTP; restart backend sau sửa env. |
 | Video thiếu model | Tải bằng đúng môi trường local/container; kiểm tra YOLO_MODEL_PATH. |
 | Port đã dùng | Dừng phiên cũ Ctrl+C hoặc docker compose stop; tránh local/Docker cùng cổng 8000. |
+| Docker không bind được 8080 | Nếu ứng dụng khác đang dùng 8080, đặt `FRONTEND_PORT=8081` trong `.env`, chạy `scripts/setup_env.py --mode docker`, rồi `docker compose up -d --wait`. Mở `http://localhost:8081`; Compose tự cập nhật origin backend theo cổng frontend. |
 | No space left | Giải phóng ổ chứa venv/Docker/data trước khi cài tiếp. |
 | Docker Cannot connect | `docker info` phải có Server; mở Desktop và chờ Engine Running. |
 
-Máy kiểm thử gặp lỗi Docker Desktop `Access is denied` / `The file cannot be accessed by the system` ở socket `Docker/run/dockerInference`, sau đó `docker-secrets-engine/engine.sock`. Đây là lỗi khởi động Docker trước khi project chạy. Khởi động lại Windows/Desktop, kiểm tra docker info; nếu còn lỗi xem [Docker Desktop #448](https://github.com/docker/desktop-feedback/issues/448) và [#531](https://github.com/docker/desktop-feedback/issues/531). Chưa xác minh build/run Compose trên máy này; không factory reset/xóa volume để thử. Dùng portable hoặc Atlas trong lúc xử lý Docker.
+Nếu gặp Docker Desktop `Access is denied` / `The file cannot be accessed by the system` ở socket `Docker/run/dockerInference` hoặc `docker-secrets-engine/engine.sock`, đó là lỗi khởi động Docker trước khi project chạy. Khởi động lại Windows/Desktop, kiểm tra docker info; nếu còn lỗi xem [Docker Desktop #448](https://github.com/docker/desktop-feedback/issues/448) và [#531](https://github.com/docker/desktop-feedback/issues/531). Không factory reset/xóa volume để thử; dùng portable hoặc Atlas trong lúc xử lý Docker. Sau khi Engine hoạt động, đã xác minh cả ba container SmartEye chạy trên máy này; frontend dùng cổng 8081 vì 8080 đang có ứng dụng khác sử dụng. Xem kết quả mới trong [validation.md](validation.md).
 
 ## 9. Kiểm thử (tùy chọn)
 

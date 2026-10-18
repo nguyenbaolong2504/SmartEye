@@ -32,7 +32,7 @@ services:
       MONGODB_USERNAME: ${MONGODB_USERNAME:-smarteye_app}
       MONGODB_PASSWORD: ${MONGODB_PASSWORD:?Run scripts/setup_env.py --mode docker first}
       MONGODB_AUTH_SOURCE: ${MONGODB_DB:-smarteye}
-      APP_BASE_URL: http://localhost:8080
+      APP_BASE_URL: http://localhost:${FRONTEND_PORT:-8080}
       YOLO_MODEL_PATH: /app/backend/data/models/yolo11n.pt
     volumes:
       - ./backend/data:/app/backend/data
