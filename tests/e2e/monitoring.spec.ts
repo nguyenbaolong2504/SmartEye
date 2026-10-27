@@ -28,7 +28,9 @@ test('camera board, road filtering, day/month heatmap and responsive layout',asy
 
 test('retained video, archive, explicit camera sharing and historical chart',async({page,request},testInfo)=>{
   test.setTimeout(90000);
-  const config=await(await request.get('/api/config')).json();
+  const configResponse=await request.get('/api/config');
+  expect(configResponse.ok()).toBe(true);
+  const config=await configResponse.json();
   test.skip(!config.video_available,'YOLO weights required for the real video workflow.');
   execFileSync(process.platform==='win32'?'.venv\\Scripts\\python.exe':'python',['scripts/make_test_video.py','--format','webm']);
   await page.goto('/',{waitUntil:'domcontentloaded'});

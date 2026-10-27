@@ -228,6 +228,6 @@ $env:SMARTEYE_TEST_MONGODB_URI='mongodb://127.0.0.1:27017/'
 Remove-Item Env:SMARTEYE_TEST_MONGODB_URI
 ```
 
-Live tests tự tạo/xóa DB `smarteye_test_<uuid>` riêng, cần user test cho phép tạo/xóa DB này. User Docker readWrite riêng `smarteye` không có quyền đó. E2E dùng `smarteye_e2e`, API 8011/frontend 5174, cần MongoDB thật/model và quyền DB test. Local không auth dùng được ngay; Atlas/app user giới hạn DB cần quyền test riêng. Không test trên dữ liệu triển khai.
+Live tests tự tạo/xóa DB `smarteye_test_<uuid>` riêng, cần user test cho phép tạo/xóa DB này. User Docker readWrite riêng `smarteye` không có quyền đó. E2E desktop/mobile dùng `smarteye_e2e_desktop`/`smarteye_e2e_mobile`, API 8011/8012 và frontend 5174/5175 riêng, cần MongoDB thật/model và quyền DB test. Local không auth dùng được ngay; Atlas/app user giới hạn DB cần quyền test riêng. Không test trên dữ liệu triển khai.
 
 Nguồn: [MongoDB Windows ZIP](https://www.mongodb.com/docs/v8.0/tutorial/install-mongodb-on-windows-zip/), [Compass connections](https://www.mongodb.com/docs/compass/current/connect/), [Docker Official Image Mongo](https://hub.docker.com/_/mongo).

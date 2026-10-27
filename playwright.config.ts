@@ -1,13 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 const python=process.platform==='win32'?'".venv\\Scripts\\python.exe"':'python';
-const externalApi=process.env.SMARTEYE_E2E_API_URL;
 const node=`"${process.execPath}"`;
 export default defineConfig({
   testDir:'./tests/e2e',fullyParallel:false,workers:1,timeout:30000,
   use:{baseURL:'http://127.0.0.1:5174',trace:'retain-on-failure',screenshot:'only-on-failure',timezoneId:'Asia/Ho_Chi_Minh'},
-  projects:[{name:'desktop',use:{...devices['Desktop Chrome']}},{name:'mobile',use:{...devices['iPhone 13'],defaultBrowserType:'chromium'}}],
+  projects:[{name:'desktop',use:{...devices['Desktop Chrome'],baseURL:'http://127.0.0.1:5174'}},{name:'mobile',use:{...devices['iPhone 13'],defaultBrowserType:'chromium',baseURL:'http://127.0.0.1:5175'}}],
   webServer:[
-    ...(!externalApi?[{command:`${python} -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8011`,url:'http://127.0.0.1:8011/api/health',reuseExistingServer:false,env:{MONGODB_DB:'smarteye_e2e',SEED_DEMO:'true',ADMIN_EMAIL:'e2e-admin@example.invalid',ADMIN_PASSWORD:'test-only-password-123',APP_BASE_URL:'http://127.0.0.1:5174'},timeout:60000}]:[]),
-    {command:`${node} node_modules/vite/bin/vite.js build && ${node} node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5174 --strictPort`,url:'http://127.0.0.1:5174',reuseExistingServer:false,env:{API_TARGET:externalApi||'http://127.0.0.1:8011'},timeout:120000}
+    ...([{name:'desktop',api:8011,frontend:5174},{name:'mobile',api:8012,frontend:5175}].map(profile=>({
+      command:`${python} -m uvicorn backend.app.main:app --host 127.0.0.1 --port ${profile.api}`,
+      url:`http://127.0.0.1:${profile.api}/api/health`,reuseExistingServer:false,
+      env:{MONGODB_DB:`smarteye_e2e_${profile.name}`,SEED_DEMO:'true',ADMIN_EMAIL:'e2e-admin@example.invalid',ADMIN_PASSWORD:'test-only-password-123',APP_BASE_URL:`http://127.0.0.1:${profile.frontend}`},timeout:60000
+    }))),
+    {command:`${node} scripts/start_e2e_frontend.mjs`,url:'http://127.0.0.1:5174',reuseExistingServer:false,timeout:120000}
   ]
 });

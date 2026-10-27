@@ -53,6 +53,6 @@ User thường phân tích video của mình; Quản lý chỉ công bố video 
 
 Backend tests có kiểm tra ngày/tháng UTC+7, tháng nhuận, dữ liệu thiếu, nhiều camera/ngưỡng khác nhau, chuẩn hóa ô thời gian, lưu lịch sử, quyền chia sẻ, HTTP Range video và tránh dùng quan sát hiện tại cho giờ tương lai.
 
-E2E kiểm tra trang camera, bộ lọc, biểu đồ tháng, phát WebM sau YOLO, lưu lịch sử và khung giờ lặp lại qua nhiều ngày. E2E sử dụng database `smarteye_e2e` riêng. Có thể đặt `SMARTEYE_E2E_API_URL` để sử dụng backend test trong Docker; không trỏ biến này vào dữ liệu triển khai thật.
+E2E kiểm tra trang camera, bộ lọc, biểu đồ tháng, phát WebM sau YOLO, lưu lịch sử và khung giờ lặp lại qua nhiều ngày. Desktop/mobile dùng DB `smarteye_e2e_desktop`/`smarteye_e2e_mobile`, API 8011/8012 và frontend 5174/5175 riêng, tránh cộng dồn giới hạn truy cập giữa các kịch bản tự động. Không thay đổi giới hạn truy cập của ứng dụng triển khai.
 
 Nếu Windows báo Application Control chặn `torch_python.dll`, sử dụng backend Docker thay vì thay đổi chính sách bảo vệ hệ điều hành. Đảm bảo ổ chứa Docker còn đủ chỗ cho image và quá trình giải nén.

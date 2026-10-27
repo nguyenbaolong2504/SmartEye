@@ -40,7 +40,9 @@ test('responsive layout and public policy dialog',async({page})=>{
 
 test('video upload, real inference and private history',async({page,request})=>{
   test.setTimeout(60000);
-  const config=await (await request.get('/api/config')).json();
+  const configResponse=await request.get('/api/config');
+  expect(configResponse.ok()).toBe(true);
+  const config=await configResponse.json();
   test.skip(!config.video_available,'Download YOLO weights to run the real video workflow.');
   execFileSync(process.platform==='win32'?'.venv\\Scripts\\python.exe':'python',['scripts/make_test_video.py']);
   await page.goto('/');await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await page.getByLabel('Email',{exact:true}).fill('e2e-admin@example.invalid');await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();

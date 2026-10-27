@@ -16,6 +16,8 @@
 
 Ảnh `docs/previews/traffic-month-demo.png` là giao diện dùng dữ liệu tổng hợp trong DB E2E; không phải đánh giá mật độ thực tế của đường trong ảnh. Nguồn camera của phiên bản mới là video tải lên theo lựa chọn người dùng; chưa có URL camera trực tiếp được cung cấp.
 
+CI đầu tiên của bản camera trên Linux có backend/frontend đạt, E2E 13 passed/2 failed/1 skipped do hai profile cùng cộng dồn giới hạn 180 request/phút của một API. Artifact xác nhận HTTP 429 ở hai bài cuối; bài video cuối bị bỏ qua sau khi config trả lỗi. Harness đã tách API/DB/proxy desktop và mobile, giữ nguyên giới hạn production; kiểm tra config phải thành công trước khi quyết định skip bài inference. Kết quả lượt CI tiếp theo cần đọc theo commit tương ứng.
+
 ## Chuyển MongoDB, ngày 18/10/2026
 
 Đây là kết quả của runtime MongoDB hiện tại; các mục SQLite/PostgreSQL phía dưới là lịch sử phiên bản cũ.
