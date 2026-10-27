@@ -32,12 +32,14 @@ Thông tin công khai chỉ dành cho demo. Startup không tự tạo các tài 
 - Đăng ký, đăng nhập, hồ sơ, đổi/reset mật khẩu qua SMTP; cookie HttpOnly, session thu hồi được, RBAC User/Analyst/Admin.
 - Hành trình yêu thích tính lại khi mở; cảnh báo trong ứng dụng, chống lặp 10 phút; báo cáo và CSV.
 - Quản trị user/camera/đường/audit; unique index, TTL token, validation và cập nhật trạng thái video có điều kiện.
+- Trang **Camera & giao thông**: xem ảnh/video đã được cho phép chia sẻ theo từng đường, số xe và trạng thái mới/cũ; nguồn thử là video tải lên.
+- Thống kê **ngày/tháng**, biểu đồ 24 giờ, bản đồ nhiệt ngày × giờ, khung giờ thường mật độ cao có điều kiện đủ dữ liệu. Tìm tuyến có thể tham khảo lịch sử 28 ngày cùng thứ/giờ khi đủ bằng chứng. Xem [hướng dẫn Camera và thống kê](docs/CAMERAS.md).
 
 ## Dữ liệu và phạm vi
 
 Video tối đa 150 MB / 300 giây. Lấy mẫu một ảnh/giây, đếm car/motorcycle/motorbike/bus/truck cả khi đứng yên. Score `min(1,max(occupancy,vehicle_count/capacity))`, occupancy tính hợp bounding box trong ROI. Tổng hợp bằng trung vị score; số xe là hiện diện mỗi ảnh, không phải lưu lượng xe đi qua.
 
-Chỉ Analyst/Admin công bố clip quay trong 15 phút và camera/đường hợp lệ; một video công bố một lần. Video gốc xóa sau xử lý/hủy; ảnh/kết quả giữ đến khi user xóa. Demo có 13 đoạn nối 9 địa điểm, 4 camera, geometry/km/vận tốc minh họa; dữ liệu thiếu/cũ có rủi ro trung tính 0,5.
+Chỉ Analyst/Admin công bố clip mới trong 15 phút; có luồng lưu lịch sử riêng cho clip cũ có thời điểm quay. Một video được đưa vào dữ liệu một lần. Mặc định xóa video gốc sau xử lý/hủy; có thể chọn giữ riêng tư trước phân tích và cho phép chia sẻ riêng sau đó. Xóa kết quả sẽ xóa video/ảnh của clip, giữ số liệu đã công bố. Demo có 13 đoạn nối 9 địa điểm, 4 camera, geometry/km/vận tốc minh họa; dữ liệu thiếu có rủi ro trung tính 0,5.
 
 Chưa có dự báo +5/+10/+15 phút, training pipeline, RTSP hoặc GPS dẫn đường. Detector pretrained COCO và quy tắc mật độ cần nhãn thực để đánh giá cho giao thông Hà Nội.
 

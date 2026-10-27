@@ -42,6 +42,11 @@ class CameraInput(BaseModel):
             raise ValueError('ROI phải nằm trong ảnh và chiếm ít nhất 1% khung hình')
         return self
 
+
+class PublishOptions(BaseModel):
+    share_preview: bool = False
+
+
 class ObservationInput(BaseModel):
     segment_id: int
     score: float = Field(ge=0, le=1)

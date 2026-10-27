@@ -57,11 +57,17 @@ def initialize_database():
         partialFilterExpression={'job_id':{'$type':'string'}}, name='one_publication_per_video')
     database.observations.create_index([('segment_id',ASCENDING),('observed_at',DESCENDING)], name='latest_segment_observation')
     database.observations.create_index('observed_at')
+    database.observations.create_index([('camera_id',1),('observed_at',-1)])
     database.alert_rules.create_index([('user_id',1),('segment_id',1),('density',1)], unique=True, name='unique_user_alert')
     database.video_jobs.create_index([('user_id',1),('created_at',-1)])
     database.video_jobs.create_index('status')
     database.favorites.create_index('user_id')
     database.notifications.create_index([('user_id',1),('created_at',-1)])
+    database.traffic_samples.create_index('sample_key', unique=True, name='unique_traffic_sample')
+    database.traffic_samples.create_index([('segment_id',1),('observed_at',1)])
+    database.traffic_samples.create_index([('camera_id',1),('observed_at',-1)])
+    database.traffic_samples.create_index('observation_id')
+    database.traffic_samples.create_index([('observed_at',-1),('_id',-1)])
     for model in (LoginSession,ResetToken):
         database[model.collection].create_index('expires_on',expireAfterSeconds=0,name='expire_tokens')
     # Synchronize counters after a Compass JSON import. Never move a counter back.

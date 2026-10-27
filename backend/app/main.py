@@ -101,7 +101,7 @@ def own(row, user):
     return row
 
 def job_dict(j,summary=False):
-    result={k:getattr(j,k) for k in ('id','camera_id','filename','status','progress','error','result','observed_at','created_at','camera_config')}
+    result={k:getattr(j,k) for k in ('id','camera_id','filename','status','progress','error','result','observed_at','created_at','camera_config','retain_video','history_published')}
     if summary and j.result:
         result['result']={**j.result,'samples':[]}
     return result
@@ -231,6 +231,8 @@ def add_camera(body:S.CameraInput,user=Depends(admin),db=Depends(get_db)):
 @app.put('/api/cameras/{ident}')
 def edit_camera(ident:int,body:S.CameraInput,user=Depends(admin),db=Depends(get_db)):
     row=item(db,Camera,ident); item(db,Segment,body.segment_id)
+    if row.segment_id!=body.segment_id:
+        row.preview_public=False;row.preview_job_id=None;row.preview_at=None;row.preview_mime=None
     for k,v in body.model_dump().items(): setattr(row,k,v)
     audit(db,user.id,'camera_updated',str(ident)); db.commit(); return camera_dict(row)
 
@@ -254,7 +256,7 @@ async def routes(body:S.RouteRequest,db=Depends(get_db)):
     return await search_routes(db,body)
 
 @app.post('/api/videos',status_code=202)
-async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),file:UploadFile=File(...),user=Depends(require_user),db=Depends(get_db)):
+async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),retain_video:bool=Form(False),file:UploadFile=File(...),user=Depends(require_user),db=Depends(get_db)):
     camera=item(db,Camera,camera_id)
     if not camera.active: raise HTTPException(400,'Camera đã ngừng hoạt động.')
     if not item(db,Segment,camera.segment_id).active: raise HTTPException(400,'Đoạn đường đã ngừng theo dõi.')
@@ -279,7 +281,7 @@ async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),f
                 if size > MAX_UPLOAD: raise HTTPException(413,f'Video tối đa {MAX_UPLOAD//1024//1024} MB.')
                 output.write(chunk)
         if not size: raise HTTPException(422,'Video rỗng.')
-        job=VideoJob(id=ident,user_id=user.id,camera_id=camera.id,filename=filename,observed_at=timestamp,camera_config=camera_dict(camera))
+        job=VideoJob(id=ident,user_id=user.id,camera_id=camera.id,filename=filename,observed_at=timestamp,camera_config=camera_dict(camera),retain_video=retain_video)
         db.add(job); audit(db,user.id,'video_uploaded',ident); db.commit()
     except Exception:
         path.unlink(missing_ok=True); raise
@@ -294,7 +296,9 @@ def videos(user=Depends(require_user),db=Depends(get_db)):
 
 @app.get('/api/videos/{ident}')
 def get_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
-    return job_dict(own(item(db,VideoJob,ident),user))
+    job=own(item(db,VideoJob,ident),user)
+    camera=db.get(Camera,job.camera_id)
+    return {**job_dict(job),'preview_shared':bool(camera and camera.preview_public and camera.preview_job_id==job.id)}
 
 @app.get('/api/videos/{ident}/frames/{second}')
 def frame(ident:str,second:int,user=Depends(require_user),db=Depends(get_db)):
@@ -317,23 +321,25 @@ def delete_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
     if job.status in ('queued','processing'): raise HTTPException(409,'Hãy hủy tác vụ trước khi xóa.')
     for path in UPLOADS.glob(f'{job.id}-*.jpg'): path.unlink(missing_ok=True)
     (UPLOADS/f'{job.id}.video').unlink(missing_ok=True)
+    (UPLOADS/f'{job.id}.retained').unlink(missing_ok=True)
+    from .monitoring import media_folder
+    try:
+        folder=media_folder(job.camera_id,job.id)
+        if folder.is_dir():
+            for shared in folder.iterdir():
+                if shared.is_file(): shared.unlink()
+            folder.rmdir()
+    except ValueError: pass
+    camera=db.get(Camera,job.camera_id)
+    if camera and camera.preview_job_id==job.id:
+        db.update(Camera,camera.id,{'preview_public':False,'preview_job_id':None,'preview_at':None,'preview_mime':None})
     db.delete(job); audit(db,user.id,'video_deleted',ident); db.commit()
     return {'message':'Đã xóa kết quả và ảnh video. Quan sát đã công bố vẫn giữ nguồn gốc.'}
 
 @app.post('/api/videos/{ident}/publish')
-def publish_video(ident:str,user=Depends(operator),db=Depends(get_db)):
-    job=own(item(db,VideoJob,ident),user)
-    if job.status != 'completed' or not job.result: raise HTTPException(409,'Video chưa phân tích xong.')
-    if db.find_one(Observation,{'job_id':ident}): raise HTTPException(409,'Video này đã được công bố.')
-    if not job.observed_at: raise HTTPException(422,'Video chưa có thời điểm ghi hình, chỉ có thể dùng để xem lại.')
-    age=(now()-datetime.fromisoformat(job.observed_at)).total_seconds()
-    if age < 0 or age > TTL_MINUTES*60: raise HTTPException(422,'Video đã quá cũ để cập nhật giao thông hiện tại.')
-    camera=item(db,Camera,job.camera_id)
-    if not camera.active or camera.segment_id != job.camera_config['segment_id']: raise HTTPException(409,'Camera đã đổi đoạn đường hoặc ngừng hoạt động. Hãy phân tích lại.')
-    if not item(db,Segment,camera.segment_id).active: raise HTTPException(409,'Đoạn đường đã ngừng theo dõi.')
-    row=Observation(segment_id=camera.segment_id,camera_id=camera.id,user_id=user.id,job_id=job.id,density=job.result['density'],score=job.result['score'],count=round(job.result['average_count']),source='yolo',note=f'YOLO {job.result["model"]}; video {job.id}',observed_at=job.observed_at)
-    db.add(row); db.flush(); emit_alerts(db,row); audit(db,user.id,'video_published',ident); db.commit()
-    return observation_dict(row)
+def publish_video(ident:str,options:S.PublishOptions|None=None,user=Depends(operator),db=Depends(get_db)):
+    from .monitoring import publish_job
+    return publish_job(db,own(item(db,VideoJob,ident),user),user,options or S.PublishOptions())
 
 @app.get('/api/favorites')
 def favorites(user=Depends(require_user),db=Depends(get_db)):
@@ -422,3 +428,7 @@ def revoke(ident:int,user=Depends(admin),db=Depends(get_db)):
 @app.get('/api/admin/system')
 def system(user=Depends(admin),db=Depends(get_db)):
     return {'model_ready':MODEL_PATH.is_file(),'model_name':MODEL_PATH.name,'google_ready':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'active_jobs':db.count(VideoJob,{'status':{'$in':['queued','processing']}}),'audit':[{k:getattr(a,k) for k in ('id','user_id','action','detail','created_at')} for a in db.find(Audit,sort=[('id',-1)],limit=100)]}
+
+
+from .monitoring import router as monitoring_router
+app.include_router(monitoring_router)

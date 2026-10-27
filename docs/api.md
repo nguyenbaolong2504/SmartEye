@@ -22,6 +22,14 @@ Swagger `/docs` trên backend. Cookie cùng origin, không lưu token trong loca
 | Segments | `POST /api/segments`, `PUT/DELETE /api/segments/{id}` | Admin |
 | Users | `GET /api/admin/users?q=`, `PATCH /api/admin/users/{id}`, `POST /api/admin/users/{id}/revoke` | Admin |
 | System/audit | `GET /api/admin/system` | Admin |
+| Camera board | `GET /api/monitor/cameras` | Public, không trả user ID hay thông tin tệp riêng tư |
+| Shared camera media | `GET /api/monitor/cameras/{id}/frame`, `/{id}/video` | Public chỉ khi đã cho phép chia sẻ, camera/đường còn hoạt động |
+| Retained original | `GET /api/videos/{id}/source` | Own/Admin, HTTP Range |
+| Historical archive | `POST /api/videos/{id}/archive` body `{share_preview:false}` | Own Analyst/Admin, video hoàn tất có thời điểm quay |
+| Change sharing | `POST /api/videos/{id}/share-preview` body `{share_preview:true/false}` | Own Analyst/Admin, đã công bố/lưu lịch sử |
+| Day/month analytics | `GET /api/traffic/history?segment_id=1&period=day&value=2026-10-01` hoặc `period=month&value=2026-10` | Public, thống kê UTC+7 |
+
+Upload nhận thêm form `retain_video=false` mặc định. Publish hiện tại nhận body tùy chọn `{share_preview:false}`; mặc định giữ ảnh/video riêng tư. Archive cho phép video cũ, không biến thời điểm tải lên thành thời điểm quay. Xem [CAMERAS.md](CAMERAS.md) về nguồn dữ liệu, quyền chia sẻ, độ phủ và điều kiện khung giờ lặp lại.
 
 Reports: `segment_id`, `start`, `end` ISO timestamp có timezone. Server UTC, UI giờ Việt Nam. Favorite chỉ input, không polyline/ETA. Job UUID; ảnh giây 0/10/20/…
 

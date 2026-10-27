@@ -7,6 +7,19 @@ from .models import Segment
 from .traffic import latest_observations
 from .seed import PLACES
 from .db import stamp
+from .db import now
+from .history import historical_evidence
+from types import SimpleNamespace
+
+
+def route_evidence(db,req,segments):
+    future = bool(req.departure_at and (req.departure_at-now()).total_seconds()>300)
+    result = {} if future else latest_observations(db)
+    missing = [s.id for s in segments if s.id not in result]
+    if missing:
+        patterns = historical_evidence(db.database,missing,req.departure_at or now())
+        result.update({sid:SimpleNamespace(**row) for sid,row in patterns.items()})
+    return result
 
 def rank_routes(routes, weights):
     total = sum(weights.values())
@@ -37,7 +50,7 @@ def demo_routes(db, req):
     if req.origin.node == req.destination.node:
         raise HTTPException(422, 'Điểm đi và điểm đến phải khác nhau.')
     segments = db.find(Segment,{'active':True})
-    latest = latest_observations(db)
+    latest = route_evidence(db,req,segments)
     adjacency = {}
     speeds = {'LOW':35 if req.mode == 'DRIVE' else 30,'NORMAL':22 if req.mode == 'DRIVE' else 24,'HIGH':9 if req.mode == 'DRIVE' else 12,None:25}
     for seg in segments:
@@ -74,7 +87,7 @@ def demo_routes(db, req):
             risk += seg.distance_km*({'LOW':.05,'NORMAL':.35,'HIGH':1,None:.5}[density])
             high_km += seg.distance_km if density == 'HIGH' else 0
             unknown_km += seg.distance_km if density is None else 0
-            details.append({'id':seg.id,'name':seg.name,'distance_km':seg.distance_km,'density':density,'source':ob.source if ob else None,'geometry':points})
+            details.append({'id':seg.id,'name':seg.name,'distance_km':seg.distance_km,'density':density,'source':ob.source if ob else None,'geometry':points,'evidence_days':getattr(ob,'evidence_days',None)})
         routes.append({'id':f'demo-{index}','name':' → '.join(s.name for s,_ in edges),'duration_seconds':round(minutes*60),'distance_km':round(distance,2),'risk':round(risk/distance,3),'high_share':round(high_km/distance,3),'unknown_share':round(unknown_km/distance,3),'geometry':geometry,'segments':details,'traffic_intervals':[]})
     return routes
 
@@ -132,8 +145,8 @@ async def google_routes(db, req):
     raw_routes = response.json().get('routes', [])
     if not raw_routes:
         raise HTTPException(404, 'Google không tìm thấy tuyến đường phù hợp.')
-    latest = latest_observations(db)
     segments = {s.id:s for s in db.find(Segment,{'active':True,'is_demo':False})}
+    latest = route_evidence(db,req,list(segments.values()))
     routes = []
     for i, raw in enumerate(raw_routes):
         geometry = decode_polyline(raw['polyline']['encodedPolyline'])
@@ -158,7 +171,7 @@ async def google_routes(db, req):
             if not seg: continue
             middle = [(seg.geometry[0][0]+seg.geometry[-1][0])/2,(seg.geometry[0][1]+seg.geometry[-1][1])/2]
             if all(point_distance_to_line(p,geometry) <= 80 for p in [*seg.geometry,middle]):
-                matches.append({'id':sid,'name':seg.name,'density':ob.density,'source':ob.source,'distance_km':seg.distance_km,'geometry':seg.geometry})
+                matches.append({'id':sid,'name':seg.name,'density':ob.density,'source':ob.source,'distance_km':seg.distance_km,'geometry':seg.geometry,'evidence_days':getattr(ob,'evidence_days',None)})
         # Camera observations affect risk, never overwrite the provider's measured ETA.
         if matches:
             camera_risk = max({'LOW':.05,'NORMAL':.35,'HIGH':1}[s['density']] for s in matches)
@@ -173,4 +186,6 @@ async def search_routes(db, req):
     reason = f'Tuyến được chọn có ETA {round(best["duration_seconds"]/60)} phút, dài {best["distance_km"]} km; điểm tổng hợp {best["score"]:.3f} theo trọng số của bạn.'
     if best['unknown_share']:
         reason += f' {round(best["unknown_share"]*100)}% tuyến chưa có dữ liệu giao thông; chưa thể khẳng định không tắc.'
-    return {'provider':req.provider,'generated_at':stamp(),'routes':routes,'recommendation':{'route_id':best['id'],'reason':reason},'notice':'Mạng đường, khoảng cách và ETA minh họa; không dùng để dẫn đường thực tế.' if req.provider == 'demo' else 'ETA do Google cung cấp. Dữ liệu camera bổ sung rủi ro theo vị trí; mật độ cao không đồng nghĩa chắc chắn ùn tắc.','future_notice':'Quan sát camera phản ánh hiện tại, chưa phải dự báo tại giờ khởi hành.' if req.departure_at else None}
+    if any(s.get('source')=='historical' for s in best['segments']):
+        reason += ' Có sử dụng thống kê 28 ngày gần nhất cùng thứ và giờ; đây là tham khảo lịch sử.'
+    return {'provider':req.provider,'generated_at':stamp(),'routes':routes,'recommendation':{'route_id':best['id'],'reason':reason},'notice':'Mạng đường, khoảng cách và ETA minh họa; không dùng để dẫn đường thực tế.' if req.provider == 'demo' else 'ETA do Google cung cấp. Dữ liệu camera bổ sung rủi ro theo vị trí; mật độ cao không đồng nghĩa chắc chắn ùn tắc.','future_notice':'Với giờ khởi hành cách hiện tại trên 5 phút, camera chỉ đóng góp thống kê lịch sử đủ dữ liệu cùng thứ/giờ; chưa phải dự báo chắc chắn.' if req.departure_at else None}

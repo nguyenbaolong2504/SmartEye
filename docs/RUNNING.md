@@ -79,7 +79,7 @@ cd C:\Users\Admin\Documents\GitHub\SmartEye
 .venv\Scripts\python.exe scripts/init_db.py --demo-accounts
 ```
 
-Kỳ vọng ping thành công, 11 collection nghiệp vụ + `counters`, 3 tài khoản, 13 đường và 4 camera. Script chạy lại được, giữ tài khoản cũ. Startup API không tự tạo tài khoản demo. Refresh Compass. Xem [danh sách collection](../database/README.md).
+Kỳ vọng ping thành công, 12 collection nghiệp vụ + `counters`, 3 tài khoản, 13 đường và 4 camera. Script chạy lại được, giữ tài khoản cũ. Startup API không tự tạo tài khoản demo. Refresh Compass. Xem [danh sách collection](../database/README.md).
 
 | Vai trò | Email | Mật khẩu demo |
 |---|---|---|
@@ -133,6 +133,8 @@ Start-Process http://127.0.0.1:5173
 Kỳ vọng health `status=ok`, `database=mongodb`. Website: [127.0.0.1:5173](http://127.0.0.1:5173). Swagger: [127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Dùng `127.0.0.1` nhất quán với APP_BASE_URL để cookie/Origin đúng. Vite proxy `/api`; browser không gọi DB trực tiếp.
 
 Đăng nhập → tìm tuyến chế độ minh họa → tải video → đợi xử lý → xem mật độ. Admin cấu hình camera/đường, Analyst/Admin công bố clip mới. Không cần Google/SMTP key cho demo.
+
+Trang mới **Camera & giao thông** dùng video tải lên đã cho phép chia sẻ, thống kê từng đường theo ngày/tháng và khung giờ thường mật độ cao. Clip cũ có thể dùng **Lưu vào lịch sử** sau khi khai báo thời điểm quay. Xem [hướng dẫn chi tiết](CAMERAS.md).
 
 Những lần sau chỉ khởi động MongoDB (nếu portable), backend và frontend; không cài/seed/tải model lại.
 

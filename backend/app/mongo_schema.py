@@ -9,6 +9,10 @@ NUMBER={'bsonType':['int','long','double','decimal']}
 INTEGER={'bsonType':['int','long']}
 BOOL={'bsonType':'bool'}
 SCHEMAS={
+    'traffic_samples':validator(['sample_key','segment_id','observed_at','score','density','count','source'],{
+        'sample_key':TEXT,'segment_id':INTEGER,'observed_at':TEXT,
+        'score':{**NUMBER,'minimum':0,'maximum':1},'count':{**INTEGER,'minimum':0},
+        'density':{'enum':['LOW','NORMAL','HIGH']},'source':TEXT}),
     'users':validator(['email','name','password','role','active','created_at'],{
         'email':TEXT,'name':TEXT,'password':TEXT,'role':{'enum':['user','analyst','admin']},'active':BOOL,'auth_version':INTEGER,'created_at':TEXT}),
     'segments':validator(['name','start_node','end_node','distance_km','geometry','active','is_demo'],{

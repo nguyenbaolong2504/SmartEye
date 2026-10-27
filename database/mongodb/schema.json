@@ -1,4 +1,66 @@
 {
+  "traffic_samples": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "sample_key",
+        "segment_id",
+        "observed_at",
+        "score",
+        "density",
+        "count",
+        "source"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "sample_key": {
+          "bsonType": "string"
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "observed_at": {
+          "bsonType": "string"
+        },
+        "score": {
+          "bsonType": [
+            "int",
+            "long",
+            "double",
+            "decimal"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "count": {
+          "bsonType": [
+            "int",
+            "long"
+          ],
+          "minimum": 0
+        },
+        "density": {
+          "enum": [
+            "LOW",
+            "NORMAL",
+            "HIGH"
+          ]
+        },
+        "source": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
   "users": {
     "$jsonSchema": {
       "bsonType": "object",

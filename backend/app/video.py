@@ -45,6 +45,7 @@ def summarize_boxes(boxes, roi, capacity, width, height):
 
 def analyze(job_id):
     cap = None
+    completed = False
     try:
         with SessionLocal() as db:
             job = db.get(VideoJob,job_id)
@@ -98,10 +99,13 @@ def analyze(job_id):
         score = float(np.median([s['score'] for s in samples]))
         distribution = {k:sum(s['density']==k for s in samples) for k in ('LOW','NORMAL','HIGH')}
         result = {'samples':samples,'density':classify(score,config['low_threshold'],config['high_threshold']),'score':round(score,4),'average_count':round(float(np.mean([s['count'] for s in samples])),1),'peak_count':max(s['count'] for s in samples),'duration_seconds':round(duration,1),'distribution':distribution,'model':MODEL_PATH.name,'sample_rate':1,'note':'Mật độ được phân loại theo ngưỡng camera, không phải xác suất ùn tắc hay tốc độ xe.'}
+        cap.release();cap=None
         with SessionLocal() as db:
             job = db.get(VideoJob,job_id)
             if job and job.status != 'cancelled':
-                db.update(VideoJob,job_id,{'result':result,'status':'completed','progress':100},condition={'status':'processing'})
+                if job.retain_video:
+                    (UPLOADS/f'{job_id}.video').replace(UPLOADS/f'{job_id}.retained')
+                completed = bool(db.update(VideoJob,job_id,{'result':result,'status':'completed','progress':100},condition={'status':'processing'}))
     except Exception as exc:
         logger.exception('Video analysis failed: %s',job_id)
         with SessionLocal() as db:
@@ -112,6 +116,7 @@ def analyze(job_id):
     finally:
         if cap: cap.release()
         (UPLOADS / f'{job_id}.video').unlink(missing_ok=True)
+        if not completed: (UPLOADS/f'{job_id}.retained').unlink(missing_ok=True)
 
 def submit(job_id):
     return executor.submit(analyze,job_id)

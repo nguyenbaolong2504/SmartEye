@@ -81,6 +81,28 @@ class Camera(Document):
     low_threshold: float = .25
     high_threshold: float = .6
     roi: list = field(default_factory=lambda:[0,0,1,1])
+    preview_public: bool = False
+    preview_at: str | None = None
+    preview_source: str | None = None
+    preview_job_id: str | None = None
+    preview_mime: str | None = None
+
+
+@dataclass(kw_only=True)
+class TrafficSample(Document):
+    collection: ClassVar[str] = 'traffic_samples'
+    sample_key: str
+    segment_id: int
+    observed_at: str
+    score: float
+    density: str
+    count: int
+    source: str
+    camera_id: int | None = None
+    observation_id: int | None = None
+    job_id: str | None = None
+    occupancy: float | None = None
+    vehicle_counts: dict = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)
@@ -112,6 +134,8 @@ class VideoJob(Document):
     result: dict | None = None
     observed_at: str | None = None
     created_at: str = field(default_factory=timestamp)
+    retain_video: bool = False
+    history_published: bool = False
 
 
 @dataclass(kw_only=True)
@@ -152,4 +176,4 @@ class Audit(Document):
 
 
 ALL_MODELS = (User, LoginSession, ResetToken, Segment, Camera, Observation,
-              VideoJob, Favorite, AlertRule, Notification, Audit)
+              VideoJob, Favorite, AlertRule, Notification, Audit, TrafficSample)

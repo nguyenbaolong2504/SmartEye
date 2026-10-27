@@ -5,6 +5,17 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Camera và thống kê ngày/tháng, ngày 27/10/2026
+
+- Backend: **72 passed** với MongoDB 8.0.32 thật, chạy cô lập tại localhost:27019 với data test ở ổ D. Có kiểm tra lịch UTC+7/tháng nhuận, chuẩn hóa ô 5 phút, ngưỡng từng camera, điều kiện lặp lại nhiều ngày, lưu lịch sử, giữ/xóa/chia sẻ video, HTTP Range và nối lịch sử cùng thứ/giờ vào API tìm tuyến.
+- Hai bài worker kiểm tra OpenCV đọc video thật và chính sách giữ/xóa tệp; detector được thay bằng stub riêng trong unit test. Không dùng kết quả này làm bằng chứng inference YOLO thật.
+- **12 E2E passed** trên Chromium desktop và mobile: camera board/bộ lọc, ngày/tháng/bản đồ nhiệt, khung giờ lặp lại qua 3 ngày, cùng các luồng tìm tuyến/tài khoản/quản trị cũ. Dữ liệu lịch sử minh họa chỉ được tạo trong `smarteye_e2e`, không vào DB triển khai.
+- Frontend: TypeScript strict và Vite production build passed. E2E dùng bản production preview để tránh phụ thuộc lượt biến đổi Vite dev lạnh trên Windows.
+- Có 4 E2E liên quan inference thật/phát video sau inference (2 luồng × desktop/mobile) chưa hoàn tất trong lượt xác minh cuối. Windows báo WinError 4551 Application Control chặn torch_python.dll. Build Docker để chuyển inference sang Linux đã cài xong dependency và export frontend, nhưng thất bại giải nén backend khi ổ C đầy; Engine chuyển filesystem chỉ đọc.
+- Đã sao lưu 824 MiB cache tải pip sang `D:\Temp\SmartEye-build-cache-backup`, giữ venv, source, DB và video. Docker sau restart còn lỗi socket dockerInference/docker-secrets-engine; không sửa ACL, tắt Application Control hoặc factory reset. Chưa xác nhận deploy chạy bản mới trên Docker local sau lỗi này. Kết quả CI Linux cần xem riêng sau push.
+
+Ảnh `docs/previews/traffic-month-demo.png` là giao diện dùng dữ liệu tổng hợp trong DB E2E; không phải đánh giá mật độ thực tế của đường trong ảnh. Nguồn camera của phiên bản mới là video tải lên theo lựa chọn người dùng; chưa có URL camera trực tiếp được cung cấp.
+
 ## Chuyển MongoDB, ngày 18/10/2026
 
 Đây là kết quả của runtime MongoDB hiện tại; các mục SQLite/PostgreSQL phía dưới là lịch sử phiên bản cũ.

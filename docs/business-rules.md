@@ -4,12 +4,11 @@ Yêu cầu cuối của tài liệu nguồn rút gọn thành video, ba mức m�
 
 | Actor | Quyền |
 |---|---|
-| Khách | Xem đường/camera, tìm tuyến, điều khoản |
-| User | Quyền khách; hồ sơ, video của mình, favorite, cảnh báo |
-| Analyst | Quan sát thủ công, công bố video của mình, báo cáo |
-| Admin | User/camera/đường/phiên/audit và kiểm duyệt video |
-| Google | Tính tuyến/ETA/tốc độ; không truy cập DB |
-| Worker | Nhận dạng xe từ video được tải lên |
+| Người dùng (User) | Tra cứu đường/camera, tìm tuyến, điều khoản; đăng nhập để quản lý hồ sơ, video của mình, favorite, cảnh báo |
+| Quản lý (role analyst) | Quyền User; quan sát thủ công, công bố video của mình, thống kê và báo cáo |
+| Admin | Quyền nghiệp vụ, quản lý user/camera/đường/phiên/audit và video thuộc quyền quản trị |
+
+Sơ đồ Actor nghiệp vụ dùng ba nhóm trên. Google là dịch vụ tích hợp; worker YOLO là thành phần xử lý nội bộ. Chức năng công khai vẫn sử dụng được trước đăng nhập.
 
 ## Tìm tuyến
 
@@ -22,7 +21,7 @@ A/B → phương tiện/nguồn/giờ → ưu tiên → validation → tuyến �
 - Mật độ cao chỉ là rủi ro. Không hứa một tuyến đồng thời ngắn nhất và nhanh nhất khi tiêu chí mâu thuẫn.
 - Thiếu quan sát không phải LOW, không phải lớp mật độ thứ tư.
 - Thay tham số cần tìm lại; favorite giữ input, tính ETA mới khi mở.
-- Camera hiện tại không phải forecast giờ tương lai; UI nêu rõ.
+- Giờ khởi hành cách hiện tại trên 5 phút chỉ dùng camera dưới dạng lịch sử đủ bằng chứng: 28 ngày gần nhất, cùng thứ/giờ. UI ghi rõ tham khảo lịch sử, chưa phải forecast được huấn luyện.
 - Chấp nhận Google trả một tuyến, không tạo tuyến thay thế giả.
 
 ## Video
@@ -36,7 +35,12 @@ Login → camera → file/thời điểm → queued → processing → completed
 - Camera đổi đoạn/ngừng: job cũ không publish được.
 - Đổi geometry đường đã có quan sát: tạo đường mới để bảo toàn lịch sử.
 - Restart: job chưa xong thành failed có giải thích, user tải lại.
-- Raw video xóa sau xử lý/hủy. Ảnh/kết quả riêng tư; xóa kết quả vẫn giữ observation đã công bố.
+- Mặc định xóa raw video sau xử lý/hủy. Người tải có thể chọn giữ video riêng tư trước phân tích. Quản lý/Admin xác nhận chia sẻ riêng để ảnh/video xuất hiện trên trang Camera. Xóa kết quả xóa cả video giữ lại và ảnh/video chia sẻ, vẫn giữ observation/mẫu số liệu đã công bố.
+- Video cũ có thời điểm quay được lưu qua Archive; không cần trong 15 phút và không làm mới trạng thái hiện tại. Cả Publish/Archive lưu mẫu theo thời điểm bắt đầu cộng số giây trong clip, không theo thời điểm tải lên.
+
+## Camera và lịch sử ngày/tháng
+
+Trang Camera dùng nguồn video tải lên đã được cho phép chia sẻ, có thời điểm quay rõ; chưa tích hợp nguồn RTSP trực tiếp. Thống kê UTC+7 theo đường/ngày/tháng; ô thiếu dữ liệu giữ trống. Mẫu được gộp theo camera và ô 5 phút, rồi chọn mức mật độ cao nhất của camera trên cùng đường. Mỗi ô đường chỉ có một trọng số. Khung giờ lặp lại cần 3 ngày có ít nhất 3 ô/ngày và tổng 12 ô; danh sách giờ thường mật độ cao chỉ lấy các giờ có từ 50% ô HIGH. Dữ liệu kiểm thử không được đưa vào DB vận hành. Xem [CAMERAS.md](CAMERAS.md).
 
 ## Cảnh báo/tài khoản
 

@@ -22,7 +22,7 @@ Docker đầy đủ: `docker compose exec backend python scripts/init_db.py --de
 
 Script chỉ thêm user chưa tồn tại, giữ password/role/active cũ. Startup không tự tạo các tài khoản này; demo bị từ chối ở production. Bản thật dùng `scripts/create_admin.py`. Password web là scrypt hash có salt, không thể đọc lại password gốc từ DB; khác DB username/password.
 
-## 11 collection nghiệp vụ + 1 kỹ thuật
+## 12 collection nghiệp vụ + 1 kỹ thuật
 
 MongoDB dùng collection/document, tương ứng vai trò bảng/bản ghi trong SQL.
 
@@ -39,6 +39,7 @@ MongoDB dùng collection/document, tương ứng vai trò bảng/bản ghi trong
 | alert_rules | Đường/mức theo dõi, active, last_sent | users, segments |
 | notifications | Nội dung, read, created_at | users |
 | audit | user_id, action, detail, created_at | users |
+| traffic_samples | Mẫu mật độ theo thời điểm quay, số xe, camera, observation_id, sample_key unique | segments, cameras, observations |
 | counters | Sequence ID tăng nguyên tử | Kỹ thuật |
 
 Mongo dùng `_id`, API giữ `id` số; video dùng UUID string, session/reset dùng token hash string. Geometry/ROI là mảng; request/config/result là document. Binary video/ảnh/model ở `backend/data`, không lưu trong Mongo.
@@ -57,7 +58,7 @@ Refresh sau init. Trong users, Project `{ "email": 1, "name": 1, "role": 1, "act
 
 ## JSON mẫu cho Compass (tùy chọn)
 
-`mongodb/` có 11 file collection JSON, counters.json và schema.json. Fixture sạch: 3 user demo, 13 đường, 4 camera; session/token/video/quan sát riêng tư trống. Không dump từ DB làm việc. Hash tương ứng password demo công khai.
+`mongodb/` có 12 file collection JSON, counters.json và schema.json. Fixture sạch: 3 user demo, 13 đường, 4 camera; session/token/video/quan sát/mẫu lịch sử riêng tư trống. Không dump từ DB làm việc. Hash tương ứng password demo công khai. Không tạo số liệu ngày/tháng giả trong DB mẫu.
 
 Khuyến nghị dùng init_db.py. Nếu muốn import thủ công, dùng DB mới `smarteye_import_demo`, sửa MONGODB_DB trong `.env`, chạy init_db.py trước để có validator/index. Trong Compass chỉ import users.json vào users bằng Add Data → Import JSON; đường/camera đã có từ init, không import trùng. Các array rỗng không cần import. Chạy init_db.py lại để đồng bộ counters theo ID lớn nhất.
 
