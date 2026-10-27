@@ -18,6 +18,8 @@
 
 CI đầu tiên của bản camera trên Linux có backend/frontend đạt, E2E 13 passed/2 failed/1 skipped do hai profile cùng cộng dồn giới hạn 180 request/phút của một API. Artifact xác nhận HTTP 429 ở hai bài cuối; bài video cuối bị bỏ qua sau khi config trả lỗi. Harness đã tách API/DB/proxy desktop và mobile, giữ nguyên giới hạn production; kiểm tra config phải thành công trước khi quyết định skip bài inference. Kết quả lượt CI tiếp theo cần đọc theo commit tương ứng.
 
+**CI Linux đã xác minh thành công:** [run 40475344305](https://github.com/nguyenbaolong2504/SmartEye/actions/runs/40475344305), commit `9a91dd8`, cả backend, frontend và E2E đều success. E2E **16 passed (47.3s), không skip**, bao gồm upload/inference YOLO thật, giữ video, lưu lịch sử, chia sẻ và trình duyệt phát WebM trên desktop/mobile. Backend có 72 bài, frontend production build đạt. Kết quả CI xác nhận luồng phần mềm trên Linux; bản Docker local vẫn chờ người dùng xử lý sau theo lựa chọn trong phiên làm việc.
+
 ## Chuyển MongoDB, ngày 18/10/2026
 
 Đây là kết quả của runtime MongoDB hiện tại; các mục SQLite/PostgreSQL phía dưới là lịch sử phiên bản cũ.
