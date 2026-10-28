@@ -68,11 +68,14 @@ def initialize_database():
     database.traffic_samples.create_index([('camera_id',1),('observed_at',-1)])
     database.traffic_samples.create_index('observation_id')
     database.traffic_samples.create_index([('observed_at',-1),('_id',-1)])
+    database.traffic_labels.create_index([('segment_id',1),('observed_at',1)],unique=True)
+    database.forecast_runs.create_index('lock_key',unique=True,partialFilterExpression={'running':True},name='one_training_job')
+    database.forecast_runs.create_index([('created_at',-1)])
     for model in (LoginSession,ResetToken):
         database[model.collection].create_index('expires_on',expireAfterSeconds=0,name='expire_tokens')
     # Synchronize counters after a Compass JSON import. Never move a counter back.
     for model in ALL_MODELS:
-        if model.primary != 'id' or model.collection == 'video_jobs': continue
+        if model.primary != 'id' or model.collection in ('video_jobs','forecast_runs','forecast_registry'): continue
         largest = database[model.collection].find_one({'_id':{'$type':'number'}},sort=[('_id',-1)])
         database.counters.update_one({'_id':model.collection},{'$max':{'seq':largest['_id'] if largest else 0}},upsert=True)
 

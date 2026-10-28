@@ -42,7 +42,7 @@ def build(output_directory):
             document['_id']=document.pop(row.primary)
             documents.append(document)
         (output/f'{name}.json').write_text(json.dumps(documents,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
-        if name not in ('sessions','reset_tokens','video_jobs'):
+        if name not in ('sessions','reset_tokens','video_jobs','forecast_runs','forecast_registry'):
             counters.append({'_id':name,'seq':len(rows)})
     (output/'counters.json').write_text(json.dumps(counters,indent=2)+'\n',encoding='utf-8',newline='\n')
     (output/'schema.json').write_text(json.dumps(SCHEMAS,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')

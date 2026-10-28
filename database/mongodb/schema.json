@@ -1,4 +1,123 @@
 {
+  "forecast_runs": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "target",
+        "segment_ids",
+        "status",
+        "running"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "target": {
+          "enum": [
+            "density",
+            "congestion"
+          ]
+        },
+        "segment_ids": {
+          "bsonType": "array"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "training",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "running": {
+          "bsonType": "bool"
+        }
+      }
+    }
+  },
+  "traffic_labels": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "segment_id",
+        "observed_at",
+        "state",
+        "reviewer_id",
+        "note"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "observed_at": {
+          "bsonType": "string"
+        },
+        "state": {
+          "enum": [
+            "FREE",
+            "SLOW",
+            "JAM"
+          ]
+        },
+        "reviewer_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "note": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
+  "forecast_registry": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "run_id",
+        "activated_by",
+        "activated_at"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "run_id": {
+          "bsonType": "string"
+        },
+        "activated_by": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "activated_at": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
   "traffic_samples": {
     "$jsonSchema": {
       "bsonType": "object",

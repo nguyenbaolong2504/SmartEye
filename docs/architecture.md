@@ -35,7 +35,7 @@ Geometry JSON `[lat,lng]`. Google matching yêu cầu các điểm của đoạn
 
 `initialize_database()` tạo collection mới với JSONSchema, index unique/history và TTL token. DB standalone hoặc Atlas đều dùng được; không yêu cầu replica set vì hiện không dùng transaction nhiều document. Collection đã tồn tại không tự thay validator; thay đổi schema sau cần migration có chủ đích.
 
-JSON mẫu nằm trong `database/mongodb/`, builder chỉ xuất fixture sạch. `scripts/init_db.py` khởi tạo DB đã cấu hình, có `--demo-accounts` riêng cho development và không ghi đè tài khoản cũ. Có 12 collection nghiệp vụ + counters; xem `database/README.md`. `database_config.py` hỗ trợ MongoDB URI/SRV hoặc host/port/username/password, tự encode thông tin xác thực khi ghép URI từ các trường riêng. SQL cũ chỉ lưu lịch sử, không tham gia runtime.
+JSON mẫu nằm trong `database/mongodb/`, builder chỉ xuất fixture sạch. `scripts/init_db.py` khởi tạo DB đã cấu hình, có `--demo-accounts` riêng cho development và không ghi đè tài khoản cũ. Có 15 collection nghiệp vụ + counters; xem `database/README.md`. `database_config.py` hỗ trợ MongoDB URI/SRV hoặc host/port/username/password, tự encode thông tin xác thực khi ghép URI từ các trường riêng. SQL cũ chỉ lưu lịch sử, không tham gia runtime.
 
 `traffic_samples` lưu chuỗi mẫu đã được công bố theo thời điểm quay; dữ liệu cũ chỉ có observation vẫn được thống kê bằng fallback, tránh đếm trùng khi có mẫu chi tiết. API lịch sử chuẩn hóa theo camera/ô 5 phút và múi giờ UTC+7. Mẫu được đọc qua index và cộng dồn trong bộ nhớ theo ô, không giữ toàn bộ khung hình thô trong RAM. Tuyến khởi hành sau trên 5 phút chỉ tham khảo lịch sử đủ số ngày cùng thứ/giờ, không dùng camera hiện tại như dự báo. Xem `docs/CAMERAS.md`.
 
@@ -44,3 +44,5 @@ Mỗi ghi MongoDB atomic trên một document; liên kết collection do API ki�
 Một ThreadPoolExecutor và model có lock; tên file UUID, không dùng đường dẫn user. Kết quả samples JSON; ảnh mỗi 10 giây. Worker cập nhật progress và kiểm tra cancel từng frame. Deploy một process; nâng Celery/Redis khi cần nhiều máy/phục hồi jobs. Process kill có thể để orphan JPEG: cần chính sách dọn storage khi vận hành dài hạn.
 
 Demo heap tìm tối đa 3 simple paths theo ETA trong graph nhỏ, không phải optimizer toàn Hà Nội. Google chỉ so route candidates provider trả; risk traffic theo độ dài polyline, camera bổ sung risk, giữ ETA. Score chỉ so trong một yêu cầu, không so tuyệt đối giữa các lần khác thời điểm.
+
+Mô-đun dự báo: forecast_data tạo cửa sổ 5 phút / 60 phút, forecast_ml huấn luyện XGBoost CPU và GRU PyTorch, forecast_api quản lý dữ liệu/nhãn/tác vụ/kích hoạt. Một worker dự báo riêng; artifact giữ trong backend/data/forecasts. Mô hình phải vượt kiểm tra theo thời gian, baseline và phạm vi từng tuyến trước khi phục vụ. Xem docs/FORECASTING.md.

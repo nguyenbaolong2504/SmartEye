@@ -5,6 +5,14 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Dự báo XGBoost / GRU và giao diện, ngày 29/10/2026
+
+- Backend: **94 passed, không skip** trên MongoDB 8.0.32 thật ở localhost:27019, DB tạm tự tạo/xóa theo bài. Có huấn luyện CPU XGBoost và GRU thật, lưu/nạp trọng số, phục vụ dự báo qua API và kiểm tra kích hoạt. Đây là dữ liệu tổng hợp cô lập cho kiểm thử phần mềm, không phải mô hình đã đánh giá tại Hà Nội.
+- Kiểm tra cửa sổ liên tiếp, thiếu dữ liệu, mốc nhãn tương lai, khoảng cách train/validation/test, nhãn ùn tắc độc lập, preview/commit CSV và CSV nhãn, quyền operator/Admin, khóa huấn luyện, hủy tác vụ, tệp thiếu và phạm vi từng tuyến. Tìm tuyến chỉ ghép dự báo đúng thời điểm.
+- TypeScript strict / Vite production build đạt. Toàn bộ **22 E2E desktop/mobile đạt**, bao gồm YOLO thật, archive, chia sẻ/phát video, camera, thống kê, tài khoản và các màn hình mới. Sáu bài của trang dự báo được chạy thêm sau khi bổ sung CSV nhãn và tự làm mới; đạt đủ.
+- Kiểm thử thẻ dự báo có kết quả dùng API contract fixture riêng, không ghi dự báo giả vào database. Ảnh preview là giao diện với mạng đường demo/DB E2E; không phải kết luận giao thông thực địa.
+- Tệp model/dataset không commit; source không kèm forecast model đã huấn luyện cho Hà Nội. Nâng cấp tự thêm ba collection, giữ dữ liệu và tài khoản hiện có. Chưa xác minh triển khai bản mới trong Docker local; ổ C chỉ còn khoảng 0,7 GB ở thời điểm kiểm tra. CI Linux cần xem theo commit sau push.
+
 ## Docker và đăng nhập, ngày 28/10/2026
 
 - Docker local đã chạy lại: MongoDB và backend healthy, frontend HTTP 200, health API báo `status=ok` và `database=mongodb`. Kiểm tra DB xác nhận 13 collection (12 nghiệp vụ và counters).

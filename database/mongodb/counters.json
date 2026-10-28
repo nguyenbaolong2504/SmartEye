@@ -34,5 +34,9 @@
   {
     "_id": "traffic_samples",
     "seq": 0
+  },
+  {
+    "_id": "traffic_labels",
+    "seq": 0
   }
 ]

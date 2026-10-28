@@ -175,5 +175,44 @@ class Audit(Document):
     created_at: str = field(default_factory=timestamp)
 
 
+@dataclass(kw_only=True)
+class ForecastRun(Document):
+    collection: ClassVar[str] = 'forecast_runs'
+    user_id: int
+    target: str
+    segment_ids: list
+    start_at: str
+    end_at: str
+    epochs: int = 25
+    status: str = 'queued'
+    running: bool = True
+    lock_key: str = 'training'
+    progress: int = 0
+    message: str = 'Đang chờ huấn luyện'
+    report: dict = field(default_factory=dict)
+    created_at: str = field(default_factory=timestamp)
+    finished_at: str | None = None
+
+
+@dataclass(kw_only=True)
+class TrafficLabel(Document):
+    collection: ClassVar[str] = 'traffic_labels'
+    segment_id: int
+    observed_at: str
+    state: str
+    reviewer_id: int
+    note: str
+    updated_at: str = field(default_factory=timestamp)
+
+
+@dataclass(kw_only=True)
+class ForecastRegistry(Document):
+    collection: ClassVar[str] = 'forecast_registry'
+    run_id: str
+    activated_by: int
+    activated_at: str = field(default_factory=timestamp)
+
+
 ALL_MODELS = (User, LoginSession, ResetToken, Segment, Camera, Observation,
-              VideoJob, Favorite, AlertRule, Notification, Audit, TrafficSample)
+              VideoJob, Favorite, AlertRule, Notification, Audit, TrafficSample,
+              ForecastRun, TrafficLabel, ForecastRegistry)

@@ -4,6 +4,10 @@ Phân tích mật độ giao thông và hỗ trợ chọn tuyến tại Hà Nộ
 
 ![Giao diện minh họa](docs/preview.png)
 
+## Dự báo và giao diện mới
+
+Trang Tổng quan, dự báo 15/30 phút bằng XGBoost + GRU, chuẩn bị dữ liệu, nhãn ùn tắc thực tế, so sánh baseline và kích hoạt mô hình có kiểm soát. Không kèm mô hình đã huấn luyện cho Hà Nội; chưa đủ dữ liệu thì không trả dự báo. [Hướng dẫn đầy đủ](docs/FORECASTING.md).
+
 ## Bắt đầu
 
 **Lệnh Windows đầy đủ, từng terminal, MongoDB portable/Atlas, backend/frontend và Docker:** [docs/RUNNING.md](docs/RUNNING.md).

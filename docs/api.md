@@ -38,3 +38,7 @@ Reports: `segment_id`, `start`, `end` ISO timestamp có timezone. Server UTC, UI
 ```
 
 Client xử lý 401/403/404/409/413/415/422/429/502/503/504. `detail` có thể chuỗi hoặc validation list. Lỗi file/Google không trả key/traceback. Không bật permissive CORS.
+
+## Dự báo XGBoost / GRU
+
+API dữ liệu, nhãn thực tế, tác vụ huấn luyện, xuất báo cáo, kích hoạt và dự báo 15/30 phút: xem [FORECASTING.md](FORECASTING.md#api). Truy vấn dự báo công khai; chuẩn bị dữ liệu/huấn luyện yêu cầu Quản lý/Admin; kích hoạt chỉ Admin.

@@ -79,7 +79,7 @@ cd C:\Users\Admin\Documents\GitHub\SmartEye
 .venv\Scripts\python.exe scripts/init_db.py --demo-accounts
 ```
 
-Kỳ vọng ping thành công, 12 collection nghiệp vụ + `counters`, 3 tài khoản, 13 đường và 4 camera. Script chạy lại được, giữ tài khoản cũ. Startup API không tự tạo tài khoản demo. Refresh Compass. Xem [danh sách collection](../database/README.md).
+Kỳ vọng ping thành công, 15 collection nghiệp vụ + `counters`, 3 tài khoản, 13 đường và 4 camera. Script chạy lại được, giữ tài khoản cũ. Startup API không tự tạo tài khoản demo. Refresh Compass. Xem [danh sách collection](../database/README.md).
 
 | Vai trò | Email | Mật khẩu demo |
 |---|---|---|
@@ -232,3 +232,7 @@ Remove-Item Env:SMARTEYE_TEST_MONGODB_URI
 Live tests tự tạo/xóa DB `smarteye_test_<uuid>` riêng, cần user test cho phép tạo/xóa DB này. User Docker readWrite riêng `smarteye` không có quyền đó. E2E desktop/mobile dùng `smarteye_e2e_desktop`/`smarteye_e2e_mobile`, API 8011/8012 và frontend 5174/5175 riêng, cần MongoDB thật/model và quyền DB test. Local không auth dùng được ngay; Atlas/app user giới hạn DB cần quyền test riêng. Không test trên dữ liệu triển khai.
 
 Nguồn: [MongoDB Windows ZIP](https://www.mongodb.com/docs/v8.0/tutorial/install-mongodb-on-windows-zip/), [Compass connections](https://www.mongodb.com/docs/compass/current/connect/), [Docker Official Image Mongo](https://hub.docker.com/_/mongo).
+
+## Giao diện và dự báo mới
+
+Sau nâng cấp cần build lại cả backend/frontend. Startup tự tạo ba collection dự báo mới, giữ DB và tài khoản cũ. Mở `/#forecast` từ website để sử dụng; xem [FORECASTING.md](FORECASTING.md) để chuẩn bị dữ liệu, huấn luyện, so sánh và kích hoạt XGBoost/GRU.

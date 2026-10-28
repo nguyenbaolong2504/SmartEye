@@ -38,6 +38,8 @@ async def lifespan(app):
     except PyMongoError:
         raise RuntimeError('Không kết nối được MongoDB. Chạy MongoDB Server/Docker và kiểm tra MONGODB_URI, MONGODB_DB trong .env.') from None
     with SessionLocal() as db:
+        db.database.forecast_runs.update_many({'running':True},{'$set':{'running':False,'status':'failed',
+            'message':'Máy chủ khởi động lại trong khi huấn luyện. Hãy tạo lần huấn luyện mới.','finished_at':stamp()}})
         seed(db)
         for job in db.find(VideoJob,{'status':{'$in':['queued','processing']}}):
             job.status = 'failed'; job.error = 'Tác vụ bị gián đoạn do máy chủ khởi động lại. Vui lòng tải lại video.'
@@ -68,8 +70,8 @@ async def guard(request, call_next):
             allowed |= {'http://127.0.0.1:5173','http://localhost:5173','http://127.0.0.1:8000','http://localhost:8000'}
         if origin and origin.rstrip('/') not in allowed:
             return JSONResponse({'detail':'Nguồn yêu cầu không được phép.'},status_code=403)
-    bucket = 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path == '/api/routes/search' else 'general'
-    limit = {'auth':20,'video':5,'route':20,'general':180}[bucket]
+    bucket = 'training' if request.url.path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path == '/api/routes/search' else 'general'
+    limit = {'training':2,'auth':20,'video':5,'route':20,'general':180}[bucket]
     ip = request.client.host if request.client else 'unknown'
     key = (ip,bucket)
     with _rate_lock:
@@ -432,3 +434,5 @@ def system(user=Depends(admin),db=Depends(get_db)):
 
 from .monitoring import router as monitoring_router
 app.include_router(monitoring_router)
+from .forecast_api import router as forecast_router
+app.include_router(forecast_router)

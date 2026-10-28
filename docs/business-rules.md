@@ -67,3 +67,7 @@ Ngừng camera/đường có thể khôi phục qua sửa trạng thái, giữ l
 ## Nghiệm thu
 
 Chạy từ repo sạch; login/signup; inference thật sau tải model; hiệu chỉnh camera; ba mức mật độ; dữ liệu cũ không coi là hiện tại; A/B/trọng số; fallback minh họa có nhãn; favorite tính lại; CSV; RBAC server; quản trị user/camera/road; kiểm thử và giới hạn được ghi rõ.
+
+## Dự báo học máy
+
+XGBoost/GRU là mô hình huấn luyện từ dữ liệu quan sát, có split theo thời gian, baseline và báo cáo riêng. Chưa có mô hình đã huấn luyện cho Hà Nội đi kèm source. Thiếu dữ liệu hoặc chưa qua kích hoạt thì không hiển thị dự báo; nhãn ùn tắc độc lập với mức mật độ YOLO. Xem FORECASTING.md.

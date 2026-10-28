@@ -9,6 +9,12 @@ NUMBER={'bsonType':['int','long','double','decimal']}
 INTEGER={'bsonType':['int','long']}
 BOOL={'bsonType':'bool'}
 SCHEMAS={
+    'forecast_runs':validator(['user_id','target','segment_ids','status','running'],{
+        '_id':TEXT,'user_id':INTEGER,'target':{'enum':['density','congestion']},
+        'segment_ids':{'bsonType':'array'},'status':{'enum':['queued','training','completed','failed','cancelled']},'running':BOOL}),
+    'traffic_labels':validator(['segment_id','observed_at','state','reviewer_id','note'],{
+        'segment_id':INTEGER,'observed_at':TEXT,'state':{'enum':['FREE','SLOW','JAM']},'reviewer_id':INTEGER,'note':TEXT}),
+    'forecast_registry':validator(['run_id','activated_by','activated_at'],{'_id':TEXT,'run_id':TEXT,'activated_by':INTEGER,'activated_at':TEXT}),
     'traffic_samples':validator(['sample_key','segment_id','observed_at','score','density','count','source'],{
         'sample_key':TEXT,'segment_id':INTEGER,'observed_at':TEXT,
         'score':{**NUMBER,'minimum':0,'maximum':1},'count':{**INTEGER,'minimum':0},

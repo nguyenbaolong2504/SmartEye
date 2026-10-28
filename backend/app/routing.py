@@ -1,6 +1,8 @@
 import heapq
 import math
 import os
+import logging
+from datetime import datetime
 import httpx
 from fastapi import HTTPException
 from .models import Segment
@@ -15,6 +17,23 @@ from types import SimpleNamespace
 def route_evidence(db,req,segments):
     future = bool(req.departure_at and (req.departure_at-now()).total_seconds()>300)
     result = {} if future else latest_observations(db)
+    if future:
+        # Use only deployed forecasts whose actual prediction time matches departure.
+        from .forecast_ml import forecast
+        for segment in segments:
+            for target in ('congestion','density'):
+                try: output=forecast(db.database,segment.id,target)
+                except Exception:
+                    logging.getLogger('smarteye.forecast').warning('Forecast unavailable for routing',exc_info=True)
+                    continue
+                matches=[p for p in output.get('predictions',[]) if abs((req.departure_at-now()).total_seconds())<=35*60
+                    and abs((req.departure_at-datetime.fromisoformat(p['predicted_at'])).total_seconds())<=150]
+                if not matches: continue
+                prediction=min(matches,key=lambda p:abs((req.departure_at-datetime.fromisoformat(p['predicted_at'])).total_seconds()))
+                label=prediction['label'];density={'FREE':'LOW','SLOW':'NORMAL','JAM':'HIGH'}.get(label,label)
+                result[segment.id]=SimpleNamespace(density=density,score={'LOW':.1,'NORMAL':.4,'HIGH':.8}[density],
+                    source='forecast',model=prediction['model'],predicted_at=prediction['predicted_at'],forecast_target=target)
+                break
     missing = [s.id for s in segments if s.id not in result]
     if missing:
         patterns = historical_evidence(db.database,missing,req.departure_at or now())
@@ -186,6 +205,8 @@ async def search_routes(db, req):
     reason = f'Tuyến được chọn có ETA {round(best["duration_seconds"]/60)} phút, dài {best["distance_km"]} km; điểm tổng hợp {best["score"]:.3f} theo trọng số của bạn.'
     if best['unknown_share']:
         reason += f' {round(best["unknown_share"]*100)}% tuyến chưa có dữ liệu giao thông; chưa thể khẳng định không tắc.'
+    if any(s.get('source')=='forecast' for s in best['segments']):
+        reason += ' Có sử dụng mô hình dự báo đã được kích hoạt, tại mốc gần giờ khởi hành.'
     if any(s.get('source')=='historical' for s in best['segments']):
         reason += ' Có sử dụng thống kê 28 ngày gần nhất cùng thứ và giờ; đây là tham khảo lịch sử.'
     return {'provider':req.provider,'generated_at':stamp(),'routes':routes,'recommendation':{'route_id':best['id'],'reason':reason},'notice':'Mạng đường, khoảng cách và ETA minh họa; không dùng để dẫn đường thực tế.' if req.provider == 'demo' else 'ETA do Google cung cấp. Dữ liệu camera bổ sung rủi ro theo vị trí; mật độ cao không đồng nghĩa chắc chắn ùn tắc.','future_notice':'Với giờ khởi hành cách hiện tại trên 5 phút, camera chỉ đóng góp thống kê lịch sử đủ dữ liệu cùng thứ/giờ; chưa phải dự báo chắc chắn.' if req.departure_at else None}
