@@ -13,6 +13,8 @@
 - Kiểm thử thẻ dự báo có kết quả dùng API contract fixture riêng, không ghi dự báo giả vào database. Ảnh preview là giao diện với mạng đường demo/DB E2E; không phải kết luận giao thông thực địa.
 - Tệp model/dataset không commit; source không kèm forecast model đã huấn luyện cho Hà Nội. Nâng cấp tự thêm ba collection, giữ dữ liệu và tài khoản hiện có. Chưa xác minh triển khai bản mới trong Docker local; ổ C chỉ còn khoảng 0,7 GB ở thời điểm kiểm tra. CI Linux cần xem theo commit sau push.
 
+CI đầu của commit `87369d6` có frontend đạt, backend/E2E dừng ở Initialize containers: MongoDB 8.0 từ chối kernel >=6.19 trên runner Ubuntu 24.04.5, trước khi code dự án được chạy. Đã pin hai job MongoDB sang Ubuntu 22.04 (kernel 6.8) và image 8.0.32, cùng nhánh phiên bản đã kiểm thử local; không bỏ bài kiểm thử hoặc thay DB bằng mock. Nguồn: [MongoDB SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912), [runner Ubuntu 22.04](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2204-Readme.md). Cần cập nhật runner khi MongoDB hỗ trợ kernel mới và trước khi label 22.04 hết hỗ trợ.
+
 ## Docker và đăng nhập, ngày 28/10/2026
 
 - Docker local đã chạy lại: MongoDB và backend healthy, frontend HTTP 200, health API báo `status=ok` và `database=mongodb`. Kiểm tra DB xác nhận 13 collection (12 nghiệp vụ và counters).
