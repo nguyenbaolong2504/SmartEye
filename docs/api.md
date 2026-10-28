@@ -42,3 +42,7 @@ Client xử lý 401/403/404/409/413/415/422/429/502/503/504. `detail` có thể 
 ## Dự báo XGBoost / GRU
 
 API dữ liệu, nhãn thực tế, tác vụ huấn luyện, xuất báo cáo, kích hoạt và dự báo 15/30 phút: xem [FORECASTING.md](FORECASTING.md#api). Truy vấn dự báo công khai; chuẩn bị dữ liệu/huấn luyện yêu cầu Quản lý/Admin; kích hoạt chỉ Admin.
+
+## Tối ưu tuyến Dijkstra/A*
+
+`/api/routes/search` nhận thêm `algorithm` (compare/dijkstra/astar), mặc định compare. `weights` nhận time/distance và density tùy chọn. Có `optimization` và `cost_components` trong response; scope Google chỉ là tập ứng viên. `/api/segments` hỗ trợ `one_way` mặc định false; `/api/places` gồm cả các nút của đoạn đang hoạt động. Xem [ROUTING.md](ROUTING.md).

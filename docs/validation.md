@@ -5,6 +5,13 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Dijkstra / A* theo thời gian + khoảng cách, ngày 29/10/2026
+
+- Backend **117 passed, không skip** với MongoDB 8.0.32 thật, DB kiểm thử riêng trên 27019. Có oracle vét cạn độc lập đối chiếu Dijkstra/A*/Yen trên 10 đồ thị nhỏ ngẫu nhiên, đường song song, chu trình và các ca heuristic km minh họa không khớp khoảng cách địa lý.
+- API kiểm tra tuyến cân bằng không phải ngắn nhất/nhanh nhất, kể cả khi không nằm trong ba tuyến nhanh nhất; đổi ưu tiên làm đổi kết quả; cạnh bị trội không làm đổi mốc chuẩn hóa; đường một chiều, địa điểm mới, favorite giữ thuật toán, trọng số lỗi và phạm vi Google.
+- TypeScript strict và Vite production build đạt. Trong lượt E2E đầy đủ, 22 luồng cũ và hai luồng so sánh mới đạt; hai luồng Admin đường một chiều phát hiện nhãn textarea tọa độ không ổn định. Đã thêm aria-label rõ và chạy lại **4/4 E2E mới đạt** trên desktop/mobile. Hai luồng chụp ảnh so sánh được kiểm tra thêm, đạt đủ. Không nới timeout hoặc bỏ kiểm thử.
+- Screenshot trong ROUTING.md là dữ liệu demo/DB E2E. Chưa áp dụng vào Docker localhost vì Engine đang không phản hồi ở lượt kiểm tra trước và ổ C thiếu dung lượng cho build. CI Linux cần xem theo commit sau push.
+
 ## Dự báo XGBoost / GRU và giao diện, ngày 29/10/2026
 
 - Backend: **94 passed, không skip** trên MongoDB 8.0.32 thật ở localhost:27019, DB tạm tự tạo/xóa theo bài. Có huấn luyện CPU XGBoost và GRU thật, lưu/nạp trọng số, phục vụ dự báo qua API và kiểm tra kích hoạt. Đây là dữ liệu tổng hợp cô lập cho kiểm thử phần mềm, không phải mô hình đã đánh giá tại Hà Nội.

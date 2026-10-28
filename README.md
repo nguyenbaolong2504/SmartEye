@@ -30,7 +30,7 @@ Thông tin công khai chỉ dành cho demo. Startup không tự tạo các tài 
 
 ## Chức năng
 
-- Tìm A–B, đổi chiều, ô tô/xe máy, giờ khởi hành, so sánh tuyến theo ETA/km/rủi ro và trọng số; giải thích đề xuất và phần thiếu dữ liệu.
+- Tìm A–B bằng Dijkstra/A*, trực tiếp tối ưu thời gian + khoảng cách, mặc định 60/40; đối chiếu hai thuật toán, ba tuyến thay thế theo Yen, hỗ trợ đường một chiều. [Cách tính và giới hạn mạng đường](docs/ROUTING.md).
 - Video gắn camera/đường: hàng đợi, tiến độ, hủy, lịch sử, ảnh bounding box, biểu đồ từng giây, LOW/NORMAL/HIGH.
 - Admin hiệu chỉnh ROI/sức chứa/ngưỡng; video giữ snapshot cấu hình. Analyst/Admin xác nhận trước khi công bố quan sát mới.
 - Đăng ký, đăng nhập, hồ sơ, đổi/reset mật khẩu qua SMTP; cookie HttpOnly, session thu hồi được, RBAC User/Analyst/Admin.

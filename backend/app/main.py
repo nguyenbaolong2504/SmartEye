@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from . import schemas as S
 from .config import COOKIE_SECURE, PRODUCTION, UPLOADS, MAX_UPLOAD, MODEL_PATH, TTL_MINUTES
@@ -50,6 +51,11 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title='SmartEye API', version='1.0.0', lifespan=lifespan)
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request,exc):
+    # Do not echo credentials or non-JSON NaN/Infinity values from a rejected body.
+    return JSONResponse({'detail':[{key:row[key] for key in ('type','loc','msg')} for row in exc.errors()]},status_code=422)
 
 @app.exception_handler(DuplicateKeyError)
 async def duplicate_record(request,exc):
@@ -194,12 +200,17 @@ def reset_password(body:S.ResetPassword,db=Depends(get_db)):
     return {'message':'Đã đặt lại mật khẩu. Vui lòng đăng nhập.'}
 
 @app.get('/api/places')
-def places(): return PLACES
+def places(db=Depends(get_db)):
+    result={p['node']:dict(p) for p in PLACES}
+    for segment in db.find(Segment,{'active':True},sort=[('id',1)]):
+        for node,point,label in ((segment.start_node,segment.geometry[0],'Đầu'),(segment.end_node,segment.geometry[-1],'Cuối')):
+            result.setdefault(node,{'node':node,'name':f'{label} {segment.name}'[:120],'lat':point[0],'lng':point[1]})
+    return list(result.values())
 
 @app.get('/api/segments')
 def segments(db=Depends(get_db)):
     latest = latest_observations(db)
-    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo')},'observation':observation_dict(latest[s.id]) if s.id in latest else None} for s in db.find(Segment,sort=[('id',1)])]
+    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},'observation':observation_dict(latest[s.id]) if s.id in latest else None} for s in db.find(Segment,sort=[('id',1)])]
 
 @app.post('/api/segments',status_code=201)
 def add_segment(body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):

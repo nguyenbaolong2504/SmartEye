@@ -16,7 +16,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 1
+    "_id": 1,
+    "one_way": false
   },
   {
     "name": "Kim Mã",
@@ -35,7 +36,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 2
+    "_id": 2,
+    "one_way": false
   },
   {
     "name": "Cầu Giấy",
@@ -54,7 +56,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 3
+    "_id": 3,
+    "one_way": false
   },
   {
     "name": "Tôn Đức Thắng",
@@ -73,7 +76,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 4
+    "_id": 4,
+    "one_way": false
   },
   {
     "name": "La Thành – Láng",
@@ -92,7 +96,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 5
+    "_id": 5,
+    "one_way": false
   },
   {
     "name": "Đường Láng – Cầu Giấy",
@@ -111,7 +116,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 6
+    "_id": 6,
+    "one_way": false
   },
   {
     "name": "Thanh Niên – Tây Hồ",
@@ -130,7 +136,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 7
+    "_id": 7,
+    "one_way": false
   },
   {
     "name": "Võ Chí Công – Bưởi",
@@ -149,7 +156,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 8
+    "_id": 8,
+    "one_way": false
   },
   {
     "name": "Xuân Thủy – Hồ Tùng Mậu",
@@ -168,7 +176,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 9
+    "_id": 9,
+    "one_way": false
   },
   {
     "name": "Trần Duy Hưng – Phạm Hùng",
@@ -187,7 +196,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 10
+    "_id": 10,
+    "one_way": false
   },
   {
     "name": "Phố Huế",
@@ -206,7 +216,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 11
+    "_id": 11,
+    "one_way": false
   },
   {
     "name": "Đại Cồ Việt",
@@ -225,7 +236,8 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 12
+    "_id": 12,
+    "one_way": false
   },
   {
     "name": "Nguyễn Thái Học",
@@ -244,6 +256,7 @@
     ],
     "is_demo": true,
     "active": true,
-    "_id": 13
+    "_id": 13,
+    "one_way": false
   }
 ]

@@ -43,6 +43,6 @@ Mỗi ghi MongoDB atomic trên một document; liên kết collection do API ki�
 
 Một ThreadPoolExecutor và model có lock; tên file UUID, không dùng đường dẫn user. Kết quả samples JSON; ảnh mỗi 10 giây. Worker cập nhật progress và kiểm tra cancel từng frame. Deploy một process; nâng Celery/Redis khi cần nhiều máy/phục hồi jobs. Process kill có thể để orphan JPEG: cần chính sách dọn storage khi vận hành dài hạn.
 
-Demo heap tìm tối đa 3 simple paths theo ETA trong graph nhỏ, không phải optimizer toàn Hà Nội. Google chỉ so route candidates provider trả; risk traffic theo độ dài polyline, camera bổ sung risk, giữ ETA. Score chỉ so trong một yêu cầu, không so tuyệt đối giữa các lần khác thời điểm.
+Dijkstra và A* tối ưu tổng chi phí cạnh theo thời gian/khoảng cách và mức phạt rủi ro tùy chọn. Hai mốc chuẩn hóa là tuyến nhanh nhất và ngắn nhất trên cùng đồ thị. A* dùng cận Haversine đã hiệu chỉnh theo tất cả cạnh; Yen tạo tối đa ba tuyến thay thế. Đường một chiều được tôn trọng. Google chỉ xếp hạng tập ứng viên provider trả, giữ ETA, không chạy Dijkstra/A* trên mạng Google. Xem ROUTING.md; điểm chỉ so trong cùng yêu cầu.
 
 Mô-đun dự báo: forecast_data tạo cửa sổ 5 phút / 60 phút, forecast_ml huấn luyện XGBoost CPU và GRU PyTorch, forecast_api quản lý dữ liệu/nhãn/tác vụ/kích hoạt. Một worker dự báo riêng; artifact giữ trong backend/data/forecasts. Mô hình phải vượt kiểm tra theo thời gian, baseline và phạm vi từng tuyến trước khi phục vụ. Xem docs/FORECASTING.md.

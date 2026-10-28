@@ -32,3 +32,13 @@ def test_google_single_route_without_traffic(client,route_request,monkeypatch):
     assert len(result['routes'])==1 and result['routes'][0]['unknown_share']==1
     assert result['routes'][0]['duration_seconds']==600
     assert 'private-test-key' not in response.text
+
+
+def test_google_combined_ranking_is_limited_to_provider_candidates(client,route_request,monkeypatch):
+    mock_google(monkeypatch,data={'routes':[{'description':name,'duration':str(seconds)+'s','distanceMeters':km*1000,
+        'polyline':{'encodedPolyline':'_p~iF~ps|U_ulLnnqC_mqNvxq`@'}} for name,seconds,km in [('Fast',100,10),('Short',300,4),('Balanced',130,5)]]})
+    route_request.update(provider='google',algorithm='compare',weights={'time':.5,'distance':.5})
+    result=client.post('/api/routes/search',json=route_request).json()
+    assert result['routes'][0]['name']=='Balanced' and result['routes'][0]['duration_seconds']==130
+    assert result['optimization']['scope']=='google_candidates'
+    assert result['optimization']['algorithm'] is None and result['optimization']['primary_search']=={}

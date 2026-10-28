@@ -277,6 +277,9 @@
         },
         "is_demo": {
           "bsonType": "bool"
+        },
+        "one_way": {
+          "bsonType": "bool"
         }
       }
     }

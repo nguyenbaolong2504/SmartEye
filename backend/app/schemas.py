@@ -1,4 +1,5 @@
 import re
+import math
 from datetime import datetime, timezone
 from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -71,14 +72,16 @@ class RouteRequest(BaseModel):
     destination: Waypoint
     mode: Literal['DRIVE', 'TWO_WHEELER'] = 'DRIVE'
     provider: Literal['demo', 'google'] = 'demo'
+    algorithm: Literal['compare','dijkstra','astar'] = 'compare'
     departure_at: datetime | None = None
-    weights: dict[str, float] = Field(default={'time': .45, 'distance': .2, 'density': .35})
+    weights: dict[str, float] = Field(default={'time': .6, 'distance': .4, 'density': 0.})
     @model_validator(mode='after')
     def coherent(self):
         if abs(self.origin.lat - self.destination.lat) + abs(self.origin.lng - self.destination.lng) < .00005:
             raise ValueError('Điểm đi và điểm đến phải khác nhau')
-        if set(self.weights) != {'time', 'distance', 'density'} or any(not 0 <= v <= 1 for v in self.weights.values()) or sum(self.weights.values()) <= 0:
+        if set(self.weights) not in ({'time','distance'},{'time','distance','density'}) or any(not math.isfinite(v) or not 0 <= v <= 1 for v in self.weights.values()) or sum(self.weights.values()) <= 0:
             raise ValueError('Trọng số phải nằm trong 0–1 và tổng lớn hơn 0')
+        self.weights.setdefault('density',0.)
         if self.departure_at:
             if not self.departure_at.tzinfo:
                 raise ValueError('Giờ khởi hành cần múi giờ')
@@ -109,6 +112,7 @@ class SegmentInput(BaseModel):
     geometry: list[list[float]] = Field(min_length=2, max_length=1000)
     active: bool = True
     is_demo: bool = False
+    one_way: bool = False
     @model_validator(mode='after')
     def coherent(self):
         if self.start_node == self.end_node:

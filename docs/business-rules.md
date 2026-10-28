@@ -16,7 +16,7 @@ A/B → phương tiện/nguồn/giờ → ưu tiên → validation → tuyến �
 
 - A khác B; tọa độ Hà Nội; khởi hành từ hiện tại đến 7 ngày sau.
 - Demo chỉ có địa điểm trong danh sách. Google có tọa độ tùy chọn.
-- `score=wt*ETA/maxETA+wd*km/maxKm+wr*risk`, chuẩn hóa tổng trọng số bằng 1.
+- `score=wt*T/T0+wd*D/D0+wr*sum(km*risk)/D0`; chuẩn hóa tổng trọng số bằng 1, mặc định time=0.6/distance=0.4/density=0. Dijkstra/A* tối ưu chi phí cạnh trực tiếp; T0/D0 cố định theo cùng đồ thị. Xem [ROUTING.md](ROUTING.md).
 - Tuyến bị trội nếu tuyến khác không kém ở ETA/km/risk và tốt hơn ở ít nhất một tiêu chí.
 - Mật độ cao chỉ là rủi ro. Không hứa một tuyến đồng thời ngắn nhất và nhanh nhất khi tiêu chí mâu thuẫn.
 - Thiếu quan sát không phải LOW, không phải lớp mật độ thứ tư.

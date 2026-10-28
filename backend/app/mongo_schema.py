@@ -22,7 +22,7 @@ SCHEMAS={
     'users':validator(['email','name','password','role','active','created_at'],{
         'email':TEXT,'name':TEXT,'password':TEXT,'role':{'enum':['user','analyst','admin']},'active':BOOL,'auth_version':INTEGER,'created_at':TEXT}),
     'segments':validator(['name','start_node','end_node','distance_km','geometry','active','is_demo'],{
-        'name':TEXT,'start_node':TEXT,'end_node':TEXT,'distance_km':{**NUMBER,'minimum':.05},'geometry':{'bsonType':'array','minItems':2},'active':BOOL,'is_demo':BOOL}),
+        'name':TEXT,'start_node':TEXT,'end_node':TEXT,'distance_km':{**NUMBER,'minimum':.05},'geometry':{'bsonType':'array','minItems':2},'active':BOOL,'is_demo':BOOL,'one_way':BOOL}),
     'cameras':validator(['name','segment_id','capacity','roi','low_threshold','high_threshold','active'],{
         'name':TEXT,'segment_id':INTEGER,'capacity':{**INTEGER,'minimum':1},'roi':{'bsonType':'array','minItems':4,'maxItems':4},
         'low_threshold':{**NUMBER,'minimum':0,'maximum':1},'high_threshold':{**NUMBER,'minimum':0,'maximum':1},'active':BOOL}),

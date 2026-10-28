@@ -31,7 +31,7 @@ MongoDB dùng collection/document, tương ứng vai trò bảng/bản ghi trong
 | users | Email unique, tên, password hash, role, active, auth_version | Tài khoản gốc |
 | sessions | Hash cookie token, user_id, auth_version, thời hạn | users |
 | reset_tokens | Hash token một lần, auth_version, thời hạn | users |
-| segments | Đường, hai node, km, geometry, active/is_demo | Đường |
+| segments | Đường, hai node, km, geometry, active/is_demo, one_way | Đường |
 | cameras | segment_id, ROI, capacity, low/high_threshold, active | segments |
 | video_jobs | UUID, user/camera, status/progress, config snapshot, result/samples | users, cameras |
 | observations | Mật độ/score/nguồn/thời điểm/job_id, đường/camera/user | segments, cameras, users |

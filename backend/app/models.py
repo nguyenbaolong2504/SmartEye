@@ -69,6 +69,7 @@ class Segment(Document):
     geometry: list
     is_demo: bool = True
     active: bool = True
+    one_way: bool = False
 
 
 @dataclass(kw_only=True)
