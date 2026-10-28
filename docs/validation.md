@@ -5,6 +5,13 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Docker và đăng nhập, ngày 28/10/2026
+
+- Docker local đã chạy lại: MongoDB và backend healthy, frontend HTTP 200, health API báo `status=ok` và `database=mongodb`. Kiểm tra DB xác nhận 13 collection (12 nghiệp vụ và counters).
+- Tái hiện lỗi: POST đăng nhập qua `127.0.0.1:8081` với Origin cùng địa chỉ trả 403, trong khi `localhost:8081` đi qua kiểm tra nguồn. Nginx dùng `$host` nên bỏ cổng, làm backend không nhận đúng nguồn của browser.
+- Sửa Nginx chuyển `Host $http_host`, build/recreate riêng frontend; backend và MongoDB tiếp tục chạy. `nginx -t` thành công.
+- Đã xác minh qua HTTP thật cả `localhost:8081` và `127.0.0.1:8081`: đăng nhập tài khoản demo User, đọc `/api/auth/me`, đăng xuất và xác nhận phiên hết hiệu lực đều đạt. Yêu cầu thiếu email/password cùng nguồn trả 422; Origin khác cổng hoặc domain lạ vẫn trả 403. Không đổi tài khoản/mật khẩu hoặc tắt kiểm tra nguồn; không in cookie phiên.
+
 ## Camera và thống kê ngày/tháng, ngày 27/10/2026
 
 - Backend: **72 passed** với MongoDB 8.0.32 thật, chạy cô lập tại localhost:27019 với data test ở ổ D. Có kiểm tra lịch UTC+7/tháng nhuận, chuẩn hóa ô 5 phút, ngưỡng từng camera, điều kiện lặp lại nhiều ngày, lưu lịch sử, giữ/xóa/chia sẻ video, HTTP Range và nối lịch sử cùng thứ/giờ vào API tìm tuyến.

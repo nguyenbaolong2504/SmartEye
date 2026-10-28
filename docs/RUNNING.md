@@ -205,6 +205,7 @@ Tiếp tục mục 4–5. Host backend/Compass dùng cổng 27018 và auth DB `s
 | Video thiếu model | Tải bằng đúng môi trường local/container; kiểm tra YOLO_MODEL_PATH. |
 | Port đã dùng | Dừng phiên cũ Ctrl+C hoặc docker compose stop; tránh local/Docker cùng cổng 8000. |
 | Docker không bind được 8080 | Nếu ứng dụng khác đang dùng 8080, đặt `FRONTEND_PORT=8081` trong `.env`, chạy `scripts/setup_env.py --mode docker`, rồi `docker compose up -d --wait`. Mở `http://localhost:8081`; Compose tự cập nhật origin backend theo cổng frontend. |
+| Đăng nhập báo “Nguồn yêu cầu không được phép” | Mở đúng địa chỉ/cổng frontend. Nginx cần chuyển nguyên Host kèm cổng (`proxy_set_header Host $http_host`) để kiểm tra cùng nguồn hoạt động cả với `localhost` và `127.0.0.1`. Sau khi cập nhật cấu hình, chạy `docker compose up --build -d --no-deps --wait frontend`. Không tắt kiểm tra nguồn yêu cầu. |
 | No space left | Giải phóng ổ chứa venv/Docker/data trước khi cài tiếp. |
 | Docker Cannot connect | `docker info` phải có Server; mở Desktop và chờ Engine Running. |
 
