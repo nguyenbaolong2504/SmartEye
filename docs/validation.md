@@ -15,6 +15,10 @@
 
 CI đầu của commit `87369d6` có frontend đạt, backend/E2E dừng ở Initialize containers: MongoDB 8.0 từ chối kernel >=6.19 trên runner Ubuntu 24.04.5, trước khi code dự án được chạy. Đã pin hai job MongoDB sang Ubuntu 22.04 (kernel 6.8) và image 8.0.32, cùng nhánh phiên bản đã kiểm thử local; không bỏ bài kiểm thử hoặc thay DB bằng mock. Nguồn: [MongoDB SERVER-121912](https://jira.mongodb.org/browse/SERVER-121912), [runner Ubuntu 22.04](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2204-Readme.md). Cần cập nhật runner khi MongoDB hỗ trợ kernel mới và trước khi label 22.04 hết hỗ trợ.
 
+**CI Linux đã xác minh thành công:** [run 40736803473](https://github.com/nguyenbaolong2504/SmartEye/actions/runs/40736803473), commit `0b8c1b2`; cả backend, frontend và E2E đều success.
+
+Đã chạy thêm smoke trọn worker, không thay các hàm huấn luyện bằng stub: 6.912 quan sát sinh riêng qua 8 ngày trong database `smarteye_forecast_smoke_<uuid>`, tạo cửa sổ, huấn luyện cả hai mô hình ở cả hai mốc 15/30 phút, lưu snapshot/báo cáo, áp dụng kiểm soát chất lượng và trả dự báo. Sau kiểm tra đã xóa đúng DB và artifact test vừa tạo. Dữ liệu có quy luật đơn giản nên điểm cao không được dùng làm bằng chứng độ chính xác ngoài thực tế. MongoDB kiểm thử 27019 đã dừng; MongoDB ứng dụng không bị dừng/xóa. Kiểm tra cuối thấy Docker Engine không phản hồi trong 8 giây và localhost:8081 không phản hồi, nên chưa áp dụng bản mới lên Docker local.
+
 ## Docker và đăng nhập, ngày 28/10/2026
 
 - Docker local đã chạy lại: MongoDB và backend healthy, frontend HTTP 200, health API báo `status=ok` và `database=mongodb`. Kiểm tra DB xác nhận 13 collection (12 nghiệp vụ và counters).
