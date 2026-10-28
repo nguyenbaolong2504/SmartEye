@@ -9,8 +9,10 @@
 
 - Backend **117 passed, không skip** với MongoDB 8.0.32 thật, DB kiểm thử riêng trên 27019. Có oracle vét cạn độc lập đối chiếu Dijkstra/A*/Yen trên 10 đồ thị nhỏ ngẫu nhiên, đường song song, chu trình và các ca heuristic km minh họa không khớp khoảng cách địa lý.
 - API kiểm tra tuyến cân bằng không phải ngắn nhất/nhanh nhất, kể cả khi không nằm trong ba tuyến nhanh nhất; đổi ưu tiên làm đổi kết quả; cạnh bị trội không làm đổi mốc chuẩn hóa; đường một chiều, địa điểm mới, favorite giữ thuật toán, trọng số lỗi và phạm vi Google.
-- TypeScript strict và Vite production build đạt. Trong lượt E2E đầy đủ, 22 luồng cũ và hai luồng so sánh mới đạt; hai luồng Admin đường một chiều phát hiện nhãn textarea tọa độ không ổn định. Đã thêm aria-label rõ và chạy lại **4/4 E2E mới đạt** trên desktop/mobile. Hai luồng chụp ảnh so sánh được kiểm tra thêm, đạt đủ. Không nới timeout hoặc bỏ kiểm thử.
-- Screenshot trong ROUTING.md là dữ liệu demo/DB E2E. Chưa áp dụng vào Docker localhost vì Engine đang không phản hồi ở lượt kiểm tra trước và ổ C thiếu dung lượng cho build. CI Linux cần xem theo commit sau push.
+- TypeScript strict và Vite production build đạt. Bốn E2E mới kiểm tra so sánh/trọng số và Admin cấu hình đường một chiều đều đạt trên desktop/mobile; 22 luồng cũ đã đạt trong lượt chạy đầy đủ. Nhãn textarea tọa độ được sửa rõ bằng aria-label sau khi E2E phát hiện lỗi chọn nhãn. Không nới timeout hoặc bỏ kiểm thử.
+- Screenshot trong ROUTING.md là dữ liệu demo/DB E2E. Đã xác minh đúng thư mục dữ liệu và dừng MongoDB kiểm thử 27019 sau khi hoàn tất, không dừng/xóa DB ứng dụng. Chưa áp dụng vào Docker localhost vì Engine đang không phản hồi ở lượt kiểm tra trước và ổ C thiếu dung lượng cho build.
+
+**CI Linux đã xác minh thành công:** [run 40746545330](https://github.com/nguyenbaolong2504/SmartEye/actions/runs/40746545330), commit `8191e84`; cả backend, frontend và bộ kiểm thử E2E đều success.
 
 ## Dự báo XGBoost / GRU và giao diện, ngày 29/10/2026
 
