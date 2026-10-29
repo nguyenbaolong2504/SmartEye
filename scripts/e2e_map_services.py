@@ -29,6 +29,17 @@ def addresses(q:str=''):
 def roads(): return PAYLOAD
 
 
+@app.get('/route/v1/driving/{coordinates}')
+def fast_routes(coordinates:str):
+    start,end=([float(x) for x in p.split(',')] for p in coordinates.split(';'))
+    def route(name,seconds,meters,offset):
+        middle=[(start[0]+end[0])/2,(start[1]+end[1])/2+offset]
+        return {'duration':seconds,'distance':meters,'geometry':{'coordinates':[start,middle,end]},
+                'legs':[{'steps':[{'name':name,'duration':seconds,'distance':meters}]}]}
+    return {'code':'Ok','routes':[route('Tuyến kiểm thử nhanh',600,4000,.001),route('Tuyến kiểm thử ngắn',900,2000,-.001)],
+            'waypoints':[{'location':start,'distance':3},{'location':end,'distance':5}]}
+
+
 @app.get('/tiles/{z}/{x}/{y}.svg')
 def tile(z:int,x:int,y:int):
     return Response('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edf1ef"/><path d="M0 128H256M128 0V256" stroke="white" stroke-width="12"/></svg>',

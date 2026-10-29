@@ -1,4 +1,6 @@
-# Dự báo XGBoost / GRU và giao diện SmartEye
+# Pipeline XGBoost / GRU trên dữ liệu quan sát thực
+
+**Phạm vi:** tài liệu này mô tả phần **Dữ liệu & mô hình** của Quản lý/Admin trong chế độ quan sát thực. Bản chạy thử hiện có XGBoost huấn luyện trên dữ liệu tổng hợp và các collection riêng; xem [DEMO.md](DEMO.md). Các điều kiện đánh giá dưới đây vẫn được giữ cho dữ liệu thực.
 
 ![Trang Tổng quan](previews/overview-redesign.png)
 
@@ -6,7 +8,7 @@
 
 ## Sử dụng
 
-Trang **Tổng quan** là điểm bắt đầu: Camera, Dự báo, Tìm đường và Bổ sung video. Menu giữ đường dẫn bằng hash nên tải lại hoặc dùng nút Back vẫn về đúng màn hình.
+Trang **Tổng quan** là điểm bắt đầu: Tình trạng & thống kê, Dự báo và Tìm đường. Nhận diện video đã được gỡ khỏi giao diện. Menu giữ đường dẫn bằng hash nên tải lại hoặc dùng nút Back vẫn về đúng màn hình.
 
 1. Cập nhật và chạy Docker theo `docs/RUNNING.md`. Sau thay đổi này cần build **backend** để có `xgboost-cpu` và `scikit-learn`; PyTorch CPU đã có trong Dockerfile. Không cần cài TensorFlow.
 2. Mở `http://localhost:8081/#forecast` nếu `.env` đang dùng `FRONTEND_PORT=8081`.
@@ -16,11 +18,11 @@ Trang **Tổng quan** là điểm bắt đầu: Camera, Dự báo, Tìm đườn
 6. Xem bảng so sánh XGBoost / GRU / Giữ nguyên trạng thái, điểm validation, ma trận nhầm lẫn và tải CSV báo cáo.
 7. **Admin** kích hoạt bản đủ điều kiện; mỗi mục tiêu có một bản đang phục vụ. Chỉ các mốc và tuyến đạt đánh giá được phép trả dự báo. Có thể kích hoạt lại một bản cũ hoặc ngừng phục vụ mà không xóa báo cáo.
 
-Code cung cấp luồng huấn luyện thật, không kèm mô hình dự báo đã huấn luyện cho Hà Nội và không thêm số liệu ngày/tháng giả vào DB triển khai.
+Code cung cấp luồng huấn luyện thật, không kèm mô hình dự báo đã huấn luyện cho Hà Nội và không thêm số liệu tổng hợp vào các collection quan sát/nhãn/mô hình thực. Bộ mẫu nằm riêng trong `demo_profiles` và `demo_registry`.
 
 ## Chuẩn bị dữ liệu
 
-- Phân tích các video có thời điểm quay thật và lưu/công bố lịch sử theo `docs/CAMERAS.md`.
+- Nhập CSV có thời gian và nguồn quan sát đã được phép sử dụng. Dữ liệu video đã công bố từ bản cũ vẫn được đọc; màn hình tải video mới đã gỡ.
 - Hoặc Quản lý/Admin nhập CSV số liệu đã quan sát. Tải mẫu tiêu đề ở `database/templates/traffic-observations.csv`. Các cột bắt buộc: `segment_id,observed_at,score,count,density`.
 - Thời gian là ISO có múi giờ; score 0–1, count 0–10000, density LOW/NORMAL/HIGH. Mỗi dòng là một quan sát thật, không phải một hàng đại diện do hệ thống tự nhân lên.
 - CSV tối đa 2 MB/5.000 dòng. **Kiểm tra CSV** không ghi DB; **Xác nhận nhập** mới ghi. Tất cả hàng được kiểm tra trước khi ghi. Nhập lại cùng tuyến/thời điểm bỏ qua bản đã có, không ghi đè. MongoDB không có transaction nhiều document: lỗi giữa lúc ghi có thể để lại một phần; nhập lại an toàn nhờ sample_key unique.

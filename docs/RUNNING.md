@@ -6,6 +6,12 @@ Tất cả lệnh dùng **PowerShell** trong `C:\Users\Admin\Documents\GitHub\Sm
 
 Compass là phần mềm quản lý DB, không khởi chạy MongoDB Server. Kết nối đã lưu trong Compass không có nghĩa server đang hoạt động.
 
+## Cập nhật giao diện rút gọn và dự báo mẫu (29/10/2026)
+
+Bản này bỏ màn hình nhận diện video, danh sách camera trống và các lựa chọn nguồn/thuật toán. XGBoost tự huấn luyện trên lịch sử mô phỏng ở nền; có nhãn MÔ PHỎNG và không thay dữ liệu thực. [Hướng dẫn chạy thử và CSV](DEMO.md).
+
+Sau cập nhật code, chạy `docker compose up -d --build --wait --wait-timeout 240`. Những lần sau chỉ cần `docker compose up -d`. Tạo lại dữ liệu mẫu nếu cần: `docker compose exec backend python scripts/prepare_demo.py --days 31`. Không cần tải YOLO.
+
 ## Đã cài xong: chạy những lần sau
 
 Mở Docker Desktop, chờ Engine running, rồi chạy:
@@ -116,11 +122,11 @@ Torch CPU/model cần vài trăm MB. `--no-cache-dir` giảm cache pip, không g
 .venv\Scripts\python.exe -m pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 .venv\Scripts\python.exe -m pip install --no-cache-dir -r backend/requirements.txt
 npm ci
-.venv\Scripts\python.exe scripts/download_model.py
+# Không cần tải YOLO cho giao diện mới.
 .venv\Scripts\python.exe -m pip check
 ```
 
-`requirements-db.txt` chỉ phục vụ DB; cần `requirements.txt` để chạy API/video. Model tải một lần vào `backend/data/models/yolo11n.pt`.
+`requirements-db.txt` chỉ phục vụ DB; cần `requirements.txt` để chạy API/dự báo. Không cần tải YOLO. Chạy `scripts/prepare_demo.py --days 31` nếu cần tạo lại lịch sử/mô hình mẫu.
 
 ## 5. Chạy backend và frontend
 
@@ -147,11 +153,7 @@ Start-Process http://127.0.0.1:5173
 
 Kỳ vọng health `status=ok`, `database=mongodb`. Website: [127.0.0.1:5173](http://127.0.0.1:5173). Swagger: [127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Dùng `127.0.0.1` nhất quán với APP_BASE_URL để cookie/Origin đúng. Vite proxy `/api`; browser không gọi DB trực tiếp.
 
-Đăng nhập → tìm tuyến chế độ minh họa → tải video → đợi xử lý → xem mật độ. Admin cấu hình camera/đường, Analyst/Admin công bố clip mới. Không cần Google/SMTP key cho demo.
-
-Trang mới **Camera & giao thông** dùng video tải lên đã cho phép chia sẻ, thống kê từng đường theo ngày/tháng và khung giờ thường mật độ cao. Clip cũ có thể dùng **Lưu vào lịch sử** sau khi khai báo thời điểm quay. Xem [hướng dẫn chi tiết](CAMERAS.md).
-
-Những lần sau chỉ khởi động MongoDB (nếu portable), backend và frontend; không cài/seed/tải model lại.
+Chọn nguồn **Mô phỏng để chạy thử** ở đầu trang → Dự báo giao thông → chọn đường và xem 15/30 phút. Chọn 07:30 hoặc 17:30 hôm qua để thử giờ cao điểm. Tình trạng & thống kê có biểu đồ ngày, bản đồ nhiệt tháng và tải CSV. Tìm đường nhập địa chỉ hoặc ghim trực tiếp; không cần chọn thuật toán. [Chi tiết và giới hạn dữ liệu mẫu](DEMO.md).
 
 ## 6. Docker đầy đủ: DB + backend + frontend
 
@@ -167,7 +169,7 @@ if (!(Test-Path .venv\Scripts\python.exe)) { python -m venv .venv }
 docker compose config --quiet
 docker compose up --build -d --wait --wait-timeout 240
 docker compose exec backend python scripts/init_db.py --demo-accounts
-docker compose exec backend python scripts/download_model.py
+docker compose exec backend python scripts/prepare_demo.py --days 31
 docker compose ps
 Invoke-RestMethod http://localhost:8080/api/health
 Start-Process http://localhost:8080

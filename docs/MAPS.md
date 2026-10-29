@@ -6,6 +6,12 @@
 
 SmartEye dùng Leaflet để hiển thị nền OpenStreetMap có tên đường, ngõ và công trình theo độ phủ dữ liệu. Kéo, pinch trên điện thoại, nút +/− và nút mở rộng bản đồ hoạt động mà không cần Google API key. Nền bản đồ khác với dữ liệu quan sát giao thông: đường hiện rõ không đồng nghĩa đã có camera hoặc tốc độ trực tiếp.
 
+## Luồng mặc định hiện tại
+
+Giao diện tự chọn nguồn, không còn dropdown nguồn hay thuật toán. Ô tô dùng `provider=auto`: OSRM trả các tuyến bám đường đã tiền xử lý, SmartEye xếp hạng theo thời gian/khoảng cách và cache ứng viên 10 phút. Không tải Overpass cho luồng ô tô thông thường. `scope=osrm_candidates`, `algorithm=null` trong kết quả phản ánh đúng việc không chạy A* trên đồ thị nội bộ OSRM. Dữ liệu mô phỏng chỉ điều chỉnh ETA cho đoạn khớp tên đường mẫu và được ghi rõ là mô phỏng.
+
+Xe máy dùng mạng OSM đầy đủ và A* để kiểm tra quyền phương tiện, nên tải đầu có thể chậm. Các phần “Đồ thị đường thực” bên dưới mô tả `provider=osm` hoặc nhánh xe máy, không phải nguồn ô tô nhanh. API vẫn hỗ trợ Dijkstra/compare để nghiên cứu; giao diện dùng A* khi chạy trên đồ thị đầy đủ. [Chạy thử](DEMO.md).
+
 ## Cập nhật và chạy
 
 Trong PowerShell ở thư mục dự án, sau khi Docker Engine đã hoạt động và đủ dung lượng build:
@@ -22,12 +28,12 @@ Chạy native: `npm ci` để thêm Leaflet, sau đó chạy backend/frontend nh
 
 ## Nhập điểm đi và đến
 
-1. Chọn **OpenStreetMap · đường phố thực**. Đây là nguồn mặc định của giao diện mới.
+1. Mở **Tìm tuyến đường**; nguồn OpenStreetMap được chọn tự động.
 2. Nhập số nhà, ngõ, tên đường, phường và Hà Nội vào từng ô. Chờ gợi ý hoặc bấm nút tìm.
 3. Chọn một kết quả; ghim A/B xuất hiện và địa chỉ đã chọn được hiển thị đầy đủ bên dưới ô. Chưa chọn kết quả thì không gửi tuyến dựa trên nội dung đang gõ.
 4. Kiểm tra ghim. Kết quả ghi rõ có số nhà, vị trí đường hoặc địa điểm. Nguồn địa chỉ có thể thiếu/sai số nhà, dùng tên tiếng Anh hoặc chỉ xác định vị trí một con đường.
 5. Nếu cần, bấm **Chọn trên bản đồ** bên dưới ô và chạm đúng lối ra vào mong muốn. Ghim trực tiếp không cần dịch vụ tìm địa chỉ. Hai điểm hiện hỗ trợ trong khu vực tọa độ Hà Nội đã giới hạn của dự án.
-6. Chọn ô tô/xe máy, giờ khởi hành, trọng số và Dijkstra/A*/So sánh; bấm **Tìm tuyến tối ưu**.
+6. Chọn ô tô/xe máy, giờ khởi hành và ưu tiên thời gian/khoảng cách; bấm **Tìm tuyến tối ưu**. Không cần chọn thuật toán.
 
 Đổi chiều sẽ đổi cả tọa độ và địa chỉ. Sửa nội dung đã chọn làm mất xác nhận của ô đó; người dùng phải chọn lại kết quả/ghim. Khi lưu yêu thích, lưu hai tọa độ, tên đầy đủ, nguồn định tuyến và ưu tiên; tuyến/ETA được tính mới khi mở lại.
 

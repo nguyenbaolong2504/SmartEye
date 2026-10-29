@@ -12,16 +12,15 @@ async function search(page:Page){
 
 test('full address selection, OSM road routing, comparisons and stale text',async({page},testInfo)=>{
   await page.goto('/#routes',{waitUntil:'domcontentloaded'});
-  await expect(page.getByLabel('Nguồn định tuyến',{exact:true})).toHaveValue('osm');
+  await expect(page.getByLabel('Nguồn định tuyến',{exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Tìm tuyến tối ưu',exact:true}).click();
   await expect(page.getByText('Chọn kết quả địa chỉ hoặc ghim cho cả điểm xuất phát và điểm đến.',{exact:true})).toBeVisible();
   await address(page,'Điểm xuất phát','12 Đường kiểm thử Hà Nội');
   await address(page,'Điểm đến','84 Đường kiểm thử Hà Nội');
   const data=await search(page);
-  expect(data.provider).toBe('osm');expect(data.optimization.scope).toBe('osm_network');expect(data.optimization.agreement).toBe(true);
+  expect(data.provider).toBe('auto');expect(data.optimization.scope).toBe('osrm_candidates');expect(data.optimization.algorithm).toBe(null);
   expect(data.routes[0].geometry.length).toBeGreaterThan(2);
-  expect(data.routes[0].segments.every((s:{source:string})=>s.source==='osm')).toBe(true);
-  await expect(page.getByText('Hai thuật toán cùng điểm tối ưu',{exact:true})).toBeVisible();
+  await expect(page.locator('.route-optimization')).toHaveCount(0);
   await expect(page.locator('.street-pin')).toHaveCount(2);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
   await page.evaluate(()=>window.scrollTo(0,0));
@@ -71,8 +70,8 @@ test('saved OSM journey retains addresses, coordinates and provider',async({page
   const card=page.locator('.favorite-card').filter({has:page.getByRole('heading',{name,exact:true})});
   await expect(card.getByText('Ô tô · OpenStreetMap',{exact:true})).toBeVisible();
   await card.getByRole('button',{name:'Tìm lại tuyến',exact:true}).click();
-  await expect(page.getByLabel('Nguồn định tuyến',{exact:true})).toHaveValue('osm');
+  await expect(page.getByLabel('Nguồn định tuyến',{exact:true})).toHaveCount(0);
   await expect(page.getByRole('combobox',{name:'Điểm xuất phát',exact:true})).toHaveValue(/12/);
   await expect(page.getByRole('combobox',{name:'Điểm đến',exact:true})).toHaveValue(/84/);
-  const result=await search(page);expect(result.provider).toBe('osm');
+  const result=await search(page);expect(result.provider).toBe('auto');
 });

@@ -22,7 +22,11 @@ Docker đầy đủ: `docker compose exec backend python scripts/init_db.py --de
 
 Script chỉ thêm user chưa tồn tại, giữ password/role/active cũ. Startup không tự tạo các tài khoản này; demo bị từ chối ở production. Bản thật dùng `scripts/create_admin.py`. Password web là scrypt hash có salt, không thể đọc lại password gốc từ DB; khác DB username/password.
 
-## 15 collection nghiệp vụ + 1 kỹ thuật
+## Dữ liệu mô phỏng mới
+
+Khi chuẩn bị demo, có thêm `demo_profiles` (lịch sử mô phỏng theo ngày/đường, source=synthetic) và `demo_registry` (bộ mẫu đang dùng, trạng thái tạo). Tổng cộng 18 collection khi cả bộ mẫu đã được tạo. Hai mô hình XGBoost nằm trong `backend/data/demo-forecasts/`, không phải MongoDB. Không nhập mẫu vào `observations`, `traffic_samples` hoặc registry thực. [Tạo, xem và tải CSV](../docs/DEMO.md).
+
+## 15 collection nghiệp vụ + 1 kỹ thuật cơ sở
 
 MongoDB dùng collection/document, tương ứng vai trò bảng/bản ghi trong SQL.
 

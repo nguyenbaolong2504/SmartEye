@@ -1,58 +1,77 @@
 # SmartEye
 
-Phân tích mật độ giao thông và hỗ trợ chọn tuyến tại Hà Nội: React + TypeScript, FastAPI, **MongoDB/PyMongo**, YOLO pretrained COCO.
+Hệ thống chạy thử **dự báo ùn tắc và lựa chọn tuyến đường Hà Nội**, dùng React/TypeScript, FastAPI, MongoDB và XGBoost.
 
-![Giao diện minh họa](docs/preview.png)
+## Bản giao diện rút gọn
 
-## Dự báo và giao diện mới
+- Bản đồ OpenStreetMap có đường/ngõ, nhập số nhà và chọn ghim A/B.
+- Tìm tuyến tự động, cân bằng thời gian và khoảng cách; không cần chọn nguồn hay thuật toán. Ô tô dùng các tuyến OSRM đã tiền xử lý và cache 10 phút để tránh tải mạng Overpass mỗi lần. A* là mặc định cho mạng đường tự quản lý; Dijkstra giữ để đối chiếu qua API.
+- Tình trạng từng đường, biểu đồ 24 giờ, bản đồ nhiệt theo tháng và tải CSV mẫu.
+- Dự báo sau 15/30 phút bằng **XGBoost được huấn luyện thật trên dữ liệu mô phỏng**. Có thể thử giờ cao điểm sáng/chiều hôm qua.
+- Đã gỡ trang nhận diện video, lựa chọn kỹ thuật và liên kết mã nguồn khỏi giao diện. Không còn các thẻ camera trống. Upload video mặc định trả HTTP 410; bản ghi cũ vẫn được bảo toàn.
+- Tải từng trang khi cần, một API khởi tạo, ngừng polling khi tab bị ẩn. Gói JS ban đầu giảm khoảng 373 → 252 KB (chưa nén).
 
-Trang Tổng quan, dự báo 15/30 phút bằng XGBoost + GRU, chuẩn bị dữ liệu, nhãn ùn tắc thực tế, so sánh baseline và kích hoạt mô hình có kiểm soát. Không kèm mô hình đã huấn luyện cho Hà Nội; chưa đủ dữ liệu thì không trả dự báo. [Hướng dẫn đầy đủ](docs/FORECASTING.md).
+**DỮ LIỆU MÔ PHỎNG không phải giao thông thực tế.** Mặc định phát sinh 31 ngày trước và ngày hiện tại, có giờ cao điểm, cuối tuần và nhiễu. Nhãn/mô hình mẫu nằm riêng, không ghi đè quan sát hay mô hình thực. Chuyển sang “Quan sát thực tế” ở đầu trang để xem đúng dữ liệu đã thu thập. [Cách tạo, chạy thử và giới hạn](docs/DEMO.md).
 
-## Bắt đầu
+## Chạy bằng Docker
 
-**Bản đồ đường phố OpenStreetMap, nhập số nhà/ngõ, chọn ghim và Dijkstra/A* trên mạng đường thực:** [docs/MAPS.md](docs/MAPS.md). Không cần Google API key; độ phủ địa chỉ và dịch vụ công cộng có giới hạn.
+Máy đã cài và build xong:
 
-**Lệnh Windows đầy đủ, từng terminal, MongoDB portable/Atlas, backend/frontend và Docker:** [docs/RUNNING.md](docs/RUNNING.md).
+```powershell
+cd C:\Users\Admin\Documents\GitHub\SmartEye
+docker compose up -d --wait --wait-timeout 240
+```
 
-**Collection, tài khoản mẫu, cách xem/import bằng Compass:** [database/README.md](database/README.md).
+Mở [SmartEye tại localhost:8081](http://localhost:8081) trên máy hiện tại (`FRONTEND_PORT=8081`). `.env.example` mặc định cổng 8080; URL phụ thuộc `FRONTEND_PORT` của bạn. Docker chạy cả frontend, backend và MongoDB; không cần chạy npm/uvicorn riêng.
 
-Compass là ứng dụng quản lý kết nối; cần MongoDB Server hoặc Atlas để lưu dữ liệu. Có script tải MongoDB portable Windows, không phải cài service. Runtime chỉ dùng MongoDB. SQL cũ được giữ trong `database/legacy-sql/`, không tự di chuyển dữ liệu.
+Sau khi cập nhật code:
+
+```powershell
+git pull --ff-only
+docker compose up -d --build --wait --wait-timeout 240
+docker compose ps
+Invoke-RestMethod http://localhost:8081/api/health
+```
+
+Lần đầu khởi động bản này, backend chuẩn bị dữ liệu mẫu và huấn luyện XGBoost ở nền. Trang sẽ tự cập nhật khi sẵn sàng. Tạo lại thủ công nếu cần:
+
+```powershell
+docker compose exec backend python scripts/prepare_demo.py --days 31
+```
+
+Dừng: `docker compose stop`. Lần sau chạy lại: `docker compose up -d`. Không dùng `down -v` nếu muốn giữ database.
+
+[Cài mới, chạy local và Docker đầy đủ](docs/RUNNING.md) · [MongoDB/Compass](database/README.md).
 
 ## Tài khoản demo local
 
-Chạy `scripts/init_db.py --demo-accounts` theo hướng dẫn trước khi đăng nhập:
+Nếu chưa tạo: `docker compose exec backend python scripts/init_db.py --demo-accounts`.
 
 | Vai trò | Email | Mật khẩu demo |
 |---|---|---|
 | Admin | admin@smarteye.test | SmartEyeAdmin@2026 |
-| Analyst | analyst@smarteye.test | SmartEyeAnalyst@2026 |
-| User | user@smarteye.test | SmartEyeUser@2026 |
+| Quản lý | analyst@smarteye.test | SmartEyeAnalyst@2026 |
+| Người dùng | user@smarteye.test | SmartEyeUser@2026 |
 
-Thông tin công khai chỉ dành cho demo. Startup không tự tạo các tài khoản này. Script giữ nguyên password/role/trạng thái tài khoản đã tồn tại. Bản thật dùng `scripts/create_admin.py` nhập email/mật khẩu riêng. Password trong MongoDB là scrypt hash có salt.
+Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của tài khoản đã tồn tại. Tài khoản database khác tài khoản website; MongoDB lưu password website dưới dạng hash.
 
-## Chức năng
+## Mô hình và thuật toán
 
-- Bản đồ OpenStreetMap kéo/phóng to, nhập số nhà/ngõ với gợi ý Photon và ghim A/B. Tìm A–B bằng Dijkstra/A* theo thời gian + khoảng cách, mặc định 60/40; tối đa ba phương án, có chiều đường và hạn chế rẽ OSM. [Phạm vi mạng đường, ETA và giới hạn nguồn công cộng](docs/MAPS.md).
-- Video gắn camera/đường: hàng đợi, tiến độ, hủy, lịch sử, ảnh bounding box, biểu đồ từng giây, LOW/NORMAL/HIGH.
-- Admin hiệu chỉnh ROI/sức chứa/ngưỡng; video giữ snapshot cấu hình. Analyst/Admin xác nhận trước khi công bố quan sát mới.
-- Đăng ký, đăng nhập, hồ sơ, đổi/reset mật khẩu qua SMTP; cookie HttpOnly, session thu hồi được, RBAC User/Analyst/Admin.
-- Hành trình yêu thích tính lại khi mở; cảnh báo trong ứng dụng, chống lặp 10 phút; báo cáo và CSV.
-- Quản trị user/camera/đường/audit; unique index, TTL token, validation và cập nhật trạng thái video có điều kiện.
-- Trang **Camera & giao thông**: xem ảnh/video đã được cho phép chia sẻ theo từng đường, số xe và trạng thái mới/cũ; nguồn thử là video tải lên.
-- Thống kê **ngày/tháng**, biểu đồ 24 giờ, bản đồ nhiệt ngày × giờ, khung giờ thường mật độ cao có điều kiện đủ dữ liệu. Tìm tuyến có thể tham khảo lịch sử 28 ngày cùng thứ/giờ khi đủ bằng chứng. Xem [hướng dẫn Camera và thống kê](docs/CAMERAS.md).
+| Thành phần | Cách dùng hiện tại |
+|---|---|
+| XGBoost | Dự báo mẫu FREE / SLOW / JAM sau 15 và 30 phút; cửa sổ lịch sử 60 phút, chia train/validation/test theo thời gian |
+| GRU | Pipeline nghiên cứu trên dữ liệu/nhãn thực, trong phần Dữ liệu & mô hình của Quản lý/Admin; chưa tự tuyên bố tốt hơn XGBoost |
+| A* | Mặc định tìm chi phí kết hợp trên đồ thị SmartEye hoặc mạng OSM tải đầy đủ |
+| Dijkstra | Thuật toán tham chiếu và chuẩn hóa chi phí; có API đối chiếu, không cần lựa chọn trên giao diện |
+| OSRM | Dịch vụ cung cấp nhanh các tuyến ô tô trên OSM. SmartEye xếp hạng các tuyến được trả về; không tuyên bố chạy A* trên đồ thị nội bộ của dịch vụ |
+| YOLO | Chức năng nhận diện đã tắt và gỡ khỏi giao diện; mã đọc dữ liệu cũ giữ để tương thích |
 
-## Dữ liệu và phạm vi
+Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy vẫn dùng mạng OSM và A* có kiểm tra quyền phương tiện nên lần tải đầu có thể chậm. Thời gian/khoảng cách là ước tính, chưa phải dẫn đường thời gian thực. Phần đường không có dữ liệu không được coi là thông thoáng. Các dịch vụ công cộng có thể gián đoạn; dùng máy chủ riêng khi cần tải lớn.
 
-Video tối đa 150 MB / 300 giây. Lấy mẫu một ảnh/giây, đếm car/motorcycle/motorbike/bus/truck cả khi đứng yên. Score `min(1,max(occupancy,vehicle_count/capacity))`, occupancy tính hợp bounding box trong ROI. Tổng hợp bằng trung vị score; số xe là hiện diện mỗi ảnh, không phải lưu lượng xe đi qua.
+Đăng ký/đăng nhập, hồ sơ, hành trình yêu thích, cảnh báo theo quan sát thực, nhập CSV, phân quyền và nhật ký quản trị vẫn có sẵn. Dữ liệu mô phỏng không phát cảnh báo thật cho người dùng.
 
-Chỉ Analyst/Admin công bố clip mới trong 15 phút; có luồng lưu lịch sử riêng cho clip cũ có thời điểm quay. Một video được đưa vào dữ liệu một lần. Mặc định xóa video gốc sau xử lý/hủy; có thể chọn giữ riêng tư trước phân tích và cho phép chia sẻ riêng sau đó. Xóa kết quả sẽ xóa video/ảnh của clip, giữ số liệu đã công bố. Demo có 13 đoạn nối 9 địa điểm, 4 camera, geometry/km/vận tốc minh họa; dữ liệu thiếu có rủi ro trung tính 0,5.
+## Tài liệu kỹ thuật
 
-Có pipeline dự báo phân loại 15/30 phút bằng XGBoost/GRU, cần dữ liệu/nhãn thực và kích hoạt sau đánh giá; không kèm mô hình dự báo đã huấn luyện cho Hà Nội. Chưa có RTSP hoặc GPS dẫn đường từng chặng. Detector pretrained COCO và quy tắc mật độ cần nhãn thực để đánh giá ngoài hiện trường.
+[Dữ liệu demo](docs/DEMO.md) · [Bản đồ](docs/MAPS.md) · [Pipeline XGBoost/GRU trên dữ liệu thực](docs/FORECASTING.md) · [API](docs/api.md) · [Kiểm thử](docs/validation.md).
 
-Google thật dùng hai khóa riêng `GOOGLE_ROUTES_API_KEY`/`GOOGLE_MAPS_BROWSER_KEY`, bật API/billing và giới hạn khóa phù hợp, sau đó restart backend. Không cần khóa Google cho OpenStreetMap hoặc demo. Giữ Google ETA; camera chỉ bổ sung rủi ro khi đường đã khảo sát khớp tuyến. Không lưu Google responses/polyline vào DB/CSV/training; xem [Routes policies](https://developers.google.com/maps/documentation/routes/policies).
-
-## Tài liệu
-
-[Cách chạy](docs/RUNNING.md) · [Database](database/README.md) · [Nghiệp vụ](docs/business-rules.md) · [Kiến trúc](docs/architecture.md) · [API](docs/api.md) · [Kiểm thử](docs/validation.md).
-
-`src/`: frontend · `backend/app/`: API/PyMongo/RBAC/worker · `backend/tests/`: Pytest · `tests/e2e/`: Playwright · `scripts/`: bootstrap/download/kiểm tra · `deploy/`: Nginx/Mongo init.
+`src/`: frontend · `backend/app/`: API/PyMongo/mô hình · `backend/tests/`: Pytest · `tests/e2e/`: Playwright · `scripts/`: khởi tạo và dữ liệu mẫu · `deploy/`: Nginx/Mongo init.

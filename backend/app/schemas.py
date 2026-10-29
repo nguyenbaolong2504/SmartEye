@@ -71,8 +71,9 @@ class RouteRequest(BaseModel):
     origin: Waypoint
     destination: Waypoint
     mode: Literal['DRIVE', 'TWO_WHEELER'] = 'DRIVE'
-    provider: Literal['demo', 'google', 'osm'] = 'demo'
-    algorithm: Literal['compare','dijkstra','astar'] = 'compare'
+    provider: Literal['demo', 'google', 'osm', 'auto'] = 'demo'
+    algorithm: Literal['compare','dijkstra','astar'] = 'astar'
+    traffic_mode: Literal['observed','demo'] = 'observed'
     departure_at: datetime | None = None
     weights: dict[str, float] = Field(default={'time': .6, 'distance': .4, 'density': 0.})
     @model_validator(mode='after')

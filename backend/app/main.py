@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Literal
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -27,11 +28,16 @@ from .security import optional_user, require_user, operator, admin, hash_passwor
 from .seed import seed, PLACES
 from .traffic import classify, latest_observations, observation_dict, emit_alerts
 from .routing import search_routes
-from .video import submit
+from .demo_data import router as demo_router, start_demo, status as demo_status, enabled as demo_enabled, current_states
 from .map_services import router as map_router, settings as map_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('smarteye')
+
+def submit(ident):
+    """Import optional legacy inference dependencies only when explicitly enabled."""
+    from .video import submit as legacy_submit
+    return legacy_submit(ident)
 
 @asynccontextmanager
 async def lifespan(app):
@@ -49,10 +55,12 @@ async def lifespan(app):
         db.delete_many(LoginSession,{'expires_at':{'$lt':stamp()}})
         db.delete_many(ResetToken,{'expires_at':{'$lt':stamp()}})
         db.commit()
+    if os.getenv('DEMO_AUTO_PREPARE','true').lower()=='true': start_demo()
     yield
 
 app = FastAPI(title='SmartEye API', version='1.0.0', lifespan=lifespan)
 app.include_router(map_router)
+app.include_router(demo_router)
 
 @app.exception_handler(RequestValidationError)
 async def invalid_request(request,exc):
@@ -71,6 +79,8 @@ _rate_lock = threading.Lock()
 
 @app.middleware('http')
 async def guard(request, call_next):
+    if request.method=='POST' and request.url.path=='/api/videos' and os.getenv('VIDEO_FEATURE_ENABLED','false').lower()!='true':
+        return JSONResponse({'detail':'Chức năng nhận diện video đã được gỡ khỏi phiên bản này.'},status_code=410)
     if request.method not in ('GET','HEAD','OPTIONS'):
         origin = request.headers.get('origin')
         allowed = {str(request.base_url).rstrip('/'),os.getenv('APP_BASE_URL','http://localhost:5173')}
@@ -126,7 +136,7 @@ def health():
 
 @app.get('/api/config')
 def config():
-    return {**map_settings(),'google_routes_available':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'maps_browser_key':os.getenv('GOOGLE_MAPS_BROWSER_KEY',''),'video_available':MODEL_PATH.is_file(),'max_upload_mb':MAX_UPLOAD//1024//1024,'observation_ttl_minutes':TTL_MINUTES,'demo_available':True,'password_reset_available':bool(os.getenv('SMTP_HOST'))}
+    return {**map_settings(),'google_routes_available':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'maps_browser_key':os.getenv('GOOGLE_MAPS_BROWSER_KEY',''),'video_available':os.getenv('VIDEO_FEATURE_ENABLED','false').lower()=='true' and MODEL_PATH.is_file(),'max_upload_mb':MAX_UPLOAD//1024//1024,'observation_ttl_minutes':TTL_MINUTES,'demo_available':demo_enabled(),'password_reset_available':bool(os.getenv('SMTP_HOST'))}
 
 @app.post('/api/auth/register',status_code=201)
 def register(body:S.Register,response:Response,db=Depends(get_db)):
@@ -210,9 +220,15 @@ def places(db=Depends(get_db)):
     return list(result.values())
 
 @app.get('/api/segments')
-def segments(db=Depends(get_db)):
+def segments(db=Depends(get_db),data_mode:Literal['observed','demo']='observed'):
     latest = latest_observations(db)
-    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},'observation':observation_dict(latest[s.id]) if s.id in latest else None} for s in db.find(Segment,sort=[('id',1)])]
+    simulated=current_states(db.database) if data_mode=='demo' and demo_enabled() and demo_status(db.database)['ready'] else {}
+    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},'observation':simulated.get(s.id) if data_mode=='demo' else observation_dict(latest[s.id]) if s.id in latest else None} for s in db.find(Segment,sort=[('id',1)])]
+
+@app.get('/api/bootstrap')
+def bootstrap(db=Depends(get_db),user=Depends(optional_user),data_mode:Literal['observed','demo']='observed'):
+    return {'places':places(db),'segments':segments(db,data_mode),'cameras':[camera_dict(c) for c in db.find(Camera)],
+            'config':config(),'user':public_user(user) if user else None,'demo':demo_status(db.database)}
 
 @app.post('/api/segments',status_code=201)
 def add_segment(body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):

@@ -6,6 +6,8 @@ os.environ['MONGODB_DB']='smarteye_test_suite'
 os.environ['SEED_DEMO']='true'
 os.environ['APP_ENV']='development'
 os.environ['COOKIE_SECURE']='false'
+os.environ['DEMO_AUTO_PREPARE']='false'
+os.environ['VIDEO_FEATURE_ENABLED']='true'  # Legacy archive/inference compatibility tests.
 os.environ['ADMIN_EMAIL']=''
 os.environ['ADMIN_PASSWORD']=''
 

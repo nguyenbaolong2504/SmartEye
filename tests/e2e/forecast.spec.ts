@@ -1,31 +1,26 @@
 import {test,expect,type Page} from '@playwright/test';
-
-async function navigate(page:Page,label:string){
-  const menu=page.getByRole('button',{name:'Mở menu',exact:true});
-  if(await menu.isVisible())await menu.click();
-  await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:label,exact:true}).click();
-}
-
-test('overview, forecast empty state, privacy and responsive navigation',async({page},testInfo)=>{
-  await page.goto('/',{waitUntil:'domcontentloaded'});
-  await expect(page.getByRole('heading',{name:/Hiểu đường đi/})).toBeVisible();
+async function navigate(page:Page,label:string){const menu=page.getByRole('button',{name:'Mở menu',exact:true});if(await menu.isVisible())await menu.click();await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:label,exact:true}).click();}
+test('synthetic forecast is ready, labeled and responsive without video or source links',async({page,request},info)=>{
+  test.setTimeout(120000);
+  await expect.poll(async()=>{const r=await request.get('/api/demo/status');return (await r.json()).ready;},{timeout:90000,intervals:[1500]}).toBe(true);
+  await page.goto('/');await expect(page.getByRole('heading',{name:/Hiểu đường đi/})).toBeVisible();
   await expect(page.getByRole('img',{name:'Sơ đồ các đoạn đường đang theo dõi'})).toBeVisible();
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
-  await page.screenshot({path:testInfo.outputPath('overview-redesign.png'),fullPage:true});
+  await expect(page.getByRole('button',{name:'Nhận dạng video',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'Mã nguồn dự án',exact:true})).toHaveCount(0);
   await navigate(page,'Dự báo giao thông');
-  await expect(page.getByRole('heading',{name:'Dự báo giao thông.'})).toBeVisible();
   await expect(page.locator('.forecast-card')).toHaveCount(2);
-  await expect(page.getByRole('heading',{name:'Chưa có dự báo',exact:true})).toHaveCount(2);
+  await expect(page.locator('.forecast-card').first()).toContainText('XGBoost');
+  await page.getByLabel('Thời điểm chạy thử').selectOption('morning');
+  await expect(page.getByText('TẠI MỐC CHẠY THỬ · MÔ PHỎNG',{exact:true})).toBeVisible();
+  await expect(page.getByText('DỮ LIỆU MÔ PHỎNG',{exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Dữ liệu & mô hình',exact:true})).toHaveCount(0);
-  await expect(page.getByText('Chưa có mô hình được Admin kích hoạt.',{exact:true})).toBeVisible();
-  await page.getByLabel('Nội dung dự báo').selectOption('congestion');
-  await expect(page.getByText('Mô hình ùn tắc học từ nhãn thực tế',{exact:false})).toBeVisible();
-  await page.reload({waitUntil:'domcontentloaded'});
-  await expect(page.getByRole('heading',{name:'Dự báo giao thông.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Chưa có dự báo',exact:true})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
-  await page.screenshot({path:testInfo.outputPath('forecast-public.png'),fullPage:true});
+  await page.screenshot({path:info.outputPath('forecast-synthetic.png'),fullPage:true});
+  await page.getByLabel('Nguồn dữ liệu',{exact:true}).selectOption('observed');
+  await expect(page.getByRole('heading',{name:'Chưa đủ dữ liệu quan sát để dự báo',exact:true})).toBeVisible();
+  await page.reload();await expect(page.getByLabel('Nguồn dữ liệu',{exact:true})).toHaveValue('observed');
 });
-
 test('admin dataset checks, CSV preview/commit and independent congestion labels',async({page},testInfo)=>{
   await page.goto('/#forecast',{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).first().click();
@@ -62,21 +57,7 @@ test('admin dataset checks, CSV preview/commit and independent congestion labels
   await page.screenshot({path:testInfo.outputPath('forecast-management.png'),fullPage:true});
 });
 
-test('forecast cards respect target and timestamps from API contract',async({page})=>{
-  // Contract fixture only: never inserts synthetic forecasts into a database.
-  await page.route('**/api/forecast/predict?*',async route=>{
-    const target=new URL(route.request().url()).searchParams.get('target');
-    await route.fulfill({json:{state:'ready',message:'Contract fixture',issue_at:new Date().toISOString(),predictions:[
-      {horizon_minutes:15,predicted_at:new Date(Date.now()+900000).toISOString(),label:target==='congestion'?'JAM':'HIGH',model:'XGBoost',test_macro_f1:.6},
-      {horizon_minutes:30,predicted_at:new Date(Date.now()+1800000).toISOString(),label:target==='congestion'?'SLOW':'NORMAL',model:'GRU',test_macro_f1:.5},
-    ]}});
-  });
-  await page.goto('/#forecast',{waitUntil:'domcontentloaded'});
-  await expect(page.locator('.forecast-card').first()).toContainText('Mật độ cao');
-  await expect(page.locator('.forecast-card').first()).toContainText('XGBoost');
-  await expect(page.locator('.forecast-card').last()).toContainText('GRU');
-  await page.getByLabel('Nội dung dự báo').selectOption('congestion');
-  await expect(page.locator('.forecast-card').first()).toContainText('Ùn tắc');
-  await expect(page.locator('.forecast-card').last()).toContainText('Đông, di chuyển chậm');
-  await expect(page.getByRole('heading',{name:'Chưa có dự báo',exact:true})).toHaveCount(0);
+test('forecast cards use API class and exact horizon timestamps',async({page})=>{
+  await page.route('**/api/demo/predict?*',async route=>route.fulfill({json:{state:'ready',is_demo:true,message:'Contract fixture',issue_at:new Date().toISOString(),current:{label:'FREE',speed_kmh:30,count:4},predictions:[{horizon_minutes:15,predicted_at:'2026-10-29T08:15:00+07:00',label:'JAM',model:'XGBoost'},{horizon_minutes:30,predicted_at:'2026-10-29T08:30:00+07:00',label:'SLOW',model:'XGBoost'}]}}));
+  await page.goto('/#forecast');await expect(page.locator('.forecast-card').first()).toContainText('Ùn tắc');await expect(page.locator('.forecast-card').first()).toContainText('08:15');await expect(page.locator('.forecast-card').last()).toContainText('Đông, di chuyển chậm');await expect(page.locator('.forecast-card').last()).toContainText('08:30');
 });

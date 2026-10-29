@@ -1,50 +1,66 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Navigation, Video, Bookmark, Bell, Settings2, ChevronRight, Menu, X, ArrowUpRight, Radio, MapPin, LogIn, Camera as CameraIcon, LayoutDashboard, BrainCircuit } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, MapPin, LogIn, Activity, LayoutDashboard, BrainCircuit } from 'lucide-react';
 import { api } from './api';
-import RoutesPage from './RoutesPage';
-import VideoPage from './VideoPage';
-import TrafficMonitor from './TrafficMonitor';
-import OverviewPage from './OverviewPage';
-import ForecastPage from './ForecastPage';
-import { HistoryPage,AlertsPage,AdminPage } from './WorkspacePages';
 import { AuthModal,ProfilePage } from './Auth';
 import { Modal,Notice,Spinner } from './components';
-import { type Place,type Segment,type Camera,type Config,type User,type Favorite } from './types';
-
-type Tab='overview'|'forecast'|'routes'|'monitor'|'video'|'history'|'alerts'|'admin'|'profile';
-const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Camera & giao thông',icon:CameraIcon},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'video',label:'Nhận dạng video',icon:Video},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
+import { type Place,type Segment,type Camera,type Config,type User,type Favorite,type DemoStatus,type DataMode } from './types';
+const OverviewPage=lazy(()=>import('./OverviewPage'));
+const RoutesPage=lazy(()=>import('./RoutesPage'));
+const TrafficMonitor=lazy(()=>import('./TrafficMonitor'));
+const ForecastPage=lazy(()=>import('./ForecastPage'));
+const HistoryPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.HistoryPage})));
+const AlertsPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.AlertsPage})));
+const AdminPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.AdminPage})));
+type Tab='overview'|'forecast'|'routes'|'monitor'|'history'|'alerts'|'admin'|'profile';
+const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Tình trạng & thống kê',icon:Activity},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
+type Bootstrap={places:Place[];segments:Segment[];cameras:Camera[];config:Config;user:User|null;demo:DemoStatus};
 export default function App(){
-  const[tab,setTab]=useState<Tab>(()=>{const view=location.hash.slice(1);return navigation.some(n=>n.id===view)?view as Tab:'overview';});const[places,setPlaces]=useState<Place[]>([]);const[segments,setSegments]=useState<Segment[]>([]);const[cameras,setCameras]=useState<Camera[]>([]);const[config,setConfig]=useState<Config|null>(null);const[user,setUser]=useState<User|null>(null);const[error,setError]=useState('');const[authOpen,setAuthOpen]=useState(Boolean(new URLSearchParams(location.search).get('reset')));const[mobileOpen,setMobileOpen]=useState(false);const[preset,setPreset]=useState<Favorite|null>(null);const[routeKey,setRouteKey]=useState(0);const[toast,setToast]=useState('');
-  const[legal,setLegal]=useState(false);
-  const[cameraPreset,setCameraPreset]=useState<number|undefined>();
-  const refresh=useCallback(()=>{Promise.all([api<Segment[]>('/segments'),api<Camera[]>('/cameras'),api<Place[]>('/places')]).then(([s,c,p])=>{setSegments(s);setCameras(c);setPlaces(p);}).catch(e=>setError(e.message));},[]);
-  const initialize=useCallback(()=>{setError('');Promise.all([api<Place[]>('/places'),api<Segment[]>('/segments'),api<Camera[]>('/cameras'),api<Config>('/config'),api<User|null>('/auth/me')]).then(([p,s,c,cf,u])=>{setPlaces(p);setSegments(s);setCameras(c);setConfig(cf);setUser(u);}).catch(e=>setError(e.message));},[]);
-  useEffect(()=>{initialize();const interval=setInterval(refresh,30000);return()=>clearInterval(interval);},[initialize,refresh]);
-  useEffect(()=>{const changed=()=>{const view=location.hash.slice(1);if(navigation.some(n=>n.id===view)||view==='profile')setTab(view as Tab);setMobileOpen(false);};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
+  const[tab,setTab]=useState<Tab>(()=>{const view=location.hash.slice(1);return navigation.some(n=>n.id===view)?view as Tab:'overview';});
+  const[dataMode,setDataMode]=useState<DataMode>(()=>localStorage.getItem('smarteye-data-mode')==='observed'?'observed':'demo');
+  const[places,setPlaces]=useState<Place[]>([]);const[segments,setSegments]=useState<Segment[]>([]);const[cameras,setCameras]=useState<Camera[]>([]);
+  const[loadedMode,setLoadedMode]=useState<DataMode|null>(null);const[config,setConfig]=useState<Config|null>(null);const[demo,setDemo]=useState<DemoStatus|null>(null);const[user,setUser]=useState<User|null>(null);
+  const[error,setError]=useState('');const[authOpen,setAuthOpen]=useState(Boolean(new URLSearchParams(location.search).get('reset')));const[mobileOpen,setMobileOpen]=useState(false);
+  const[preset,setPreset]=useState<Favorite|null>(null);const[routeKey,setRouteKey]=useState(0);const[toast,setToast]=useState('');const[legal,setLegal]=useState(false);const version=useRef(0);
+  const refresh=useCallback(()=>{
+    const current=++version.current;
+    api<Bootstrap>(`/bootstrap?data_mode=${dataMode}`).then(data=>{
+      if(current!==version.current)return;
+      setPlaces(data.places);setSegments(data.segments);setCameras(data.cameras);setConfig(data.config);setLoadedMode(dataMode);setUser(data.user);setDemo(data.demo);setError('');
+      if(!data.demo.enabled&&dataMode==='demo')setDataMode('observed');
+    }).catch(e=>{if(current===version.current)setError(e.message);});
+  },[dataMode]);
+  useEffect(()=>{refresh();return()=>{version.current++;};},[refresh]);
+  useEffect(()=>{const interval=setInterval(()=>{if(!document.hidden)refresh();},demo?.enabled&&!demo.ready?5000:30000);return()=>clearInterval(interval);},[refresh,demo?.ready,demo?.enabled]);
+  useEffect(()=>{localStorage.setItem('smarteye-data-mode',dataMode);},[dataMode]);
+  useEffect(()=>{const changed=()=>{const view=location.hash.slice(1);if(navigation.some(n=>n.id===view)||view==='profile')setTab(view as Tab);else{setTab('overview');location.hash='overview';}setMobileOpen(false);};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(timer);},[toast]);
   function navigate(id:Tab){setTab(id);location.hash=id;setMobileOpen(false);window.scrollTo({top:0});}
-  function onUser(next:User|null){setUser(next);if(!next)navigate('overview');}
+  function onUser(next:User|null){version.current++;setUser(next);if(!next)navigate('overview');}
   const current=tab==='profile'?'Hồ sơ cá nhân':navigation.find(n=>n.id===tab)?.label;
-  return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}><a href="#" className="brand" onClick={e=>{e.preventDefault();navigate('overview');}}><span className="brand-icon"><span/><i/></span><span>SmartEye<small>HIỂU ĐƯỜNG · CHỌN LỐI</small></span></a><button className="mobile-close icon-button" onClick={()=>setMobileOpen(false)} aria-label="Đóng menu"><X size={20}/></button><nav aria-label="Điều hướng chính">{navigation.filter(n=>n.id!=='admin'||user?.role==='admin').map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='video'||id==='admin')&&<div className="nav-group-label">{id==='overview'?'THEO DÕI GIAO THÔNG':id==='video'?'CÔNG CỤ & CÁ NHÂN':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav><div className="sidebar-project"><div><Radio size={17}/><b>Hà Nội</b></div><p>Không gian nghiên cứu<br/>giao thông đô thị</p><div className="project-stats"><span><b>{cameras.filter(c=>c.active).length}</b> camera</span><span><b>{segments.length}</b> đoạn đường</span></div></div><div className="sidebar-bottom"><div className="mini-brand">SE<span>01</span></div><p>Dữ liệu rõ ràng.<br/>Di chuyển thông minh.</p><a href="https://github.com/nguyenbaolong2504/SmartEye" target="_blank" rel="noreferrer">Mã nguồn dự án<ArrowUpRight size={14}/></a><small>SmartEye · Phiên bản 1.0</small></div></aside>
-    {mobileOpen&&<div className="sidebar-scrim" onClick={()=>setMobileOpen(false)}/>}
+  return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}>
+    <a href="#overview" className="brand" onClick={e=>{e.preventDefault();navigate('overview');}}><span className="brand-icon"><span/><i/></span><span>SmartEye<small>HIỂU ĐƯỜNG · CHỌN LỐI</small></span></a>
+    <button className="mobile-close icon-button" onClick={()=>setMobileOpen(false)} aria-label="Đóng menu"><X size={20}/></button>
+    <nav aria-label="Điều hướng chính">{navigation.filter(n=>n.id!=='admin'||user?.role==='admin').map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG HÀ NỘI':id==='history'?'CÁ NHÂN':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
+    <div className="sidebar-project"><div><Radio size={17}/><b>Hà Nội</b></div><p>{dataMode==='demo'?'Không gian chạy thử':'Dữ liệu quan sát'}<br/>giao thông đô thị</p><div className="project-stats"><span><b>{segments.filter(s=>s.active).length}</b> tuyến đường</span><span>UTC+7</span></div></div>
+    <div className="sidebar-bottom"><p>Dữ liệu rõ ràng.<br/>Chủ động hành trình.</p><small>SmartEye · Phiên bản 1.1</small></div>
+  </aside>{mobileOpen&&<div className="sidebar-scrim" onClick={()=>setMobileOpen(false)}/>}
     <div className="main-shell"><header className="topbar"><button className="mobile-toggle icon-button" onClick={()=>setMobileOpen(true)} aria-label="Mở menu"><Menu size={21}/></button><div className="breadcrumb"><span>Không gian làm việc</span><ChevronRight size={14}/><b>{current}</b></div><div className="topbar-actions"><span className="city-label"><MapPin size={14}/>Hà Nội, Việt Nam</span>{user?<button className="user-button" aria-label={`Hồ sơ ${user.name}`} onClick={()=>navigate('profile')}><span>{user.name.charAt(0).toUpperCase()}</span><div>{user.name}<small>{user.role==='admin'?'Quản trị viên':user.role==='analyst'?'Quản lý':'Người dùng'}</small></div><ChevronRight size={15}/></button>:<button className="button small" onClick={()=>setAuthOpen(true)}><LogIn size={15}/>Đăng nhập</button>}</div></header>
-    <main>{error&&<div className="connection-error"><Notice kind="error">{error} Kiểm tra backend đã chạy tại cổng 8000.</Notice><button className="button" onClick={initialize}>Thử kết nối lại</button></div>}
-      {!config&&!error?<div className="loading-page"><Spinner/><p>Đang kết nối SmartEye…</p></div>:config&&<>
-
-      {tab==='overview'&&<OverviewPage segments={segments} cameras={cameras} places={places} onNavigate={navigate}/>}
-      {tab==='forecast'&&<ForecastPage segments={segments} user={user} onLogin={()=>setAuthOpen(true)} onUpload={()=>navigate('video')}/>}
-      {tab==='routes'&&<RoutesPage key={routeKey} places={places} segments={segments} config={config} user={user} onLogin={()=>setAuthOpen(true)} preset={preset} onSaved={()=>setToast('Đã lưu hành trình yêu thích.')}/>}
-      {tab==='monitor'&&<TrafficMonitor segments={segments} onUpload={id=>{setCameraPreset(id);navigate('video');}} onFindRoute={()=>navigate('routes')}/>}
-      {tab==='video'&&<VideoPage cameras={cameras} segments={segments} config={config} user={user} onLogin={()=>setAuthOpen(true)} onUpdated={refresh} initialCameraId={cameraPreset}/>}
-      {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
-      {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
-      {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} cameras={cameras} segments={segments} onUpdated={refresh}/>}
-      {tab==='profile'&&user&&<ProfilePage user={user} onUser={onUser}/>}
-      </>}
+    <main>{error&&<div className="connection-error"><Notice kind="error">{error}</Notice><button className="button" onClick={refresh}>Thử kết nối lại</button></div>}
+      {demo?.enabled&&<div className={`data-mode-bar ${dataMode}`}><div><b>{dataMode==='demo'?'DỮ LIỆU MÔ PHỎNG':'DỮ LIỆU QUAN SÁT'}</b><span>{dataMode==='demo'?'Chạy thử dự báo và thống kê · không phải tình trạng thực tế':'Chỉ sử dụng dữ liệu đã ghi nhận; thời điểm thiếu được giữ trống'}</span></div><label>Nguồn dữ liệu<select aria-label="Nguồn dữ liệu" value={dataMode} onChange={e=>setDataMode(e.target.value as DataMode)}><option value="demo">Mô phỏng để chạy thử</option><option value="observed">Quan sát thực tế</option></select></label></div>}
+      {(!config||loadedMode!==dataMode)&&!error?<div className="loading-page"><Spinner/><p>Đang kết nối SmartEye…</p></div>:config&&<Suspense fallback={<div className="loading-page"><Spinner/><p>Đang mở trang…</p></div>}>
+        {tab==='overview'&&<OverviewPage segments={segments} places={places} onNavigate={navigate} dataMode={dataMode}/>}
+        {tab==='forecast'&&<ForecastPage segments={segments} user={user} dataMode={dataMode} demo={demo} onLogin={()=>setAuthOpen(true)} onHistory={()=>navigate('monitor')} onUpdated={refresh}/>}
+        {tab==='routes'&&<RoutesPage key={`${routeKey}-${dataMode}`} places={places} segments={segments} config={config} user={user} dataMode={dataMode} onLogin={()=>setAuthOpen(true)} preset={preset} onSaved={()=>setToast('Đã lưu hành trình yêu thích.')}/>}
+        {tab==='monitor'&&<TrafficMonitor segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
+        {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
+        {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
+        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} cameras={cameras} segments={segments} onUpdated={refresh}/>}
+        {tab==='profile'&&user&&<ProfilePage user={user} onUser={onUser}/>}
+      </Suspense>}
       <footer className="footer"><span>© SmartEye · Hệ thống hỗ trợ quyết định giao thông</span><button className="text-button" onClick={()=>setLegal(true)}>Điều khoản & quyền riêng tư</button></footer>
     </main></div>
     {authOpen&&config&&<AuthModal config={config} onClose={()=>setAuthOpen(false)} onUser={onUser} resetToken={new URLSearchParams(location.search).get('reset')||undefined}/>}
     {toast&&<div role="status" className="toast">{toast}</div>}
-    {legal&&<Modal title="Điều khoản & quyền riêng tư" onClose={()=>setLegal(false)}><h3>Sử dụng SmartEye</h3><p>SmartEye hỗ trợ nghiên cứu và lựa chọn tuyến. Mật độ xe là chỉ báo theo vùng camera đã hiệu chỉnh; hệ thống không đo chính xác tốc độ hay bảo đảm một tuyến không ùn tắc. Mạng đường minh họa không dùng để dẫn đường thực tế. Người tải video cần có quyền sử dụng và tránh đưa hình ảnh cá nhân không cần thiết lên hệ thống.</p><h3>Dữ liệu được lưu</h3><p>Hệ thống lưu email, tên, mật khẩu đã băm, phiên đăng nhập, đầu vào hành trình yêu thích, kết quả camera, ảnh minh họa, cảnh báo và nhật ký quản trị. Video gốc mặc định được xóa sau xử lý; nếu chọn giữ, video vẫn riêng tư cho đến khi được phép chia sẻ. Dữ liệu đã công bố và nhãn thực tế có thể được dùng để huấn luyện dự báo; ảnh/video cá nhân không tự động công khai. Chủ tài khoản có thể xóa kết quả video và hành trình của mình. Quan sát đã công bố được giữ để phục vụ báo cáo có nguồn gốc. Dữ liệu nằm trên máy chủ do chủ dự án vận hành.</p><h3>OpenStreetMap và tìm địa chỉ</h3><p>Nền đường phố được tải từ máy chủ OpenStreetMap. Khi tìm địa chỉ, nội dung đã nhập được gửi qua máy chủ SmartEye tới Photon để lấy gợi ý; khi tính tuyến, vùng tọa độ được gửi tới nguồn Overpass để lấy mạng đường. Các dịch vụ công cộng có thể chậm hoặc thiếu số nhà. Kiểm tra ghim và biển báo thực tế; ETA là ước tính. Gợi ý địa chỉ chỉ được giữ ngắn trong bộ nhớ máy chủ; hành trình chỉ được lưu vào tài khoản khi bạn chọn lưu.</p><h3>Google Maps</h3><p>Khi bạn chọn Google Routes, tọa độ và giờ khởi hành được gửi tới Google để tính tuyến. Nội dung dịch vụ tuân theo <a className="text-button" href="https://maps.google.com/help/terms_maps/" target="_blank" rel="noreferrer">Điều khoản Google Maps</a> và <a className="text-button" href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Chính sách quyền riêng tư Google</a>. SmartEye không lưu kết quả định tuyến Google vào cơ sở dữ liệu hay dùng làm dữ liệu huấn luyện.</p><p>Yêu cầu về dữ liệu cá nhân: liên hệ quản trị viên triển khai hoặc chủ dự án qua <a className="text-button" href="https://github.com/nguyenbaolong2504/SmartEye/issues" target="_blank" rel="noreferrer">trang hỗ trợ SmartEye</a>; không gửi mật khẩu hoặc video riêng tư vào issue công khai.</p></Modal>}
+    {legal&&<Modal title="Điều khoản & quyền riêng tư" onClose={()=>setLegal(false)}><h3>Sử dụng SmartEye</h3><p>SmartEye phục vụ nghiên cứu, không bảo đảm tình trạng giao thông hay dẫn đường thực tế. Chế độ mô phỏng sử dụng dữ liệu tổng hợp có nhãn riêng; mọi dự báo và điều chỉnh thời gian trong chế độ này là kết quả chạy thử.</p><h3>Dữ liệu được lưu</h3><p>Hệ thống lưu thông tin tài khoản, mật khẩu đã băm, phiên đăng nhập, hành trình yêu thích, quan sát, cảnh báo và nhật ký quản trị. Lịch sử và mô hình mô phỏng được lưu riêng với dữ liệu thực. Các bản ghi camera cũ được giữ theo quyền truy cập đã cấp.</p><h3>Bản đồ và địa chỉ</h3><p>Bản đồ sử dụng OpenStreetMap. Nội dung tìm địa chỉ được gửi qua máy chủ tới Photon; tọa độ tìm tuyến được gửi tới OSRM hoặc vùng mạng đường Overpass khi cần. Dịch vụ công cộng có thể chậm hoặc thiếu số nhà. Chọn ghim sát lối vào, kiểm tra biển báo và đường thực tế. ETA là ước tính, không phải dữ liệu giao thông trực tiếp. Hành trình chỉ được lưu vào tài khoản khi bạn chọn lưu.</p></Modal>}
   </div>;
 }

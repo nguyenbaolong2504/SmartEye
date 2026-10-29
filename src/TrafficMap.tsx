@@ -37,7 +37,7 @@ export function TrafficMap({segments,routes,selected,onSelect,browserKey,provide
       const chosen=route.id===selected;
       L.polyline(route.geometry,{color:chosen?'#ffffff':'#637eaa',weight:chosen?10:5,opacity:chosen?1:.55}).addTo(layer);
       L.polyline(route.geometry,{color:chosen?'#286bd2':'#728cb5',weight:chosen?6:4,opacity:chosen?1:.7}).on('click',()=>callbacks.current.onSelect(route.id)).bindTooltip(textNode(route.name)).addTo(layer);
-      if(chosen&&trafficVisible)for(const segment of route.segments.filter(segment=>segment.density))L.polyline(segment.geometry,{color:densityColor[segment.density!],weight:6}).addTo(layer);
+      if(chosen&&trafficVisible)for(const segment of route.segments.filter(segment=>segment.density&&segment.geometry.length>1))L.polyline(segment.geometry,{color:densityColor[segment.density!],weight:6}).addTo(layer);
     }
     const points=[origin||active&&{lat:active.geometry[0][0],lng:active.geometry[0][1],name:'Điểm xuất phát'},destination||active&&{lat:active.geometry.at(-1)![0],lng:active.geometry.at(-1)![1],name:'Điểm đến'}];
     points.forEach((point,index)=>{if(!point)return;const icon=L.divIcon({className:'street-pin',html:`<span class="${index?'destination':'origin'}"><b>${index?'B':'A'}</b></span>`,iconSize:[34,42],iconAnchor:[17,40]});L.marker([point.lat,point.lng],{icon}).bindTooltip(textNode(point.name)).addTo(layer);});
