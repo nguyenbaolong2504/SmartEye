@@ -45,4 +45,6 @@ API dữ liệu, nhãn thực tế, tác vụ huấn luyện, xuất báo cáo, 
 
 ## Tối ưu tuyến Dijkstra/A*
 
+`provider=osm` nhận tọa độ/địa chỉ đã chọn, dùng dữ liệu đường OpenStreetMap qua Overpass. `GET /api/map/places?q=...` trả gợi ý địa chỉ Photon (tối thiểu 3 ký tự, khu vực Hà Nội). Config thêm `osm_available`, `osm_tile_url`, `address_search_available`. Optimization có `scope=osm_network`, vùng tải và độ lệch ghim/đường; xem [MAPS.md](MAPS.md).
+
 `/api/routes/search` nhận thêm `algorithm` (compare/dijkstra/astar), mặc định compare. `weights` nhận time/distance và density tùy chọn. Có `optimization` và `cost_components` trong response; scope Google chỉ là tập ứng viên. `/api/segments` hỗ trợ `one_way` mặc định false; `/api/places` gồm cả các nút của đoạn đang hoạt động. Xem [ROUTING.md](ROUTING.md).

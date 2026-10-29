@@ -64,14 +64,14 @@ class ObservationInput(BaseModel):
 class Waypoint(BaseModel):
     lat: float = Field(ge=20.5, le=21.5)
     lng: float = Field(ge=105.2, le=106.2)
-    name: str = Field(default='', max_length=120)
+    name: str = Field(default='', max_length=240)
     node: str | None = Field(default=None, max_length=80)
 
 class RouteRequest(BaseModel):
     origin: Waypoint
     destination: Waypoint
     mode: Literal['DRIVE', 'TWO_WHEELER'] = 'DRIVE'
-    provider: Literal['demo', 'google'] = 'demo'
+    provider: Literal['demo', 'google', 'osm'] = 'demo'
     algorithm: Literal['compare','dijkstra','astar'] = 'compare'
     departure_at: datetime | None = None
     weights: dict[str, float] = Field(default={'time': .6, 'distance': .4, 'density': 0.})

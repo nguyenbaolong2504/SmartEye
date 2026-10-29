@@ -1,5 +1,7 @@
 # Chạy SmartEye trên Windows với MongoDB
 
+Bản mới mặc định có bản đồ OpenStreetMap, ô nhập địa chỉ đầy đủ và chọn ghim. Không cần API key/DB mới. Sau cập nhật, build lại backend và frontend như mục Docker bên dưới; cách dùng và giới hạn nguồn địa chỉ/đường: [MAPS.md](MAPS.md).
+
 Tất cả lệnh dùng **PowerShell** trong `C:\Users\Admin\Documents\GitHub\SmartEye`. Chỉ copy lệnh trong khối code, không copy dấu nhắc `PS C:\...>`. Chọn local (mục 1–5), Docker đầy đủ (mục 6), hoặc Docker chỉ DB (mục 7).
 
 Compass là phần mềm quản lý DB, không khởi chạy MongoDB Server. Kết nối đã lưu trong Compass không có nghĩa server đang hoạt động.

@@ -236,7 +236,10 @@ async def google_routes(db, req):
     return routes
 
 async def search_routes(db, req):
-    if req.provider=='google':
+    if req.provider=='osm':
+        from .osm_routing import osm_routes
+        routes,optimization=await osm_routes(db,req)
+    elif req.provider=='google':
         routes=rank_routes(await google_routes(db,req),req.weights)
         optimization={'scope':'google_candidates','algorithm':None,'agreement':None,'primary_search':{},
             'normalized_weights':normalized_weights(req.weights),
@@ -248,12 +251,14 @@ async def search_routes(db, req):
         routes,optimization=demo_routes(db,req)
     best=routes[0]
     reason=f'Tuyến được chọn có ETA {round(best["duration_seconds"]/60)} phút, dài {best["distance_km"]} km; điểm tổng hợp {best["score"]:.3f} theo trọng số của bạn.'
-    if optimization['scope']=='configured_network':
+    if optimization['scope'] in ('configured_network','osm_network'):
         reason+=' Tối ưu chi phí kết hợp ngay trên đồ thị bằng '+('Dijkstra và A* đã đối chiếu.' if req.algorithm=='compare' else ('Dijkstra.' if req.algorithm=='dijkstra' else 'A*.'))
     if best['unknown_share']: reason+=f' {round(best["unknown_share"]*100)}% tuyến chưa có dữ liệu giao thông; chưa thể khẳng định không tắc.'
     if any(s.get('source')=='forecast' for s in best['segments']): reason+=' Có sử dụng mô hình dự báo đã được kích hoạt, tại mốc gần giờ khởi hành.'
     if any(s.get('source')=='historical' for s in best['segments']): reason+=' Có sử dụng thống kê 28 ngày gần nhất cùng thứ và giờ; đây là tham khảo lịch sử.'
     notice=('Mạng đường, khoảng cách và ETA minh họa; không dùng để dẫn đường thực tế.' if optimization.get('contains_demo_roads') else
         'Tối ưu trong mạng đường đã cấu hình; ETA ước tính từ vận tốc tham chiếu theo mật độ, chưa phải phép đo tốc độ thực tế.') if req.provider=='demo' else 'Chọn trong các tuyến Google cung cấp, giữ ETA Google. Camera/dự báo chỉ bổ sung rủi ro theo vị trí.'
+    if req.provider=='osm':
+        notice='© OpenStreetMap contributors. Tuyến bám đường OSM trong vùng tải; ghim được nối vào đường phù hợp gần nhất (tối đa 200 m). Đoạn từ cửa nhà tới điểm nối chưa được xác minh và không tính vào ETA. Tôn trọng chiều đường, quyền phương tiện, giới hạn rộng đã gắn thẻ và hạn chế rẽ qua nút; đường có hạn chế điều kiện/phức tạp chưa xử lý được loại thận trọng. Dữ liệu có thể thiếu hoặc thay đổi; kiểm tra biển báo thực tế.'
     return {'provider':req.provider,'generated_at':stamp(),'routes':routes,'recommendation':{'route_id':best['id'],'reason':reason},
         'optimization':optimization,'notice':notice,'future_notice':'Dự báo hoặc lịch sử chỉ dùng khi đủ bằng chứng và phù hợp giờ khởi hành. Chi phí cạnh là snapshot tại giờ khởi hành, chưa cập nhật theo thời điểm đến từng đoạn.' if req.departure_at else None}

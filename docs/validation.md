@@ -5,6 +5,14 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## OpenStreetMap, địa chỉ và mạng đường thực, ngày 29/10/2026
+
+- TypeScript strict và Vite production build đạt; Leaflet được tách thành bundle riêng. Toàn bộ **32/32 E2E desktop/mobile đạt**, gồm lưu/mở lại địa chỉ, tọa độ, nguồn định tuyến, đổi chiều, ghim, zoom, mở rộng và nội dung địa chỉ chưa xác nhận; các luồng dự báo/tài khoản/quản trị/video YOLO thật cũ đều đạt. E2E dùng upstream HTTP (tile, Photon, Overpass), API và DB riêng; không đưa fixture vào dữ liệu triển khai.
+- Backend đã chạy trọn với MongoDB 8.0.32 thật trên 27019: **140 passed, không skip**, gồm từ chối tọa độ upstream không hợp lệ. Đã kiểm tra snap trong cạnh, chiều đường, cấm rẽ qua nút, tiếp tục đi thẳng khi cấm quay đầu, quyền xe/bề rộng, giới hạn vùng, phân biệt quan sát demo/khảo sát, tác động mật độ đến ETA, lỗi nguồn, fallback và cache. Kết quả CI cuối được bổ sung sau push.
+- Live Photon trả địa danh/số nhà thật ở Hà Nội; trình duyệt tải được nền OSM thật và chụp chi tiết đường/ngõ/công trình/số nhà. Ảnh MAPS.md không có tuyến hoặc traffic giả. Các request tile bị hủy khi chuyển vùng/zoom không được coi là bằng chứng dịch vụ nền luôn có sẵn.
+- Overpass công cộng trả quá tải 502 hoặc timeout, kể cả nguồn thay thế, khi kiểm tra vùng Ngọc Hà – Văn Miếu. Vì vậy chưa xác minh thành công một lượt tìm tuyến trọn vẹn với extract Hà Nội vừa tải từ nguồn thật. Tìm tuyến được kiểm chứng trên fixture đồ thị OSM riêng; không suy thành dữ liệu nguồn công cộng đang hoạt động hay độ chính xác giao thông thực địa. Đã thêm timeout, fallback một nguồn, cache 6 giờ và lỗi rõ; không thay bằng tuyến seed khi upstream lỗi.
+- Docker Engine hiện phản hồi, container ứng dụng cũ healthy nhưng chưa có module forecast/graph và chưa có thư viện XGBoost/scikit-learn. Ổ C còn khoảng 0,89 GB; chưa build lại image backend đầy đủ hoặc áp dụng source mới vào các container đang chạy. Preview kiểm tra nền thật dùng cổng 5176/8016 và DB riêng, không dùng tài khoản/video/database triển khai.
+
 ## Dijkstra / A* theo thời gian + khoảng cách, ngày 29/10/2026
 
 - Backend **117 passed, không skip** với MongoDB 8.0.32 thật, DB kiểm thử riêng trên 27019. Có oracle vét cạn độc lập đối chiếu Dijkstra/A*/Yen trên 10 đồ thị nhỏ ngẫu nhiên, đường song song, chu trình và các ca heuristic km minh họa không khớp khoảng cách địa lý.

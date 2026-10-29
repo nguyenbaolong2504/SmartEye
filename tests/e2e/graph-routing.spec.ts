@@ -11,7 +11,7 @@ async function search(page:Page){
 }
 
 test('Dijkstra and A* use combined priorities, comparison and visible cost breakdown',async({page},testInfo)=>{
-  await page.goto('/#routes',{waitUntil:'domcontentloaded'});
+  await page.goto('/#routes',{waitUntil:'domcontentloaded'});await page.getByLabel('Nguồn định tuyến',{exact:true}).selectOption('demo');
   await expect(page.getByLabel('Thuật toán tìm tuyến',{exact:true})).toHaveValue('compare');
   await page.getByRole('button',{name:'Cân bằng 50/50',exact:true}).click();
   const compare=await search(page);
@@ -40,7 +40,7 @@ test('Dijkstra and A* use combined priorities, comparison and visible cost break
 });
 
 test('admin configures one-way road and endpoints become available without reload',async({page})=>{
-  await page.goto('/#routes',{waitUntil:'domcontentloaded'});
+  await page.goto('/#routes',{waitUntil:'domcontentloaded'});await page.getByLabel('Nguồn định tuyến',{exact:true}).selectOption('demo');
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await page.getByLabel('Email',{exact:true}).fill('e2e-admin@example.invalid');
   await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');
@@ -56,7 +56,7 @@ test('admin configures one-way road and endpoints become available without reloa
   await page.getByLabel('Tọa độ đường',{exact:true}).fill('[[21.04,105.79],[21.04,105.81]]');
   await page.getByLabel('Đường một chiều: chỉ đi từ nút đầu đến nút cuối',{exact:true}).check();
   await page.getByRole('button',{name:'Lưu đoạn đường',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
-  await navigate(page,'Tìm tuyến đường');
+  await navigate(page,'Tìm tuyến đường');await page.getByLabel('Nguồn định tuyến',{exact:true}).selectOption('demo');
   await expect(page.getByLabel('Điểm xuất phát',{exact:true}).locator(`option[value="${west}"]`)).toHaveCount(1);
   await page.getByLabel('Điểm xuất phát',{exact:true}).selectOption(west);await page.getByLabel('Điểm đến',{exact:true}).selectOption(east);
   const forward=await search(page);expect(forward.status).toBe(200);expect(forward.body.routes).toHaveLength(1);

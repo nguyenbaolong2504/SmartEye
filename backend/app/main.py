@@ -28,6 +28,7 @@ from .seed import seed, PLACES
 from .traffic import classify, latest_observations, observation_dict, emit_alerts
 from .routing import search_routes
 from .video import submit
+from .map_services import router as map_router, settings as map_settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('smarteye')
@@ -51,6 +52,7 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title='SmartEye API', version='1.0.0', lifespan=lifespan)
+app.include_router(map_router)
 
 @app.exception_handler(RequestValidationError)
 async def invalid_request(request,exc):
@@ -76,8 +78,8 @@ async def guard(request, call_next):
             allowed |= {'http://127.0.0.1:5173','http://localhost:5173','http://127.0.0.1:8000','http://localhost:8000'}
         if origin and origin.rstrip('/') not in allowed:
             return JSONResponse({'detail':'Nguồn yêu cầu không được phép.'},status_code=403)
-    bucket = 'training' if request.url.path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path == '/api/routes/search' else 'general'
-    limit = {'training':2,'auth':20,'video':5,'route':20,'general':180}[bucket]
+    bucket = 'training' if request.url.path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path == '/api/routes/search' else 'geocoding' if request.url.path=='/api/map/places' else 'general'
+    limit = {'training':2,'auth':20,'video':5,'route':20,'geocoding':45,'general':180}[bucket]
     ip = request.client.host if request.client else 'unknown'
     key = (ip,bucket)
     with _rate_lock:
@@ -124,7 +126,7 @@ def health():
 
 @app.get('/api/config')
 def config():
-    return {'google_routes_available':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'maps_browser_key':os.getenv('GOOGLE_MAPS_BROWSER_KEY',''),'video_available':MODEL_PATH.is_file(),'max_upload_mb':MAX_UPLOAD//1024//1024,'observation_ttl_minutes':TTL_MINUTES,'demo_available':True,'password_reset_available':bool(os.getenv('SMTP_HOST'))}
+    return {**map_settings(),'google_routes_available':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'maps_browser_key':os.getenv('GOOGLE_MAPS_BROWSER_KEY',''),'video_available':MODEL_PATH.is_file(),'max_upload_mb':MAX_UPLOAD//1024//1024,'observation_ttl_minutes':TTL_MINUTES,'demo_available':True,'password_reset_available':bool(os.getenv('SMTP_HOST'))}
 
 @app.post('/api/auth/register',status_code=201)
 def register(body:S.Register,response:Response,db=Depends(get_db)):

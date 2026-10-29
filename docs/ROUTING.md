@@ -1,5 +1,7 @@
 # Dijkstra / A*: tối ưu thời gian và khoảng cách
 
+**Nguồn đường phố mới:** giao diện mặc định dùng OpenStreetMap, nhập địa chỉ và chọn ghim. Chi tiết dựng đồ thị đường thực, hạn chế rẽ, phạm vi tối ưu và ETA: [MAPS.md](MAPS.md). Phần mạng cấu hình bên dưới vẫn dành cho dữ liệu các đoạn đường trong MongoDB; Google chỉ xếp hạng tập ứng viên của nhà cung cấp.
+
 ![So sánh Dijkstra và A*](previews/routing-compare-desktop.png)
 
 Ảnh từ trình duyệt kiểm thử với mạng demo, không phải bằng chứng thời gian di chuyển thực tế. [Ảnh trên điện thoại](previews/routing-compare-mobile.png).

@@ -1,0 +1,72 @@
+{
+  "elements": [
+    {
+      "type": "node",
+      "id": 1,
+      "lat": 21.03,
+      "lon": 105.82
+    },
+    {
+      "type": "node",
+      "id": 2,
+      "lat": 21.03,
+      "lon": 105.825
+    },
+    {
+      "type": "node",
+      "id": 3,
+      "lat": 21.03,
+      "lon": 105.83
+    },
+    {
+      "type": "node",
+      "id": 4,
+      "lat": 21.035,
+      "lon": 105.825
+    },
+    {
+      "type": "node",
+      "id": 5,
+      "lat": 21.035,
+      "lon": 105.83
+    },
+    {
+      "type": "way",
+      "id": 10,
+      "nodes": [
+        1,
+        2
+      ],
+      "tags": {
+        "highway": "residential",
+        "name": "Đường kiểm thử Tây"
+      }
+    },
+    {
+      "type": "way",
+      "id": 20,
+      "nodes": [
+        2,
+        3
+      ],
+      "tags": {
+        "highway": "residential",
+        "name": "Đường kiểm thử Đông"
+      }
+    },
+    {
+      "type": "way",
+      "id": 30,
+      "nodes": [
+        2,
+        4,
+        5,
+        3
+      ],
+      "tags": {
+        "highway": "residential",
+        "name": "Đường kiểm thử vòng"
+      }
+    }
+  ]
+}

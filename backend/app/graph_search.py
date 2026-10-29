@@ -49,15 +49,19 @@ def shortest_path(graph,start,goal,algorithm='dijkstra',heuristic=lambda node:0.
     return result,{'expanded_nodes':expanded,'relaxed_edges':relaxed,'elapsed_ms':round((perf_counter()-began)*1000,3)}
 
 
-def yen_paths(graph,start,goal,first,algorithm,heuristic=lambda node:0.,limit=3):
+def yen_paths(graph,start,goal,first,algorithm,heuristic=lambda node:0.,limit=3,max_searches=None):
     """K shortest loopless paths; bans use edge IDs, including parallel edges."""
     if first is None: return []
     accepted=[first];pending=[];serial=itertools.count()
-    seen={tuple(e.key for e in first)}
+    seen={tuple(e.key for e in first)};searches=0
     while len(accepted)<limit:
         last=accepted[-1]
         nodes=[start]+[edge.end for edge in last]
         for index in range(len(last)):
+            if max_searches is not None and searches>=max_searches:
+                while pending and len(accepted)<limit: accepted.append(heapq.heappop(pending)[-1])
+                return accepted
+            searches+=1
             root=last[:index];signature=tuple(e.key for e in root)
             removed={path[index].key for path in accepted if len(path)>index and tuple(e.key for e in path[:index])==signature}
             spur,_=shortest_path(graph,nodes[index],goal,algorithm,heuristic,

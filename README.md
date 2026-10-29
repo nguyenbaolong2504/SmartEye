@@ -10,6 +10,8 @@ Trang Tổng quan, dự báo 15/30 phút bằng XGBoost + GRU, chuẩn bị dữ
 
 ## Bắt đầu
 
+**Bản đồ đường phố OpenStreetMap, nhập số nhà/ngõ, chọn ghim và Dijkstra/A* trên mạng đường thực:** [docs/MAPS.md](docs/MAPS.md). Không cần Google API key; độ phủ địa chỉ và dịch vụ công cộng có giới hạn.
+
 **Lệnh Windows đầy đủ, từng terminal, MongoDB portable/Atlas, backend/frontend và Docker:** [docs/RUNNING.md](docs/RUNNING.md).
 
 **Collection, tài khoản mẫu, cách xem/import bằng Compass:** [database/README.md](database/README.md).
@@ -45,7 +47,7 @@ Video tối đa 150 MB / 300 giây. Lấy mẫu một ảnh/giây, đếm car/mo
 
 Chỉ Analyst/Admin công bố clip mới trong 15 phút; có luồng lưu lịch sử riêng cho clip cũ có thời điểm quay. Một video được đưa vào dữ liệu một lần. Mặc định xóa video gốc sau xử lý/hủy; có thể chọn giữ riêng tư trước phân tích và cho phép chia sẻ riêng sau đó. Xóa kết quả sẽ xóa video/ảnh của clip, giữ số liệu đã công bố. Demo có 13 đoạn nối 9 địa điểm, 4 camera, geometry/km/vận tốc minh họa; dữ liệu thiếu có rủi ro trung tính 0,5.
 
-Chưa có dự báo +5/+10/+15 phút, training pipeline, RTSP hoặc GPS dẫn đường. Detector pretrained COCO và quy tắc mật độ cần nhãn thực để đánh giá cho giao thông Hà Nội.
+Có pipeline dự báo phân loại 15/30 phút bằng XGBoost/GRU, cần dữ liệu/nhãn thực và kích hoạt sau đánh giá; không kèm mô hình dự báo đã huấn luyện cho Hà Nội. Chưa có RTSP hoặc GPS dẫn đường từng chặng. Detector pretrained COCO và quy tắc mật độ cần nhãn thực để đánh giá ngoài hiện trường.
 
 Google thật dùng hai khóa riêng `GOOGLE_ROUTES_API_KEY`/`GOOGLE_MAPS_BROWSER_KEY`, bật API/billing và giới hạn khóa phù hợp, sau đó restart backend. Không cần khóa cho demo. Giữ Google ETA; camera chỉ bổ sung rủi ro khi đường đã khảo sát khớp tuyến. Không lưu Google responses/polyline vào DB/CSV/training; xem [Routes policies](https://developers.google.com/maps/documentation/routes/policies).
 
