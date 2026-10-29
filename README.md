@@ -32,7 +32,7 @@ Thông tin công khai chỉ dành cho demo. Startup không tự tạo các tài 
 
 ## Chức năng
 
-- Tìm A–B bằng Dijkstra/A*, trực tiếp tối ưu thời gian + khoảng cách, mặc định 60/40; đối chiếu hai thuật toán, ba tuyến thay thế theo Yen, hỗ trợ đường một chiều. [Cách tính và giới hạn mạng đường](docs/ROUTING.md).
+- Bản đồ OpenStreetMap kéo/phóng to, nhập số nhà/ngõ với gợi ý Photon và ghim A/B. Tìm A–B bằng Dijkstra/A* theo thời gian + khoảng cách, mặc định 60/40; tối đa ba phương án, có chiều đường và hạn chế rẽ OSM. [Phạm vi mạng đường, ETA và giới hạn nguồn công cộng](docs/MAPS.md).
 - Video gắn camera/đường: hàng đợi, tiến độ, hủy, lịch sử, ảnh bounding box, biểu đồ từng giây, LOW/NORMAL/HIGH.
 - Admin hiệu chỉnh ROI/sức chứa/ngưỡng; video giữ snapshot cấu hình. Analyst/Admin xác nhận trước khi công bố quan sát mới.
 - Đăng ký, đăng nhập, hồ sơ, đổi/reset mật khẩu qua SMTP; cookie HttpOnly, session thu hồi được, RBAC User/Analyst/Admin.
@@ -49,7 +49,7 @@ Chỉ Analyst/Admin công bố clip mới trong 15 phút; có luồng lưu lịc
 
 Có pipeline dự báo phân loại 15/30 phút bằng XGBoost/GRU, cần dữ liệu/nhãn thực và kích hoạt sau đánh giá; không kèm mô hình dự báo đã huấn luyện cho Hà Nội. Chưa có RTSP hoặc GPS dẫn đường từng chặng. Detector pretrained COCO và quy tắc mật độ cần nhãn thực để đánh giá ngoài hiện trường.
 
-Google thật dùng hai khóa riêng `GOOGLE_ROUTES_API_KEY`/`GOOGLE_MAPS_BROWSER_KEY`, bật API/billing và giới hạn khóa phù hợp, sau đó restart backend. Không cần khóa cho demo. Giữ Google ETA; camera chỉ bổ sung rủi ro khi đường đã khảo sát khớp tuyến. Không lưu Google responses/polyline vào DB/CSV/training; xem [Routes policies](https://developers.google.com/maps/documentation/routes/policies).
+Google thật dùng hai khóa riêng `GOOGLE_ROUTES_API_KEY`/`GOOGLE_MAPS_BROWSER_KEY`, bật API/billing và giới hạn khóa phù hợp, sau đó restart backend. Không cần khóa Google cho OpenStreetMap hoặc demo. Giữ Google ETA; camera chỉ bổ sung rủi ro khi đường đã khảo sát khớp tuyến. Không lưu Google responses/polyline vào DB/CSV/training; xem [Routes policies](https://developers.google.com/maps/documentation/routes/policies).
 
 ## Tài liệu
 

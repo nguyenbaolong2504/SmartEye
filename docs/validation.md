@@ -5,13 +5,24 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Docker đã triển khai bản OSM/dự báo mới, ngày 29/10/2026
+
+- Đã build và recreate backend/frontend trên máy thật; `mongo` và `backend` healthy, frontend HTTP 200 tại `http://localhost:8081`. MongoDB giữ nguyên container/volume trước đó; đối chiếu số bản ghi users=3, segments=13, cameras=4, các nhóm quan sát/video/favorites ban đầu trống đều không đổi. Có 16 collection sau khi tự bổ sung ba collection dự báo.
+- Build mặc định gặp timeout khi tải wheel PyTorch CPU hơn 200 MB từ CDN. Đã sửa Dockerfile: tách lớp PyTorch khỏi requirements ứng dụng, bổ sung libgomp1, nâng pip và cấu hình timeout/retry; hỗ trợ base CPU cục bộ qua build arg tùy chọn. Nâng cấp lần này dùng runtime CPU đã có trong image cũ, không tải lại PyTorch; build backend/frontend hoàn tất và pip check đạt. Cách build mặc định cho máy mới vẫn dùng Python slim.
+- Chỉ dọn bốn cache build SmartEye cũ đã xác minh (khoảng 2,07 GB); không dùng system prune, không xóa volume hoặc cache dự án khác. Giữ image backend cũ và bản sao file frontend trong backend/data để quay lại khi cần. Ổ C còn khoảng 3,4 GB sau build.
+- Kiểm tra thực ngay trong Docker/Linux: PyTorch 2.14.1+cpu; XGBoost 3.2.0 fit/predict; GRU forward/backward và bước Adam; YOLO11n inference thật trên ảnh trống đều đạt. Mẫu mô hình tạm chỉ ở RAM, không ghi số liệu giả hoặc mô hình dự báo thực địa vào DB.
+- HTTP qua Nginx: health/database mongodb; đăng nhập, đọc hồ sơ, đăng xuất và xác nhận phiên hết hiệu lực đủ ba vai trò; đăng nhập qua 127.0.0.1:8081 cũng đạt. API tìm tuyến mạng cấu hình trả đối chiếu Dijkstra/A* cùng chi phí.
+- Trình duyệt xác nhận giao diện mới mặc định OSM, so sánh Dijkstra/A*, tìm/chọn hai địa danh thật qua Photon, tải nền bản đồ và mở rộng/thu gọn. Lượt tính tuyến OSM thật trả 504 từ nguồn Overpass chậm; đây vẫn là giới hạn dịch vụ ngoài cần theo dõi, không coi Docker healthy là bằng chứng nguồn đường công cộng sẵn sàng. [Ảnh giao diện Docker và thông báo nguồn đường](previews/docker-osm-live.png).
+
 ## OpenStreetMap, địa chỉ và mạng đường thực, ngày 29/10/2026
 
 - TypeScript strict và Vite production build đạt; Leaflet được tách thành bundle riêng. Toàn bộ **32/32 E2E desktop/mobile đạt**, gồm lưu/mở lại địa chỉ, tọa độ, nguồn định tuyến, đổi chiều, ghim, zoom, mở rộng và nội dung địa chỉ chưa xác nhận; các luồng dự báo/tài khoản/quản trị/video YOLO thật cũ đều đạt. E2E dùng upstream HTTP (tile, Photon, Overpass), API và DB riêng; không đưa fixture vào dữ liệu triển khai.
-- Backend đã chạy trọn với MongoDB 8.0.32 thật trên 27019: **140 passed, không skip**, gồm từ chối tọa độ upstream không hợp lệ. Đã kiểm tra snap trong cạnh, chiều đường, cấm rẽ qua nút, tiếp tục đi thẳng khi cấm quay đầu, quyền xe/bề rộng, giới hạn vùng, phân biệt quan sát demo/khảo sát, tác động mật độ đến ETA, lỗi nguồn, fallback và cache. Kết quả CI cuối được bổ sung sau push.
+- Backend đã chạy trọn với MongoDB 8.0.32 thật trên 27019: **140 passed, không skip**, gồm từ chối tọa độ upstream không hợp lệ. Đã kiểm tra snap trong cạnh, chiều đường, cấm rẽ qua nút, tiếp tục đi thẳng khi cấm quay đầu, quyền xe/bề rộng, giới hạn vùng, phân biệt quan sát demo/khảo sát, tác động mật độ đến ETA, lỗi nguồn, fallback và cache. CI Linux của cùng source cũng đã đạt (liên kết bên dưới).
 - Live Photon trả địa danh/số nhà thật ở Hà Nội; trình duyệt tải được nền OSM thật và chụp chi tiết đường/ngõ/công trình/số nhà. Ảnh MAPS.md không có tuyến hoặc traffic giả. Các request tile bị hủy khi chuyển vùng/zoom không được coi là bằng chứng dịch vụ nền luôn có sẵn.
 - Overpass công cộng trả quá tải 502 hoặc timeout, kể cả nguồn thay thế, khi kiểm tra vùng Ngọc Hà – Văn Miếu. Vì vậy chưa xác minh thành công một lượt tìm tuyến trọn vẹn với extract Hà Nội vừa tải từ nguồn thật. Tìm tuyến được kiểm chứng trên fixture đồ thị OSM riêng; không suy thành dữ liệu nguồn công cộng đang hoạt động hay độ chính xác giao thông thực địa. Đã thêm timeout, fallback một nguồn, cache 6 giờ và lỗi rõ; không thay bằng tuyến seed khi upstream lỗi.
-- Docker Engine hiện phản hồi, container ứng dụng cũ healthy nhưng chưa có module forecast/graph và chưa có thư viện XGBoost/scikit-learn. Ổ C còn khoảng 0,89 GB; chưa build lại image backend đầy đủ hoặc áp dụng source mới vào các container đang chạy. Preview kiểm tra nền thật dùng cổng 5176/8016 và DB riêng, không dùng tài khoản/video/database triển khai.
+- Docker Engine hiện phản hồi, container ứng dụng cũ healthy nhưng chưa có module forecast/graph và chưa có thư viện XGBoost/scikit-learn. Ổ C còn khoảng 0,89 GB; chưa build lại image backend đầy đủ hoặc áp dụng source mới vào các container đang chạy. Preview kiểm tra nền thật dùng cổng 5176/8016 và DB riêng, không dùng tài khoản/video/database triển khai. Sau kiểm tra đã dừng preview, xóa đúng ba DB preview/E2E riêng và dừng MongoDB kiểm thử 27019 sau khi xác nhận dbpath ở ổ D; không dừng/xóa DB ứng dụng.
+
+**CI Linux đã xác minh thành công:** [run 40834315698](https://github.com/nguyenbaolong2504/SmartEye/actions/runs/40834315698), commit `abd8d83`; cả backend, frontend và bộ kiểm thử E2E đều success.
 
 ## Dijkstra / A* theo thời gian + khoảng cách, ngày 29/10/2026
 

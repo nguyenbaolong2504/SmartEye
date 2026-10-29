@@ -6,6 +6,19 @@ Tất cả lệnh dùng **PowerShell** trong `C:\Users\Admin\Documents\GitHub\Sm
 
 Compass là phần mềm quản lý DB, không khởi chạy MongoDB Server. Kết nối đã lưu trong Compass không có nghĩa server đang hoạt động.
 
+## Đã cài xong: chạy những lần sau
+
+Mở Docker Desktop, chờ Engine running, rồi chạy:
+
+```powershell
+cd C:\Users\Admin\Documents\GitHub\SmartEye
+docker compose up -d --wait --wait-timeout 240
+```
+
+Cấu hình trên máy hiện tại dùng `FRONTEND_PORT=8081`: mở `http://localhost:8081`. Docker chạy cả frontend/backend/MongoDB; có thể đóng terminal sau khi lệnh thành công. Không cần kích hoạt `.venv`, chạy npm/uvicorn riêng, tạo lại tài khoản hoặc tải lại YOLO khi chỉ khởi động lại.
+
+Dừng bằng `docker compose stop`. Xem trạng thái bằng `docker compose ps`; kiểm tra API bằng `Invoke-RestMethod http://localhost:8081/api/health`.
+
 ## 1. Chuẩn bị môi trường
 
 Yêu cầu Windows x64, Python 3.11, Node.js 22+, mạng và đủ dung lượng tải dependency/model.
@@ -180,6 +193,22 @@ docker compose up -d --wait
 ```
 
 `stop`/`down` giữ volume; không thêm `-v` nếu cần dữ liệu. Deploy thật dùng Admin/secret riêng, HTTPS, `APP_ENV=production`, `COOKIE_SECURE=true`, `APP_BASE_URL` đúng origin; hiện một backend worker.
+
+### Cập nhật trên máy đã có PyTorch CPU
+
+Dockerfile đã tách lớp PyTorch khỏi requirements ứng dụng, có `libgomp1` cho XGBoost, pip mới hỗ trợ tiếp tục tải và timeout/retry phù hợp mạng chậm. Máy mới vẫn build mặc định từ `python:3.11-slim` theo mục 6.
+
+Nếu máy đã có image backend CPU chạy tốt, có thể dùng image đó làm base cục bộ để tránh tải lại PyTorch lớn. Đây là cách đã dùng để nâng cấp trên máy hiện tại:
+
+```powershell
+git pull origin main
+docker image tag smarteye-backend:latest smarteye-runtime:cpu
+docker compose build --build-arg BACKEND_BASE_IMAGE=smarteye-runtime:cpu backend
+docker compose build frontend
+docker compose up -d --no-build --wait --wait-timeout 240
+```
+
+`smarteye-runtime:cpu` là tag cục bộ tạo từ image của chính dự án, không phải image cần kéo từ Docker Hub. Chỉ dùng khi image đó đã có Python 3.11 và PyTorch/torchvision CPU phù hợp; máy mới hoặc không còn image thì dùng build mặc định. Không cần thêm biến này vào `.env` hoặc đổi cấu hình MongoDB. Những lần chỉ mở lại dự án dùng lệnh ở đầu tài liệu.
 
 ## 7. Docker chỉ DB, backend/frontend trên Windows
 

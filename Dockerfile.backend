@@ -1,8 +1,21 @@
-FROM python:3.11-slim
+ARG BACKEND_BASE_IMAGE=python:3.11-slim
+FROM ${BACKEND_BASE_IMAGE}
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 && rm -rf /var/lib/apt/lists/*
-COPY backend/requirements*.txt backend/
-RUN pip install --no-cache-dir 'torch>=2.6,<3' torchvision --index-url https://download.pytorch.org/whl/cpu && pip install --no-cache-dir -r backend/requirements.txt
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_DEFAULT_TIMEOUT=120 PIP_RETRIES=8
+RUN apt-get -o Acquire::Retries=3 update \
+    && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+RUN python -m pip install --no-cache-dir --upgrade 'pip>=25.2,<27'
+# Keep the large CPU runtime separate from application requirements. An explicit
+# local CPU base can reuse an installed runtime on slow/space-limited machines.
+RUN if python -c "import torch, torchvision; v=tuple(map(int,torch.__version__.split('+')[0].split('.')[:2])); assert (2,6) <= v < (3,0)" > /dev/null 2>&1; then \
+        echo 'Reusing installed PyTorch runtime'; \
+    else \
+        python -m pip install --no-cache-dir 'torch>=2.6,<3' torchvision --index-url https://download.pytorch.org/whl/cpu; \
+    fi
+COPY backend/requirements-db.txt backend/requirements.txt backend/
+RUN python -m pip install --no-cache-dir -r backend/requirements.txt \
+    && python -m pip check
 COPY backend backend
 COPY scripts scripts
 COPY database database
