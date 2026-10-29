@@ -14,6 +14,10 @@
 - HTTP qua Nginx: health/database mongodb; đăng nhập, đọc hồ sơ, đăng xuất và xác nhận phiên hết hiệu lực đủ ba vai trò; đăng nhập qua 127.0.0.1:8081 cũng đạt. API tìm tuyến mạng cấu hình trả đối chiếu Dijkstra/A* cùng chi phí.
 - Trình duyệt xác nhận giao diện mới mặc định OSM, so sánh Dijkstra/A*, tìm/chọn hai địa danh thật qua Photon, tải nền bản đồ và mở rộng/thu gọn. Lượt tính tuyến OSM thật trả 504 từ nguồn Overpass chậm; đây vẫn là giới hạn dịch vụ ngoài cần theo dõi, không coi Docker healthy là bằng chứng nguồn đường công cộng sẵn sàng. [Ảnh giao diện Docker và thông báo nguồn đường](previews/docker-osm-live.png).
 
+Đã chạy lại đúng lệnh khởi động thông thường `docker compose up -d --wait --wait-timeout 60`: ba container vẫn Running, MongoDB/backend healthy, không phải build lại. `docker buildx build --check --file Dockerfile.backend .` với base mặc định hoàn tất không có cảnh báo.
+
+**CI Linux của bản sửa Docker đã đạt:** [run 40898831851](https://github.com/nguyenbaolong2504/SmartEye/actions/runs/40898831851), commit `b591ca8`; backend, frontend và E2E đều success. Đây là CI ứng dụng; bằng chứng build/runtime Docker local nằm ở các bước kiểm chứng phía trên.
+
 ## OpenStreetMap, địa chỉ và mạng đường thực, ngày 29/10/2026
 
 - TypeScript strict và Vite production build đạt; Leaflet được tách thành bundle riêng. Toàn bộ **32/32 E2E desktop/mobile đạt**, gồm lưu/mở lại địa chỉ, tọa độ, nguồn định tuyến, đổi chiều, ghim, zoom, mở rộng và nội dung địa chỉ chưa xác nhận; các luồng dự báo/tài khoản/quản trị/video YOLO thật cũ đều đạt. E2E dùng upstream HTTP (tile, Photon, Overpass), API và DB riêng; không đưa fixture vào dữ liệu triển khai.
