@@ -21,6 +21,15 @@ def route_evidence(db,req,segments):
         from .history import LOCAL
         active=require_active(db.database)
         at=(req.departure_at or now()).astimezone(LOCAL)
+        if req.departure_at and req.departure_at>now():
+            from .calendar_forecast import project_day
+            result={}
+            for segment in segments:
+                if segment.id not in active['segment_ids']:continue
+                hourly,_,_=project_day(db.database,segment.id,at.date())
+                label=hourly[at.hour]['label'];density={'FREE':'LOW','SLOW':'NORMAL','JAM':'HIGH'}[label]
+                result[segment.id]=SimpleNamespace(density=density,score={'LOW':.1,'NORMAL':.4,'HIGH':.8}[density],source='forecast',is_demo=True)
+            return result
         return {segment.id:SimpleNamespace(density={'FREE':'LOW','SLOW':'NORMAL','JAM':'HIGH'}[row['state']],
             score=row['score'],source='simulation') for segment in segments if segment.id in active['segment_ids']
             for row in [day_rows(segment.id,at.date())[at.hour*12+at.minute//5]]}
@@ -192,7 +201,7 @@ async def google_routes(db, req):
         raise HTTPException(503, 'Chưa cấu hình Google Routes API. Hãy dùng chế độ minh họa hoặc liên hệ quản trị viên.')
     def waypoint(p):
         return {'location':{'latLng':{'latitude':p.lat,'longitude':p.lng}}}
-    payload = {'origin':waypoint(req.origin),'destination':waypoint(req.destination),'travelMode':req.mode,'routingPreference':'TRAFFIC_AWARE','computeAlternativeRoutes':True,'extraComputations':['TRAFFIC_ON_POLYLINE'],'polylineQuality':'HIGH_QUALITY','languageCode':'vi-VN','units':'METRIC'}
+    payload = {'origin':waypoint(req.origin),'destination':waypoint(req.destination),'travelMode':req.mode,'routingPreference':'TRAFFIC_AWARE_OPTIMAL','computeAlternativeRoutes':True,'extraComputations':['TRAFFIC_ON_POLYLINE'],'polylineQuality':'HIGH_QUALITY','languageCode':'vi-VN','units':'METRIC'}
     if req.departure_at:
         payload['departureTime'] = req.departure_at.isoformat().replace('+00:00','Z')
     try:
@@ -210,7 +219,8 @@ async def google_routes(db, req):
     if not raw_routes:
         raise HTTPException(404, 'Google không tìm thấy tuyến đường phù hợp.')
     segments = {s.id:s for s in db.find(Segment,{'active':True,'is_demo':False})}
-    latest = route_evidence(db,req,list(segments.values()))
+    # Google results remain distinct from the synthetic history and its models.
+    latest = route_evidence(db,req.model_copy(update={'traffic_mode':'observed'}),list(segments.values()))
     routes = []
     for i, raw in enumerate(raw_routes):
         geometry = decode_polyline(raw['polyline']['encodedPolyline'])
@@ -244,6 +254,9 @@ async def google_routes(db, req):
     return routes
 
 async def search_routes(db, req):
+    if req.provider=='auto' and os.getenv('GOOGLE_ROUTES_API_KEY') and os.getenv('GOOGLE_MAPS_BROWSER_KEY'):
+        req=req.model_copy(update={'provider':'google','traffic_mode':'observed'})
+    if req.provider=='google':req=req.model_copy(update={'traffic_mode':'observed'})
     if req.provider=='auto' and req.mode=='DRIVE':
         from .fast_routes import fast_routes
         routes,optimization=await fast_routes(db,req)
@@ -276,5 +289,6 @@ async def search_routes(db, req):
         reason=f'Tuyến đề xuất dài {best["distance_km"]} km, thời gian ước tính {round(best["duration_seconds"]/60)} phút, phù hợp ưu tiên của bạn.'
     if req.traffic_mode=='demo':
         notice+=' DỮ LIỆU MÔ PHỎNG: trạng thái giao thông và phần điều chỉnh ETA chỉ phục vụ chạy thử.'
+    if req.provider=='google':notice='Thời gian dự kiến theo Google Maps, có xét tình hình giao thông vào giờ khởi hành đã chọn.'
     return {'provider':req.provider,'is_demo':req.traffic_mode=='demo','generated_at':stamp(),'routes':routes,'recommendation':{'route_id':best['id'],'reason':reason},
-        'optimization':optimization,'notice':notice,'future_notice':'Dự báo hoặc lịch sử chỉ dùng khi đủ bằng chứng và phù hợp giờ khởi hành. Chi phí cạnh là snapshot tại giờ khởi hành, chưa cập nhật theo thời điểm đến từng đoạn.' if req.departure_at else None}
+        'optimization':optimization,'notice':notice,'future_notice':'Ước tính cho giờ khởi hành đã chọn. Hãy kiểm tra lại tình hình trước khi đi.' if req.departure_at else None}

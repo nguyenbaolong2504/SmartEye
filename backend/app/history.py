@@ -31,6 +31,11 @@ def window(period, value):
             selected = date.fromisoformat(value+'-01')
             first = datetime.combine(selected,time(),LOCAL)
             last = first.replace(year=first.year+1,month=1) if first.month==12 else first.replace(month=first.month+1)
+        elif period == 'year':
+            selected=date.fromisoformat(value)
+            if selected>now().astimezone(LOCAL).date():raise ValueError()
+            last=datetime.combine(selected,time(),LOCAL)
+            first=last-timedelta(days=365)
         else:
             raise ValueError()
         if first > now():
@@ -103,11 +108,13 @@ def history_report(database, segment, period, value):
     hourly = [{**summary([r for r in rows if r['at'].hour==hour]),'hour':hour} for hour in range(24)]
     daily = []
     heatmap = []
+    grouped=defaultdict(list)
+    for row in rows:grouped[row['at'].date()].append(row)
     day = first
     while day < last:
-        day_rows = [r for r in rows if r['at'].date()==day.date()]
+        day_rows = grouped.get(day.date(),[])
         daily.append({'date':day.date().isoformat(),**summary(day_rows)})
-        for hour in range(24):
+        for hour in range(24) if period!='year' else ():
             heatmap.append({'date':day.date().isoformat(),'hour':hour,
                             **summary([r for r in day_rows if r['at'].hour==hour])})
         day += timedelta(days=1)
@@ -115,7 +122,14 @@ def history_report(database, segment, period, value):
     expected = max(1,int((elapsed+4.999)//5))
     peaks = sorted((h for h in hourly if h['sufficient'] and h['high_share']>=.5),
                    key=lambda h:(-h['high_share'],-h['average_score'],h['hour']))[:5]
+    monthly=defaultdict(list);weekly=defaultdict(list)
+    if period=='year':
+        for row in rows:
+            monthly[row['at'].strftime('%Y-%m')].append(row)
+            weekly[(row['at'].weekday(),row['at'].hour)].append(row)
     return {'segment_id':segment.id,'segment_name':segment.name,'is_demo':segment.is_demo,
+            'monthly':[{'month':month,**summary(items)} for month,items in sorted(monthly.items())],
+            'weekdays':[{'weekday':w,'hour':h,**summary(weekly.get((w,h),[]))} for w in range(7) for h in range(24)] if period=='year' else [],
             'period':period,'value':value,'timezone':'Asia/Ho_Chi_Minh','generated_at':now().isoformat(),
             'summary':{**summary(rows),'raw_samples':total,'coverage_percent':round(min(100,len(rows)/expected*100),3)},
             'hourly':hourly,'daily':daily,'heatmap':heatmap,'peak_hours':peaks,

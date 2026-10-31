@@ -61,6 +61,10 @@ async def lifespan(app):
 app = FastAPI(title='SmartEye API', version='1.0.0', lifespan=lifespan)
 app.include_router(map_router)
 app.include_router(demo_router)
+from .calendar_forecast import router as calendar_router
+app.include_router(calendar_router)
+from .departure_planning import router as departure_router
+app.include_router(departure_router)
 
 @app.exception_handler(RequestValidationError)
 async def invalid_request(request,exc):
@@ -88,7 +92,7 @@ async def guard(request, call_next):
             allowed |= {'http://127.0.0.1:5173','http://localhost:5173','http://127.0.0.1:8000','http://localhost:8000'}
         if origin and origin.rstrip('/') not in allowed:
             return JSONResponse({'detail':'Nguồn yêu cầu không được phép.'},status_code=403)
-    bucket = 'training' if request.url.path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path == '/api/routes/search' else 'geocoding' if request.url.path=='/api/map/places' else 'general'
+    bucket = 'training' if request.url.path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path in ('/api/routes/search','/api/routes/departures') else 'geocoding' if request.url.path=='/api/map/places' else 'general'
     limit = {'training':2,'auth':20,'video':5,'route':20,'geocoding':45,'general':180}[bucket]
     ip = request.client.host if request.client else 'unknown'
     key = (ip,bucket)

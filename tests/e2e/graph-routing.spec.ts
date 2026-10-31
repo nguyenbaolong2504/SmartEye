@@ -25,3 +25,17 @@ test('configured network still defaults to A* and obeys one-way roads',async({re
   expect(response.ok()).toBe(true);expect((await response.json()).optimization.algorithm).toBe('astar');
   const reverse=await request.post('/api/routes/search',{data:{origin:b,destination:a,provider:'demo'}});expect(reverse.status()).toBe(404);
 });
+
+test('future journey compares adjacent departure times in ordinary language',async({page})=>{
+  await page.goto('/#routes');
+  await address(page,'Điểm xuất phát','12 Đường kiểm thử');await address(page,'Điểm đến','84 Đường kiểm thử');
+  const day=new Date(Date.now()+7*3600000+86400000).toISOString().slice(0,10);
+  await page.locator('.route-sidebar input[type="datetime-local"]').fill(`${day}T17:00`);
+  await page.getByRole('button',{name:'Tìm tuyến tối ưu',exact:true}).click();
+  await expect(page.locator('.route-option').first()).toBeVisible();
+  await page.getByRole('button',{name:'So sánh giờ đi',exact:true}).click();
+  await expect(page.locator('.departure-options article')).toHaveCount(3);
+  await expect(page.locator('.departure-options')).toContainText('16:00');
+  await expect(page.locator('.departure-options')).toContainText('18:00');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1)).toBe(false);
+});

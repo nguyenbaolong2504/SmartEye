@@ -1,4 +1,6 @@
-# Chạy thử dự báo mà chưa có camera
+# Dữ liệu minh họa và lịch sử một năm
+
+**Bản mới:** xem [PLANNING.md](PLANNING.md) để dự báo ngày mai, chọn ngày/giờ và so sánh giờ khởi hành. Giao diện đã bỏ thanh nguồn phía trên và tên mô hình khỏi trang người dùng. Các mô tả màn hình chạy lại giờ hôm qua bên dưới chỉ áp dụng cho bản cũ; API ngắn hạn vẫn được giữ.
 
 Bản này có chế độ **Mô phỏng để chạy thử**, tự chuẩn bị ở lần khởi động đầu trong môi trường development. Không cần tải video hay tự nhập hàng nghìn dòng dữ liệu.
 
@@ -25,7 +27,7 @@ Dừng bằng `docker compose stop`, chạy lại bằng `docker compose up -d`.
 Docker:
 
 ```powershell
-docker compose exec backend python scripts/prepare_demo.py --days 31
+docker compose exec backend python scripts/prepare_demo.py --days 365
 Invoke-RestMethod http://localhost:8081/api/demo/status
 ```
 
@@ -33,7 +35,7 @@ Local, sau khi MongoDB và `.env` đã đúng:
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r backend/requirements.txt
-.venv\Scripts\python.exe scripts/prepare_demo.py --days 31
+.venv\Scripts\python.exe scripts/prepare_demo.py --days 365
 ```
 
 Hoặc Admin vào Dự báo, nếu chưa có mẫu thì bấm **Tạo dữ liệu mẫu**. Huấn luyện chạy nền; dữ liệu cũ tiếp tục dùng đến khi bộ mới hoàn tất. Khi đã sẵn sàng, script có thể tạo lại bộ mẫu mà không xóa dữ liệu thực.
@@ -44,7 +46,7 @@ Backend và frontend chạy local theo [RUNNING.md](RUNNING.md). Không cần `d
 
 - Seed cố định 42, chu kỳ sáng/chiều, sự khác biệt từng đường, cuối tuần và nhiễu có tương quan theo thời gian. Thỉnh thoảng có một đợt đông xe ngoài giờ cao điểm.
 - Mỗi 5 phút có chỉ số mật độ, số xe minh họa, tốc độ mẫu và nhãn FREE / SLOW / JAM. Nhãn mô phỏng dựa trên tỷ lệ tốc độ mẫu / tốc độ thông thoáng: dưới 0,30 là JAM, dưới 0,65 là SLOW, còn lại FREE. Đây là quy ước của bộ sinh, không phải tiêu chuẩn đánh giá giao thông thực.
-- Tạo 31 ngày trước cùng ngày hiện tại cho tối đa 20 tuyến đang hoạt động, gồm Hoàng Quốc Việt. Nếu tuyến mẫu này chưa có, chỉ thêm bản ghi mới có `is_demo=true`; không sửa tuyến của bạn.
+- Tạo 365 ngày trước cùng ngày hiện tại cho tối đa 20 tuyến đang hoạt động, gồm Hoàng Quốc Việt. Nếu tuyến mẫu này chưa có, chỉ thêm bản ghi mới có `is_demo=true`; không sửa tuyến của bạn.
 - XGBoost học từ 8 ngày trước, dùng 12 mốc lịch sử liên tiếp (60 phút), số xe, chỉ số/nhãn lịch sử, giờ, thứ và mã tuyến. Ngày hiện tại không tham gia huấn luyện.
 - Hai mô hình cho 15 và 30 phút. Chia 60/20/20 theo thời gian; nhãn train/validation phải nằm trước phần kế tiếp. Chuẩn hóa chỉ fit trên train. Có báo cáo so với cách giữ nguyên trạng thái.
 - Lúc dự báo chỉ đọc mốc đến thời điểm yêu cầu; không lấy nhãn tương lai từ bộ sinh để trả thay mô hình. Không coi điểm tốt trên dữ liệu tổng hợp là độ chính xác trên đường thật.
@@ -63,11 +65,11 @@ Không ghi mẫu vào `observations`, `traffic_samples`, `traffic_labels`, `fore
 ## Cấu hình và API
 
 - `DEMO_DATA_ENABLED`: mặc định bật ở development, tắt ở production; chỉ bật ở production nếu chủ ý triển khai một bản demo có nhãn.
-- `DEMO_AUTO_PREPARE=true`, `DEMO_HISTORY_DAYS=31`, `DEMO_ESTIMATORS=96`.
+- `DEMO_AUTO_PREPARE=true`, `DEMO_HISTORY_DAYS=365`, `DEMO_ESTIMATORS=96`.
 - `VIDEO_FEATURE_ENABLED=false`: không tải video mới. Chỉ bật lại nếu cần kiểm tra tương thích API cũ; giao diện nhận diện đã gỡ.
 - `OSRM_URL=https://router.project-osrm.org`: nguồn ô tô nhanh; cache ứng viên 10 phút, trọng số và dữ liệu giao thông được tính lại theo từng yêu cầu. Xe máy dùng mạng OSM đầy đủ; không thay bằng tuyến xe đạp hay tuyến ô tô không kiểm tra quyền.
 - `GET /api/demo/status`, `GET /api/demo/predict?segment_id=14`.
-- `GET /api/demo/predict?segment_id=14&issue_at=<ISO có múi giờ trong 30 ngày đã qua>`.
+- `GET /api/demo/predict?segment_id=14&issue_at=<ISO có múi giờ trong 30 ngày đã qua (API ngắn hạn cũ)>`.
 - `GET /api/demo/history?segment_id=14&period=month&value=2026-10` (thay ID/tháng bằng dữ liệu của bạn).
 - `GET /api/demo/export.csv?segment_id=14`.
 - `POST /api/demo/prepare` chỉ Admin; không cần gửi body.

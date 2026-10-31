@@ -2,6 +2,10 @@ import {test,expect} from '@playwright/test';
 test('road search, daily chart, monthly heatmap, drill-down and synthetic CSV',async({page,request},info)=>{
   await page.goto('/#monitor');await expect(page.getByRole('heading',{name:'Tình trạng & thống kê.'})).toBeVisible();
   await expect(page.locator('.hourly-column')).toHaveCount(24);
+  await expect(page.getByRole('heading',{name:'So sánh các tháng trong năm',exact:true})).toBeVisible();
+  expect(await page.locator('.monthly-chart button').count()).toBeGreaterThanOrEqual(12);
+  expect(await page.locator('.monthly-chart button').count()).toBeLessThanOrEqual(13);
+  await expect(page.getByRole('heading',{name:'Giờ cao điểm theo từng thứ',exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1)).toBe(false);
   await page.getByLabel('Tìm tuyến đường thống kê').fill('hoang quoc viet');await expect(page.locator('.road-list-item')).toHaveCount(1);await page.locator('.road-list-item').click();
   await page.getByRole('button',{name:'Theo tháng',exact:true}).click();await expect(page.getByRole('heading',{name:'Bản đồ nhiệt ngày × giờ'})).toBeVisible();
@@ -9,7 +13,7 @@ test('road search, daily chart, monthly heatmap, drill-down and synthetic CSV',a
   expect(await page.locator('.monitor-heatmap').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(25);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
   await page.screenshot({path:info.outputPath('monthly-synthetic-history.png'),fullPage:true});
-  const link=page.getByRole('link',{name:'Tải CSV mẫu',exact:true});const csv=await request.get((await link.getAttribute('href'))!);expect(csv.ok()).toBe(true);expect(await csv.text()).toContain('synthetic');
+  const link=page.getByRole('link',{name:'Tải dữ liệu',exact:true});const csv=await request.get((await link.getAttribute('href'))!);expect(csv.ok()).toBe(true);expect(await csv.text()).toContain('synthetic');
   await page.locator('.monitor-heat-cell').first().click();await expect(page.getByRole('heading',{name:'Bản đồ nhiệt ngày × giờ'})).toHaveCount(0);await expect(page.locator('.hourly-column')).toHaveCount(24);
   await page.getByLabel('Tìm tuyến đường thống kê').fill('KHONG-CO-DUONG');await expect(page.getByText('Không tìm thấy tuyến đường.',{exact:true})).toBeVisible();
 });

@@ -10,6 +10,8 @@ os.environ['DEMO_AUTO_PREPARE']='false'
 os.environ['VIDEO_FEATURE_ENABLED']='true'  # Legacy archive/inference compatibility tests.
 os.environ['ADMIN_EMAIL']=''
 os.environ['ADMIN_PASSWORD']=''
+os.environ['GOOGLE_ROUTES_API_KEY']=''
+os.environ['GOOGLE_MAPS_BROWSER_KEY']=''
 
 from fastapi.testclient import TestClient
 from backend.app.main import app, _requests

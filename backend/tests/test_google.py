@@ -1,6 +1,10 @@
 import httpx
 import pytest
 from backend.app import routing
+import json
+from datetime import datetime,timedelta
+from backend.app.db import now,get_database
+from backend.app.history import LOCAL
 
 def mock_google(monkeypatch,status=200,data=None,timeout=False):
     real_client=httpx.AsyncClient
@@ -42,3 +46,32 @@ def test_google_combined_ranking_is_limited_to_provider_candidates(client,route_
     assert result['routes'][0]['name']=='Balanced' and result['routes'][0]['duration_seconds']==130
     assert result['optimization']['scope']=='google_candidates'
     assert result['optimization']['algorithm'] is None and result['optimization']['primary_search']=={}
+
+
+def test_google_future_departures_use_historical_traffic_without_saving_google_data(client,route_request,monkeypatch):
+    calls=[];real=httpx.AsyncClient
+    def handler(request):
+        payload=json.loads(request.content);calls.append(payload)
+        hour=datetime.fromisoformat(payload['departureTime'].replace('Z','+00:00')).astimezone(LOCAL).hour
+        seconds=1800 if hour==17 else 1200
+        return httpx.Response(200,json={'routes':[{'duration':f'{seconds}s','staticDuration':'900s','distanceMeters':4000,
+            'polyline':{'encodedPolyline':'_p~iF~ps|U_ulLnnqC_mqNvxq`@'}}]})
+    monkeypatch.setattr(routing.httpx,'AsyncClient',lambda **kwargs:real(transport=httpx.MockTransport(handler),**kwargs))
+    monkeypatch.setenv('GOOGLE_ROUTES_API_KEY','private-test-key-never-return')
+    monkeypatch.setenv('GOOGLE_MAPS_BROWSER_KEY','public-browser-test-key')
+    departure=(now().astimezone(LOCAL)+timedelta(days=1)).replace(hour=17,minute=0,second=0,microsecond=0)
+    route_request.update(provider='auto',traffic_mode='demo',departure_at=departure.isoformat())
+    response=client.post('/api/routes/search',json=route_request)
+    assert response.status_code==200,response.text
+    data=response.json();assert data['provider']=='google' and not data['is_demo']
+    assert calls[0]['routingPreference']=='TRAFFIC_AWARE_OPTIMAL'
+    assert datetime.fromisoformat(calls[0]['departureTime'].replace('Z','+00:00'))==departure
+    calls.clear()
+    comparison=client.post('/api/routes/departures',json=route_request)
+    assert comparison.status_code==200,comparison.text
+    result=comparison.json();assert len(calls)==3 and len(result['options'])==3
+    assert {datetime.fromisoformat(row['departure_at']).astimezone(LOCAL).hour for row in result['options']}=={16,17,18}
+    assert all(row['provider']=='google' and not row['is_demo'] for row in result['options'])
+    assert 'private-test-key' not in comparison.text
+    database=get_database()
+    assert all(database[name].count_documents({})==0 for name in ('demo_profiles','traffic_samples','observations','forecast_registry'))

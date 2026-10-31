@@ -2,16 +2,24 @@
 
 Hệ thống chạy thử **dự báo ùn tắc và lựa chọn tuyến đường Hà Nội**, dùng React/TypeScript, FastAPI, MongoDB và XGBoost.
 
+## Chọn ngày, giờ và tránh giờ cao điểm
+
+Giao diện đã bỏ thanh chọn nguồn dữ liệu phía trên và tên mô hình khỏi các màn hình người dùng. **Dự báo giao thông** mặc định xem ngày mai lúc 17:00: chọn tuyến/ngày/giờ, xem khung giờ nên tránh, số ngày cùng thứ từng ùn tắc và các giờ có thể cân nhắc thay thế. **Tình trạng & thống kê** có một năm lịch sử, so sánh tháng và giờ cao điểm theo từng thứ. Khi tìm tuyến có thể bấm **So sánh giờ đi** để xem giờ đã chọn và một giờ trước/sau.
+
+Dữ liệu minh họa mặc định tạo **365 ngày đã qua cùng ngày hiện tại** cho 14 tuyến, lưu riêng với dữ liệu thật. Phần dự báo ngày mai học từ các tuần trước; không lấy nhãn được sinh sẵn của ngày tương lai để trả kết quả. [Hướng dẫn và giới hạn](docs/PLANNING.md).
+
+Google Maps đã được chuẩn bị: khi có cả hai khóa, trang tìm tuyến dùng Google và gửi đúng giờ khởi hành để nhận dự tính giao thông. **Hiện chưa có khóa nên bản đang chạy dùng lịch sử minh họa và OpenStreetMap.** Không lấy dữ liệu một năm bằng cách sao chép Google Maps, không lưu phản hồi Google vào lịch sử hay mô hình.
+
 ## Bản giao diện rút gọn
 
 - Bản đồ OpenStreetMap có đường/ngõ, nhập số nhà và chọn ghim A/B.
 - Tìm tuyến tự động, cân bằng thời gian và khoảng cách; không cần chọn nguồn hay thuật toán. Ô tô dùng các tuyến OSRM đã tiền xử lý và cache 10 phút để tránh tải mạng Overpass mỗi lần. A* là mặc định cho mạng đường tự quản lý; Dijkstra giữ để đối chiếu qua API.
 - Tình trạng từng đường, biểu đồ 24 giờ, bản đồ nhiệt theo tháng và tải CSV mẫu.
-- Dự báo sau 15/30 phút bằng **XGBoost được huấn luyện thật trên dữ liệu mô phỏng**. Có thể thử giờ cao điểm sáng/chiều hôm qua.
+- Dự báo ngày sắp tới và các mốc ngắn hạn bằng **XGBoost được huấn luyện thật trên dữ liệu mô phỏng**. Có thể chọn ngày mai hoặc một ngày trong 7 ngày tới.
 - Đã gỡ trang nhận diện video, lựa chọn kỹ thuật và liên kết mã nguồn khỏi giao diện. Không còn các thẻ camera trống. Upload video mặc định trả HTTP 410; bản ghi cũ vẫn được bảo toàn.
 - Tải từng trang khi cần, một API khởi tạo, ngừng polling khi tab bị ẩn. Gói JS ban đầu giảm khoảng 373 → 252 KB (chưa nén).
 
-**DỮ LIỆU MÔ PHỎNG không phải giao thông thực tế.** Mặc định phát sinh 31 ngày trước và ngày hiện tại, có giờ cao điểm, cuối tuần và nhiễu. Nhãn/mô hình mẫu nằm riêng, không ghi đè quan sát hay mô hình thực. Chuyển sang “Quan sát thực tế” ở đầu trang để xem đúng dữ liệu đã thu thập. [Cách tạo, chạy thử và giới hạn](docs/DEMO.md).
+**DỮ LIỆU MÔ PHỎNG không phải giao thông thực tế.** Mặc định phát sinh 365 ngày trước và ngày hiện tại, có giờ cao điểm, cuối tuần và nhiễu. Nhãn/mô hình mẫu nằm riêng, không ghi đè quan sát hay mô hình thực. Chuyển sang “Quan sát thực tế” ở đầu trang để xem đúng dữ liệu đã thu thập. [Cách tạo, chạy thử và giới hạn](docs/DEMO.md).
 
 ## Chạy bằng Docker
 
@@ -36,7 +44,7 @@ Invoke-RestMethod http://localhost:8081/api/health
 Lần đầu khởi động bản này, backend chuẩn bị dữ liệu mẫu và huấn luyện XGBoost ở nền. Trang sẽ tự cập nhật khi sẵn sàng. Tạo lại thủ công nếu cần:
 
 ```powershell
-docker compose exec backend python scripts/prepare_demo.py --days 31
+docker compose exec backend python scripts/prepare_demo.py --days 365
 ```
 
 Dừng: `docker compose stop`. Lần sau chạy lại: `docker compose up -d`. Không dùng `down -v` nếu muốn giữ database.
@@ -59,7 +67,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 
 | Thành phần | Cách dùng hiện tại |
 |---|---|
-| XGBoost | Dự báo mẫu FREE / SLOW / JAM sau 15 và 30 phút; cửa sổ lịch sử 60 phút, chia train/validation/test theo thời gian |
+| XGBoost | Dự báo theo ngày/giờ từ lịch sử 7/14/21/28 ngày trước và đặc điểm thời gian; vẫn giữ pipeline ngắn hạn; chia train/validation/test theo thời gian |
 | GRU | Pipeline nghiên cứu trên dữ liệu/nhãn thực, trong phần Dữ liệu & mô hình của Quản lý/Admin; chưa tự tuyên bố tốt hơn XGBoost |
 | A* | Mặc định tìm chi phí kết hợp trên đồ thị SmartEye hoặc mạng OSM tải đầy đủ |
 | Dijkstra | Thuật toán tham chiếu và chuẩn hóa chi phí; có API đối chiếu, không cần lựa chọn trên giao diện |

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from .config import DATA, PRODUCTION
 from .db import get_db, get_database, now, stamp, MongoSession
@@ -44,18 +44,17 @@ def day_rows(segment_id,day,seed=42):
     rng=np.random.default_rng(int.from_bytes(digest[:8],'little'))
     capacity=32+segment_id%5*7;free_speed=32+segment_id%4*3
     shift=(segment_id%5-2)*.16;weekend=.63 if day.weekday()>=5 else 1.
-    incident=rng.random()<.12;noise=0.;rows=[]
-    for slot in range(288):
-        hour=slot/12;noise=.84*noise+float(rng.normal(0,.035))
-        morning=math.exp(-((hour-7.7-shift)/1.05)**2)
-        evening=math.exp(-((hour-17.3-shift)/1.3)**2)
-        extra=.33*math.exp(-((hour-13.3)/.6)**2) if incident else 0.
-        pressure=np.clip(.12+.06*(segment_id%3)+weekend*(.55*morning+.64*evening)+extra+noise,0,1)
-        ratio=float(np.clip(1.-1.05*pressure-.11*(morning+evening)+rng.normal(0,.025),.06,1.))
-        state='JAM' if ratio<.3 else 'SLOW' if ratio<.65 else 'FREE'
-        rows.append({'minute':slot*5,'score':round(float(pressure),4),'count':max(0,round(float(pressure)*capacity+rng.normal(0,2))),
-                     'speed_kmh':round(free_speed*ratio,1),'state':state})
-    return rows
+    incident=rng.random()<.12;hour=np.arange(288)/12
+    noise=rng.normal(0,.035,288)
+    for slot in range(1,288):noise[slot]+=.84*noise[slot-1]
+    morning=np.exp(-((hour-7.7-shift)/1.05)**2);evening=np.exp(-((hour-17.3-shift)/1.3)**2)
+    season=1+.09*math.cos(day.timetuple().tm_yday*math.tau/365.25)
+    extra=.33*np.exp(-((hour-13.3)/.6)**2) if incident else 0.
+    pressure=np.clip(.12+.06*(segment_id%3)+weekend*season*(.55*morning+.64*evening)+extra+noise,0,1)
+    ratio=np.clip(1.-1.05*pressure-.11*(morning+evening)+rng.normal(0,.025,288),.06,1.)
+    counts=np.maximum(0,np.rint(pressure*capacity+rng.normal(0,2,288))).astype(int)
+    return [{'minute':slot*5,'score':round(float(pressure[slot]),4),'count':int(counts[slot]),
+             'speed_kmh':round(float(free_speed*ratio[slot]),1),'state':'JAM' if ratio[slot]<.3 else 'SLOW' if ratio[slot]<.65 else 'FREE'} for slot in range(288)]
 
 
 def feature_row(day,row):
@@ -71,23 +70,26 @@ def artifacts_ready(active):
     if not active:return False
     try:folder=FOLDER/str(uuid.UUID(active['run_id']))
     except (ValueError,KeyError):return False
-    return all((folder/name).is_file() for name in ('metadata.json','xgb-15.json','xgb-30.json'))
+    names=['metadata.json','xgb-15.json','xgb-30.json']
+    if active.get('generator_version',1)>=2 and active.get('history_days',0)>=60:names+=['outlook.json','outlook-metadata.json']
+    return all((folder/name).is_file() for name in names)
 
 
 def status(database):
     active=_active(database);job=database.demo_registry.find_one({'_id':'job'}) or {}
     return {'enabled':enabled(),'ready':artifacts_ready(active),'running':bool(job.get('running')),'message':job.get('message','Chưa tạo bộ dữ liệu mẫu.'),
+            'planning_ready':bool(active and active.get('generator_version',1)>=2 and active.get('history_days',0)>=60 and artifacts_ready(active)),
             'segment_ids':active['segment_ids'] if active else [],'generated_at':active.get('created_at') if active else None,
             'model':'XGBoost','history_days':active.get('history_days') if active else None,'notice':NOTICE,'is_demo':True}
 
 
-def prepare_demo(database,days=31,estimators=96):
+def prepare_demo(database,days=365,estimators=96):
     if not enabled(): raise ValueError('Dữ liệu mô phỏng đang tắt.')
     if not _job_lock.acquire(blocking=False): return False
     run_id=str(uuid.uuid4());folder=FOLDER/run_id
     try:
         database.demo_profiles.create_index([('dataset_id',1),('segment_id',1),('date',1)],unique=True)
-        database.demo_registry.update_one({'_id':'job'},{'$set':{'running':True,'message':'Đang tạo lịch sử mô phỏng…','updated_at':stamp()}},upsert=True)
+        database.demo_registry.update_one({'_id':'job'},{'$set':{'running':True,'message':'Đang tổng hợp lịch sử giao thông…','updated_at':stamp()}},upsert=True)
         # Append one clearly marked sample road; never rename/overwrite existing roads.
         if not database.segments.find_one({'name':'Hoàng Quốc Việt'}):
             with MongoSession(database) as db:
@@ -95,23 +97,29 @@ def prepare_demo(database,days=31,estimators=96):
                                geometry=[[21.0467,105.7865],[21.0469,105.8073]],is_demo=True));db.commit()
         roads=list(database.segments.find({'active':True}).sort('_id',1))[:20]
         if not roads: raise ValueError('Cần ít nhất một tuyến đường để mô phỏng.')
-        ids=[r['_id'] for r in roads];today=now().astimezone(LOCAL).date();days=max(9,min(31,days))
-        docs=[];series={sid:{} for sid in ids};labels={}
+        ids=[r['_id'] for r in roads];today=now().astimezone(LOCAL).date();days=max(9,min(365,days))
+        from .calendar_forecast import hourly_slots,train_calendar
+        docs=[];series={sid:{} for sid in ids};labels={};profiles={sid:{} for sid in ids}
         for offset in range(days,-1,-1):
             day=today-timedelta(days=offset)
             for sid in ids:
                 rows=day_rows(sid,day)
-                docs.append({'dataset_id':run_id,'segment_id':sid,'date':day.isoformat(),'source':'synthetic','slots':rows})
+                hours=hourly_slots(rows);profiles[sid][day]=hours
+                docs.append({'dataset_id':run_id,'segment_id':sid,'date':day.isoformat(),'source':'synthetic','slots':rows,'hourly':hours})
                 if today-timedelta(days=8)<=day<today:
                     for row in rows:
                         item=feature_row(day,row);at=item['at'];series[sid][at]=item;labels[(sid,at)]=row['state']
+                if len(docs)>=28:
+                    database.demo_profiles.insert_many(docs,ordered=False);docs=[]
+            if offset%30==0:database.demo_registry.update_one({'_id':'job'},{'$set':{'message':f'Đang chuẩn bị lịch sử: {days-offset}/{days} ngày…'}})
+        if docs:database.demo_profiles.insert_many(docs,ordered=False)
         folder.mkdir(parents=True,exist_ok=True)
         from xgboost import XGBClassifier
         from .forecast_ml import metrics
         report={'is_demo':True,'notice':NOTICE,'seed':42,'model':'XGBoost','segment_ids':ids,
                 'history_days':days,'created_at':stamp(),'horizons':{},'training_end':datetime.combine(today,datetime.min.time(),LOCAL).isoformat()}
         for horizon in (15,30):
-            database.demo_registry.update_one({'_id':'job'},{'$set':{'message':f'Đang huấn luyện dự báo mẫu {horizon} phút…'}})
+            database.demo_registry.update_one({'_id':'job'},{'$set':{'message':'Đang cập nhật dự tính giao thông…'}})
             data=examples(series,labels,ids,'congestion',horizon);train,val,test=split_indices(data,horizon)
             raw=data['x'].reshape(len(data['x']),-1)
             mean=raw[train].mean(0);std=np.maximum(raw[train].std(0),.001)
@@ -127,10 +135,12 @@ def prepare_demo(database,days=31,estimators=96):
                 'train_label_end':float((data['times'][train]+horizon*60).max()),'validation_issue_start':float(data['times'][val].min()),
                 'validation_label_end':float((data['times'][val]+horizon*60).max()),'test_issue_start':float(data['times'][test].min())}
         (folder/'metadata.json').write_text(json.dumps(report,ensure_ascii=False),encoding='utf-8')
-        database.demo_profiles.insert_many(docs,ordered=False)
+        if days>=60:
+            database.demo_registry.update_one({'_id':'job'},{'$set':{'message':'Đang chuẩn bị dự báo cho những ngày tới…'}})
+            train_calendar(folder,profiles,ids,estimators=min(72,estimators))
         previous=_active(database)
-        database.demo_registry.replace_one({'_id':'active'},{'_id':'active','run_id':run_id,'segment_ids':ids,'created_at':stamp(),'history_days':days},upsert=True)
-        database.demo_registry.update_one({'_id':'job'},{'$set':{'running':False,'message':'Dữ liệu mẫu và dự báo đã sẵn sàng.','updated_at':stamp()}})
+        database.demo_registry.replace_one({'_id':'active'},{'_id':'active','run_id':run_id,'segment_ids':ids,'created_at':stamp(),'history_days':days,'generator_version':2},upsert=True)
+        database.demo_registry.update_one({'_id':'job'},{'$set':{'running':False,'message':'Lịch sử và dự báo đã sẵn sàng.','updated_at':stamp()}})
         _reports.clear()
         # Only obsolete synthetic datasets in this dedicated collection are removed.
         keep=[run_id]+([previous['run_id']] if previous else [])
@@ -138,7 +148,7 @@ def prepare_demo(database,days=31,estimators=96):
         return True
     except Exception:
         logging.getLogger('smarteye.demo').exception('Synthetic dataset preparation failed')
-        database.demo_registry.update_one({'_id':'job'},{'$set':{'running':False,'message':'Chưa chuẩn bị được dữ liệu mẫu. Admin có thể tạo lại hoặc kiểm tra thư viện XGBoost.','updated_at':stamp()}},upsert=True)
+        database.demo_registry.update_one({'_id':'job'},{'$set':{'running':False,'message':'Chưa chuẩn bị được lịch sử. Vui lòng thử lại hoặc liên hệ người quản lý.','updated_at':stamp()}},upsert=True)
         raise
     finally: _job_lock.release()
 
@@ -146,9 +156,10 @@ def prepare_demo(database,days=31,estimators=96):
 def start_demo(database=None,force=False):
     global _pending
     database=database if database is not None else get_database()
-    if not enabled() or not force and artifacts_ready(_active(database)): return
+    active=_active(database);wanted=max(9,min(365,int(os.getenv('DEMO_HISTORY_DAYS','365'))))
+    if not enabled() or not force and artifacts_ready(active) and active.get('generator_version',1)>=2 and active.get('history_days',0)>=wanted:return
     def work():
-        try: prepare_demo(database,days=int(os.getenv('DEMO_HISTORY_DAYS','31')),estimators=int(os.getenv('DEMO_ESTIMATORS','96')))
+        try: prepare_demo(database,days=wanted,estimators=int(os.getenv('DEMO_ESTIMATORS','96')))
         except Exception: pass
     with _schedule_lock:
         if _job_lock.locked() or _pending is not None and not _pending.done(): return
@@ -168,12 +179,14 @@ def rows_for(database,active,sid,first,last):
     output=[]
     query={'dataset_id':active['run_id'],'segment_id':sid,'date':{'$gte':first.astimezone(LOCAL).date().isoformat(),'$lte':last.astimezone(LOCAL).date().isoformat()}}
     documents={doc['date']:doc for doc in database.demo_profiles.find(query)}
-    day=max(first.astimezone(LOCAL).date(),today-timedelta(days=31))
+    day=max(first.astimezone(LOCAL).date(),today-timedelta(days=active.get('history_days',365)))
     while day<=min(last.astimezone(LOCAL).date(),today):
         if day.isoformat() not in documents:
-            doc={'source':'synthetic','slots':day_rows(sid,day),'date':day.isoformat()}
+            from .calendar_forecast import hourly_slots
+            slots=day_rows(sid,day)
+            doc={'source':'synthetic','slots':slots,'hourly':hourly_slots(slots),'date':day.isoformat()}
             database.demo_profiles.update_one({'dataset_id':active['run_id'],'segment_id':sid,'date':day.isoformat()},
-                {'$setOnInsert':{'source':'synthetic','slots':doc['slots']}},upsert=True)
+                {'$setOnInsert':{'source':'synthetic','slots':doc['slots'],'hourly':doc['hourly']}},upsert=True)
             documents[day.isoformat()]=doc
         day+=timedelta(days=1)
     for doc in documents.values():
@@ -245,6 +258,9 @@ def prediction(segment_id:int,issue_at:datetime|None=None,db=Depends(get_db)):
 def history(segment_id:int,period:str='day',value:str|None=None,db=Depends(get_db)):
     active=require_active(db.database)
     if segment_id not in active['segment_ids']: raise HTTPException(404,'Tuyến chưa có dữ liệu mẫu.')
+    if period=='year':
+        from .calendar_forecast import annual_report
+        return annual_report(db.database,active,segment_id)
     value=value or now().astimezone(LOCAL).date().isoformat()[:7 if period=='month' else 10]
     first,last=window(period,value);key=(active['run_id'],segment_id,period,value,int(now().timestamp()//300))
     if key in _reports:return _reports[key]
@@ -267,10 +283,10 @@ def history(segment_id:int,period:str='day',value:str|None=None,db=Depends(get_d
 
 
 @router.get('/export.csv')
-def export(segment_id:int,db=Depends(get_db)):
+def export(segment_id:int,days:int=Query(default=365,ge=1,le=365),db=Depends(get_db)):
     active=require_active(db.database)
     if segment_id not in active['segment_ids']:raise HTTPException(404,'Tuyến chưa có dữ liệu mẫu.')
-    rows=rows_for(db.database,active,segment_id,now()-timedelta(days=31),now())
+    rows=rows_for(db.database,active,segment_id,now()-timedelta(days=days),now())
     output=io.StringIO();writer=csv.writer(output)
     writer.writerow(['segment_id','observed_at','score','count','speed_kmh','state','source'])
     for row in rows:writer.writerow([segment_id,row['at'].isoformat(),row['score'],row['count'],row['speed_kmh'],CLASSES['congestion'][row['severity']],'synthetic'])

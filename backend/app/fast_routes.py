@@ -56,7 +56,9 @@ async def fast_routes(db,req):
     roads=db.find(Segment,{'active':True})
     # Demo names intentionally map only to the user's selected simulated mode.
     eligible=roads if req.traffic_mode=='demo' else [s for s in roads if not s.is_demo]
-    evidence=route_evidence(db,req,eligible)
+    names={clean(s.get('name','')) for item in raw['routes'][:3] for leg in item.get('legs',[]) for s in leg.get('steps',[])}
+    matched=[r for r in eligible if any(clean(alias) in names for alias in r.name.replace('–','-').split('-'))]
+    evidence=route_evidence(db,req,matched)
     routes=[]
     for index,item in enumerate(raw['routes'][:3]):
         geometry=[[p[1],p[0]] for p in item['geometry']['coordinates']]

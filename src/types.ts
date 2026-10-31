@@ -1,6 +1,6 @@
 export type Density = 'LOW' | 'NORMAL' | 'HIGH';
 export type DataMode='demo'|'observed';
-export type DemoStatus={enabled:boolean;ready:boolean;running:boolean;message:string;segment_ids:number[];history_days:number|null;model:string;notice:string;is_demo:boolean};
+export type DemoStatus={enabled:boolean;ready:boolean;planning_ready?:boolean;running:boolean;message:string;segment_ids:number[];history_days:number|null;generated_at?:string;model:string;notice:string;is_demo:boolean};
 export type Point = [number, number];
 export type Place = {node: string; name: string; lat: number; lng: number};
 export type Waypoint = {name:string;lat:number;lng:number;node?:string};
@@ -19,7 +19,7 @@ export type Sample = {second: number; count: number; occupancy: number; score: n
 export type VideoJob = {id: string; camera_id: number; filename: string; status: string; progress: number; error: string|null; observed_at: string|null; created_at: string; camera_config: Camera; retain_video:boolean; history_published:boolean; preview_shared?:boolean; result: {density: Density; score: number; average_count: number; peak_count: number; duration_seconds: number; distribution: Record<Density,number>; samples: Sample[]; model: string; note: string}|null};
 export type MonitorCamera = {id:number;name:string;segment_id:number;segment_name:string;is_demo:boolean;active:boolean;state:'current'|'stale'|'empty'|'inactive';density:Density|null;last_density:Density|null;score:number|null;count:number|null;vehicle_counts:Record<string,number>;observed_at:string|null;source:string|null;preview_at:string|null;image_url:string|null;video_url:string|null};
 export type TrafficStats = {slot_count:number;observed_minutes:number;observed_days:number;evidence_days:number;sufficient:boolean;average_score:number|null;average_count:number|null;high_share:number|null;low_share:number|null};
-export type HistoryReport = {segment_id:number;segment_name:string;is_demo:boolean;period:'day'|'month';value:string;timezone:string;generated_at:string;summary:TrafficStats&{raw_samples:number;coverage_percent:number};hourly:(TrafficStats&{hour:number})[];daily:(TrafficStats&{date:string})[];heatmap:(TrafficStats&{date:string;hour:number})[];peak_hours:(TrafficStats&{hour:number})[];method:string;pattern_requirement:string};
+export type HistoryReport = {segment_id:number;segment_name:string;is_demo:boolean;period:'day'|'month'|'year';value:string;timezone:string;generated_at:string;summary:TrafficStats&{raw_samples:number;coverage_percent:number};hourly:(TrafficStats&{hour:number})[];daily:(TrafficStats&{date:string})[];heatmap:(TrafficStats&{date:string;hour:number})[];peak_hours:(TrafficStats&{hour:number})[];method:string;pattern_requirement:string;monthly?:(TrafficStats&{month:string})[];weekdays?:(TrafficStats&{weekday:number;hour:number})[];history_start?:string;history_end?:string};
 export type AlertData = {rules: {id: number; segment_id: number; density: Density; active: boolean}[]; notifications: {id: number; message: string; read: boolean; created_at: string}[]};
 export const densityLabel = {LOW:'Thấp', NORMAL:'Bình thường', HIGH:'Cao'};
 export const densityColor = {LOW:'#16a780', NORMAL:'#e7a42d', HIGH:'#e45b64'};

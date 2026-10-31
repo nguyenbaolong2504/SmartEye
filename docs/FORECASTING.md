@@ -6,6 +6,8 @@
 
 Ảnh giao diện lấy từ kiểm thử trình duyệt, dùng mạng đường demo công khai và DB kiểm thử riêng. Không phải kết quả dự báo giao thông Hà Nội. [Màn hình quản lý mô hình](previews/forecast-management.png) · [Giao diện điện thoại](previews/forecast-mobile.png).
 
+Phần dự báo ngày/giờ và lịch sử một năm: [PLANNING.md](PLANNING.md). Tài liệu bên dưới dành cho quản lý mô hình quan sát thực.
+
 ## Sử dụng
 
 Trang **Tổng quan** là điểm bắt đầu: Tình trạng & thống kê, Dự báo và Tìm đường. Nhận diện video đã được gỡ khỏi giao diện. Menu giữ đường dẫn bằng hash nên tải lại hoặc dùng nút Back vẫn về đúng màn hình.

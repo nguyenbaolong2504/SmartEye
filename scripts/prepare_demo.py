@@ -9,7 +9,7 @@ from backend.app.demo_data import prepare_demo,status
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--days',type=int,default=31)
+    parser.add_argument('--days',type=int,default=365)
     args=parser.parse_args()
     initialize_database()
     with SessionLocal() as db:seed(db)

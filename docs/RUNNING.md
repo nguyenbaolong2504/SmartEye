@@ -10,7 +10,11 @@ Compass là phần mềm quản lý DB, không khởi chạy MongoDB Server. K�
 
 Bản này bỏ màn hình nhận diện video, danh sách camera trống và các lựa chọn nguồn/thuật toán. XGBoost tự huấn luyện trên lịch sử mô phỏng ở nền; có nhãn MÔ PHỎNG và không thay dữ liệu thực. [Hướng dẫn chạy thử và CSV](DEMO.md).
 
-Sau cập nhật code, chạy `docker compose up -d --build --wait --wait-timeout 240`. Những lần sau chỉ cần `docker compose up -d`. Tạo lại dữ liệu mẫu nếu cần: `docker compose exec backend python scripts/prepare_demo.py --days 31`. Không cần tải YOLO.
+Sau cập nhật code, chạy `docker compose up -d --build --wait --wait-timeout 240`. Những lần sau chỉ cần `docker compose up -d`. Tạo lại dữ liệu mẫu nếu cần: `docker compose exec backend python scripts/prepare_demo.py --days 365`. Không cần tải YOLO.
+
+## Dự báo theo ngày và lịch sử một năm
+
+Bản 31/10/2026 bỏ thanh dữ liệu phía trên các trang. Mở **Dự báo giao thông**, chọn đường, ngày và giờ định đi để xem tình trạng dự kiến và giờ nên tránh. **Tình trạng & thống kê → Một năm** có lịch sử 365 ngày, so sánh tháng và thứ trong tuần. [Cách dùng và chuẩn bị Google Maps](PLANNING.md).
 
 ## Đã cài xong: chạy những lần sau
 
@@ -126,7 +130,7 @@ npm ci
 .venv\Scripts\python.exe -m pip check
 ```
 
-`requirements-db.txt` chỉ phục vụ DB; cần `requirements.txt` để chạy API/dự báo. Không cần tải YOLO. Chạy `scripts/prepare_demo.py --days 31` nếu cần tạo lại lịch sử/mô hình mẫu.
+`requirements-db.txt` chỉ phục vụ DB; cần `requirements.txt` để chạy API/dự báo. Không cần tải YOLO. Chạy `scripts/prepare_demo.py --days 365` nếu cần tạo lại lịch sử/mô hình mẫu.
 
 ## 5. Chạy backend và frontend
 
@@ -169,7 +173,7 @@ if (!(Test-Path .venv\Scripts\python.exe)) { python -m venv .venv }
 docker compose config --quiet
 docker compose up --build -d --wait --wait-timeout 240
 docker compose exec backend python scripts/init_db.py --demo-accounts
-docker compose exec backend python scripts/prepare_demo.py --days 31
+docker compose exec backend python scripts/prepare_demo.py --days 365
 docker compose ps
 Invoke-RestMethod http://localhost:8080/api/health
 Start-Process http://localhost:8080
