@@ -164,7 +164,7 @@ def demo_routes(db, req):
     return rank_routes(routes,req.weights,(time_ref,distance_ref)),metadata
 
 
-def decode_polyline(encoded):
+def decode_polyline(encoded, precision=5):
     points, index, lat, lng = [], 0, 0, 0
     while index < len(encoded):
         values = []
@@ -172,6 +172,8 @@ def decode_polyline(encoded):
             shift = value = 0
             while True:
                 b = ord(encoded[index])-63
+                if not 0 <= b <= 63 or shift > 30:
+                    raise ValueError('Invalid encoded polyline')
                 index += 1
                 value |= (b & 31) << shift
                 shift += 5
@@ -180,7 +182,7 @@ def decode_polyline(encoded):
             values.append(~(value >> 1) if value & 1 else value >> 1)
         lat += values[0]
         lng += values[1]
-        points.append([lat/1e5,lng/1e5])
+        points.append([lat/10**precision,lng/10**precision])
     return points
 
 def point_distance_to_line(point, line):
@@ -257,10 +259,10 @@ async def search_routes(db, req):
     if req.provider=='auto' and os.getenv('GOOGLE_ROUTES_API_KEY') and os.getenv('GOOGLE_MAPS_BROWSER_KEY'):
         req=req.model_copy(update={'provider':'google','traffic_mode':'observed'})
     if req.provider=='google':req=req.model_copy(update={'traffic_mode':'observed'})
-    if req.provider=='auto' and req.mode=='DRIVE':
+    if req.provider=='auto':
         from .fast_routes import fast_routes
         routes,optimization=await fast_routes(db,req)
-    elif req.provider in ('osm','auto'):
+    elif req.provider=='osm':
         from .osm_routing import osm_routes
         routes,optimization=await osm_routes(db,req)
     elif req.provider=='google':
@@ -286,6 +288,8 @@ async def search_routes(db, req):
         notice='© OpenStreetMap contributors. Tuyến bám đường OSM trong vùng tải; ghim được nối vào đường phù hợp gần nhất (tối đa 200 m). Đoạn từ cửa nhà tới điểm nối chưa được xác minh và không tính vào ETA. Tôn trọng chiều đường, quyền phương tiện, giới hạn rộng đã gắn thẻ và hạn chế rẽ qua nút; đường có hạn chế điều kiện/phức tạp chưa xử lý được loại thận trọng. Dữ liệu có thể thiếu hoặc thay đổi; kiểm tra biển báo thực tế.'
     if req.provider=='auto':
         notice='© OpenStreetMap contributors · OSRM. Cho ô tô: chọn theo thời gian và khoảng cách trong các tuyến nguồn cung cấp. ETA tham chiếu, không phải giao thông trực tiếp. Khoảng nối ghim tới đường chưa tính vào ETA; kiểm tra lối vào và biển báo thực tế.' if req.mode=='DRIVE' else notice
+        if req.mode=='TWO_WHEELER':
+            notice='© OpenStreetMap contributors · Valhalla. Tuyến dành cho xe máy, tránh cao tốc theo dữ liệu bản đồ. Thời gian là ước tính; kiểm tra lối vào và biển báo thực tế. Khoảng nối ghim tới đường chưa tính vào thời gian đi.'
         reason=f'Tuyến đề xuất dài {best["distance_km"]} km, thời gian ước tính {round(best["duration_seconds"]/60)} phút, phù hợp ưu tiên của bạn.'
     if req.traffic_mode=='demo':
         notice+=' DỮ LIỆU MÔ PHỎNG: trạng thái giao thông và phần điều chỉnh ETA chỉ phục vụ chạy thử.'

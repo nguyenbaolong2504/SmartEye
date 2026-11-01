@@ -5,7 +5,7 @@ public address/Overpass services for each browser run.
 """
 import json
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.responses import Response
 
 app=FastAPI()
@@ -38,6 +38,37 @@ def fast_routes(coordinates:str):
                 'legs':[{'steps':[{'name':name,'duration':seconds,'distance':meters}]}]}
     return {'code':'Ok','routes':[route('Tuyến kiểm thử nhanh',600,4000,.001),route('Tuyến kiểm thử ngắn',900,2000,-.001)],
             'waypoints':[{'location':start,'distance':3},{'location':end,'distance':5}]}
+
+
+def polyline6(points):
+    result, previous = '', [0, 0]
+    for point in points:
+        for axis, value in enumerate(point):
+            number = round(value*1e6)
+            delta = number-previous[axis]
+            previous[axis] = number
+            delta = ~(delta << 1) if delta < 0 else delta << 1
+            while delta >= 32:
+                result += chr((32 | (delta & 31))+63)
+                delta >>= 5
+            result += chr(delta+63)
+    return result
+
+
+@app.post('/route')
+def motorcycle_routes(body:dict=Body(...)):
+    assert body['costing'] == 'motorcycle'
+    assert body['costing_options']['motorcycle']['exclude_highways'] is True
+    start, end = ([p['lat'],p['lon']] for p in body['locations'])
+    def trip(name, seconds, km, offset):
+        points = [start,[(start[0]+end[0])/2+offset,(start[1]+end[1])/2],end]
+        summary = {'time':seconds,'length':km,'has_highway':False}
+        return {'status':0,'units':'kilometers','summary':summary,
+                'legs':[{'summary':summary,'shape':polyline6(points),'maneuvers':[
+                    {'street_names':[name],'time':seconds,'length':km,'travel_type':'motorcycle',
+                     'begin_shape_index':0,'end_shape_index':2}]}]}
+    return {'trip':trip('Tuyến xe máy nhanh',600,4,.001),
+            'alternates':[{'trip':trip('Tuyến xe máy ngắn',900,2,-.001)}]}
 
 
 @app.get('/tiles/{z}/{x}/{y}.svg')

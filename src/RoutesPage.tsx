@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownUp, ArrowRight, Car, Bike, Navigation, Clock3, Route as RouteIcon, Bookmark, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { api,json } from './api';
 import { TrafficMap } from './TrafficMap';
@@ -18,6 +18,9 @@ export default function RoutesPage({places,segments,config,user,onLogin,preset,o
   async function compareTimes(){if(!lastRequest)return;setComparing(true);setError('');try{setComparison(await api('/routes/departures',json(lastRequest)));}catch(e){setError((e as Error).message);}finally{setComparing(false);}}
   const selectRoute=useCallback((id:string)=>setSelected(id),[]);
   const draftVersion=useRef(0);
+  const searchForm=useRef<HTMLFormElement>(null);
+  const searchRequest=useRef<AbortController|null>(null);
+  useEffect(()=>()=>{searchRequest.current?.abort();searchRequest.current=null;},[]);
   function mark(){draftVersion.current++;setEdited(true);}
   function changeWeight(key:'time'|'distance'|'density',value:number){const keys=['time','distance','density'] as const;const rest=keys.filter(k=>k!==key);const remaining=rest.reduce((sum,k)=>sum+weights[k],0);const next={...weights,[key]:value};for(const k of rest)next[k]=remaining>0?(1-value)*weights[k]/remaining:(1-value)/rest.length;setWeights(next);mark();}
   function waypoint(id:string,address:Waypoint|null) {
@@ -26,12 +29,27 @@ export default function RoutesPage({places,segments,config,user,onLogin,preset,o
   }
   function pickPoint(point:[number,number]){if(!picking)return;if(point[0]<20.5||point[0]>21.5||point[1]<105.2||point[1]>106.2){setError('Chọn điểm trong khu vực Hà Nội đang hỗ trợ.');return;}const value={lat:point[0],lng:point[1],name:`${picking==='origin'?'Điểm đi':'Điểm đến'} trên bản đồ (${point[0].toFixed(6)}, ${point[1].toFixed(6)})`};if(picking==='origin')setAddressOrigin(value);else setAddressDestination(value);setPicking(null);setError('');mark();}
   function startPick(kind:'origin'|'destination'){setPicking(picking===kind?null:kind);document.querySelector('.street-map-panel')?.scrollIntoView({behavior:'smooth',block:'center'});}
-  async function search(e:React.FormEvent){e.preventDefault();setError('');setLoading(true);setResult(null);setSelected('');setLastRequest(null);setComparison(null);const version=draftVersion.current;try{const body:RouteRequest={origin:waypoint(origin,addressOrigin),destination:waypoint(destination,addressDestination),mode,provider,algorithm,traffic_mode:dataMode,weights,departure_at:departure?new Date(departure).toISOString():null};const data=await api<RouteResult>('/routes/search',json(body));setResult(data);setLastRequest(body);setSelected(data.recommendation.route_id);setEdited(draftVersion.current!==version);}catch(e){setError((e as Error).message);}finally{setLoading(false);}}
+  async function search(e:React.FormEvent){
+    e.preventDefault();if(searchRequest.current)return;
+    setError('');setResult(null);setSelected('');setLastRequest(null);setComparison(null);
+    let body:RouteRequest;
+    try{body={origin:waypoint(origin,addressOrigin),destination:waypoint(destination,addressDestination),mode,provider,algorithm,traffic_mode:dataMode,weights,departure_at:departure?new Date(departure).toISOString():null};}
+    catch(e){setError((e as Error).message);return;}
+    const controller=new AbortController();searchRequest.current=controller;
+    const timer=window.setTimeout(()=>controller.abort(),provider==='google'?30000:15000);
+    const version=draftVersion.current;setLoading(true);
+    try{
+      const data=await api<RouteResult>('/routes/search',{...json(body),signal:controller.signal});
+      if(searchRequest.current!==controller)return;
+      setResult(data);setLastRequest(body);setSelected(data.recommendation.route_id);setEdited(draftVersion.current!==version);
+    }catch(e){if(searchRequest.current===controller)setError(controller.signal.aborted?'Chưa nhận được tuyến đường. Vui lòng thử lại sau vài giây.':(e as Error).message);}
+    finally{window.clearTimeout(timer);if(searchRequest.current===controller){searchRequest.current=null;setLoading(false);}}
+  }
   async function save(e:React.FormEvent){e.preventDefault();setSaving(true);try{await api('/favorites',json({name:saveName,request:lastRequest}));setSaveOpen(false);onSaved();}catch(e){setError((e as Error).message);}finally{setSaving(false);}}
   const active=result?.routes.find(r=>r.id===selected);
   return <>
     <div className="page-heading"><div><div className="eyebrow">DI CHUYỂN THÔNG MINH HƠN</div><h1>Tìm tuyến đường tối ưu<span>.</span></h1><p>Chọn tuyến cân bằng thời gian và khoảng cách; dữ liệu giao thông giúp ước tính thời gian.</p></div><span className="mode-badge"><span className="live-dot"/>{provider==='google'?'Google Maps':'Bản đồ đường phố'}</span></div>
-    <div className="route-layout"><section className="route-sidebar card"><form onSubmit={search}>
+    <div className="route-layout"><section className="route-sidebar card"><form ref={searchForm} onSubmit={search}>
       <div className="section-title"><Navigation size={18}/><h2>Hành trình của bạn</h2></div>
       {provider!=='demo'?<div className="address-waypoints">
         <AddressField label="Điểm xuất phát" value={addressOrigin} onChange={place=>{setAddressOrigin(place);mark();}} picking={picking==='origin'} onPick={()=>startPick('origin')}/>
@@ -49,13 +67,13 @@ export default function RoutesPage({places,segments,config,user,onLogin,preset,o
     <div className="sidebar-foot"><Clock3 size={15}/> Thời gian di chuyển là ước tính, nên kiểm tra lại trước khi đi.</div></section>
     <div className="route-main"><TrafficMap places={places} segments={segments} routes={result?.routes||[]} selected={selected} onSelect={selectRoute} browserKey={config.maps_browser_key} provider={result?.provider||provider} origin={provider==='demo'?places.find(p=>p.node===origin):addressOrigin} destination={provider==='demo'?places.find(p=>p.node===destination):addressDestination} picking={picking} onPick={pickPoint} tileUrl={config.osm_tile_url}/>
       {edited&&result&&<Notice>Thông số đã thay đổi. Bấm “Tìm tuyến tối ưu” để tính lại.</Notice>}
-      {result?<><div className="result-heading"><h2>{result.routes.length} tuyến đường được so sánh</h2><button className="button small" onClick={()=>{if(!user){onLogin();return;}setSaveName(`${lastRequest?.origin.name} → ${lastRequest?.destination.name}`.slice(0,100));setSaveOpen(true);}}><Bookmark size={15}/>Lưu hành trình</button></div>
+      {loading?<section className="card route-search-state" role="status" aria-live="polite"><Spinner/><h3>Đang tìm và so sánh các tuyến đường…</h3><p>Bạn có thể tiếp tục xem bản đồ trong lúc chờ kết quả.</p></section>:result?<><div className="result-heading"><h2>{result.routes.length} tuyến đường được so sánh</h2><button className="button small" onClick={()=>{if(!user){onLogin();return;}setSaveName(`${lastRequest?.origin.name} → ${lastRequest?.destination.name}`.slice(0,100));setSaveOpen(true);}}><Bookmark size={15}/>Lưu hành trình</button></div>
       <div className="route-cards">{result.routes.map((r,i)=><button key={r.id} className={`route-option ${r.id===selected?'selected':''}`} onClick={()=>setSelected(r.id)}><div className="route-option-head"><span className="route-number">{String(i+1).padStart(2,'0')}</span>{r.recommended?<span className="recommended">Đề xuất SmartEye</span>:<span className="muted">Tuyến thay thế</span>}<ChevronRight size={16}/></div><h3>{r.name}</h3><div className="route-metrics"><span><Clock3 size={15}/><strong>{Math.round(r.duration_seconds/60)}</strong> phút</span><span><RouteIcon size={15}/><strong>{r.distance_km}</strong> km</span></div><div className="route-tags">{r.badges.filter(b=>b!=='Ít đoạn rủi ro nhất').map(b=><span key={b}>{b}</span>)}</div></button>)}</div>
       <Notice kind="success">{result.recommendation.reason}</Notice>{result.provider==='google'&&<span className="google-attribution" translate="no">Google Maps</span>}
       <section className="card departure-planning"><div className="section-title"><Clock3 size={18}/><h2>Đi sớm hay muộn hơn có thuận tiện hơn?</h2></div><p className="muted">So sánh giờ đã chọn với một giờ trước và một giờ sau để cân nhắc thời điểm khởi hành.</p><button className="button" disabled={comparing||edited} onClick={compareTimes}>{comparing?<Spinner/>:<Clock3 size={16}/>}So sánh giờ đi</button>{comparison&&<><div className="departure-options">{comparison.options.map(option=><article key={option.departure_at} className={option.departure_at===comparison.recommended_departure?'recommended':''}><b>{new Date(option.departure_at).toLocaleTimeString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'})}</b><strong>{Math.round(option.duration_seconds/60)} phút</strong><span>{option.distance_km} km · {option.label}</span>{option.departure_at===comparison.recommended_departure&&<small>Ít thời gian đi đường nhất trong các giờ đã so sánh</small>}</article>)}</div><p className="data-footnote">{comparison.options.some(o=>o.is_demo)?'Thời gian ước tính từ lịch sử minh họa. ':''}{comparison.notice}</p>{comparison.options.some(o=>o.provider==='google')&&<span className="google-attribution" translate="no">Google Maps</span>}</>}</section>
       {result.optimization?.snaps&&<div className="route-access-note">{result.optimization.snaps.map(snap=><span key={snap.label}>{snap.label==='origin'?'Ghim A':'Ghim B'} cách điểm nối đường <b>{Math.round(snap.distance_km*1000)} m</b>.</span>)}<small>Kiểm tra lối ra vào thực tế. Khoảng nối từ cửa nhà tới đường chưa được xác minh và chưa tính vào thời gian di chuyển.</small></div>}
       {active&&<section className="card segment-details"><div className="section-title"><RouteIcon size={17}/><h2>Các đoạn có dữ liệu trong tuyến đang chọn</h2></div>{active.segments.length?active.segments.map((s,i)=><div className="segment-row" key={i}><span>{s.name}<small>{s.distance_km} km · {s.source==='simulation'?'Lịch sử minh họa':s.source==='yolo'?'Camera lưu trữ':s.source==='manual'?'Quan sát thủ công':s.source==='forecast'?'Ước tính từ lịch sử':s.source==='historical'?`Lịch sử cùng thứ/giờ · ${s.evidence_days||0} ngày`:s.source==='osm'?'Đường OSM · chưa có quan sát':'Chưa có quan sát'}</small></span><DensityBadge value={s.density}/></div>):<p className="muted">Tuyến này chưa trùng các đường có dữ liệu. Thời gian hiện là ước tính từ mạng đường, chưa tính ùn tắc thực tế.</p>}</section>}
-      <p className="micro">{result.notice} {result.future_notice}</p></>:<section className="card"><Empty><h3>Một hành trình tốt bắt đầu từ dữ liệu.</h3><p>Kéo bản đồ, dùng nút + để xem đường và ngõ, hoặc mở rộng bản đồ. Nhập địa chỉ hoặc chọn ghim A/B trên bản đồ. Chọn ưu tiên, SmartEye sẽ so sánh thời gian và khoảng cách cho bạn.</p></Empty></section>}
+      <p className="micro">{result.notice} {result.future_notice}</p></>:error?<section className="card route-search-state"><Navigation size={25}/><h3>Chưa tìm được tuyến đường</h3><p>Kiểm tra thông báo bên cạnh và hai ghim trên bản đồ, rồi thử tìm lại.</p><button className="button" onClick={()=>searchForm.current?.requestSubmit()}>Tìm lại tuyến đường<ArrowRight size={16}/></button></section>:<section className="card"><Empty><h3>Một hành trình tốt bắt đầu từ dữ liệu.</h3><p>Kéo bản đồ, dùng nút + để xem đường và ngõ, hoặc mở rộng bản đồ. Nhập địa chỉ hoặc chọn ghim A/B trên bản đồ. Chọn ưu tiên, SmartEye sẽ so sánh thời gian và khoảng cách cho bạn.</p></Empty></section>}
     </div></div>
     {saveOpen&&<Modal title="Lưu hành trình yêu thích" onClose={()=>setSaveOpen(false)}><form onSubmit={save}><label className="field">Tên hành trình<input autoFocus value={saveName} onChange={e=>setSaveName(e.target.value)} required minLength={2} maxLength={100}/></label><p className="micro">Lưu điểm đi, điểm đến và ưu tiên. Tuyến và ETA sẽ được tính mới mỗi lần mở.</p><button className="button primary full" disabled={saving}>{saving?<Spinner/>:<Bookmark size={16}/>}Lưu hành trình</button></form></Modal>}
   </>;

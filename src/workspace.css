@@ -90,3 +90,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,su
 @media(max-width:700px){.app-shell .street-map-panel{height:420px;min-height:420px}.street-map-toolbar{top:10px;left:10px;right:10px;gap:7px}.street-map-toolbar .map-label{font-size:9px;padding:9px}.street-map-toolbar button span{display:none}.street-map-legend{left:10px;gap:8px;font-size:9px;padding:7px;bottom:52px}.map-pick-hint{top:60px;font-size:11px;min-width:220px}.app-shell .map-expanded{inset:6px;height:auto;min-height:0}.street-demo-note{bottom:104px;font-size:9px;left:10px}.address-suggestions{z-index:65}.route-access-note{font-size:10px}}
 
 .street-pin b{transform:rotate(45deg);display:block}.address-selected-label{font-size:10px;line-height:1.7;color:#4e7b7a;margin:5px 0 0;overflow-wrap:anywhere}
+
+.route-search-state{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:32px 22px;color:var(--teal)}.route-search-state h3{font-size:17px;margin:0}.route-search-state p{max-width:440px;font-size:12px;line-height:1.8;color:#718798;margin:0}.route-search-state>.spin{width:28px;height:28px}

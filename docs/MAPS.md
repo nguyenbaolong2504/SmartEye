@@ -10,7 +10,15 @@ SmartEye dùng Leaflet để hiển thị nền OpenStreetMap có tên đường
 
 Giao diện tự chọn nguồn, không còn dropdown nguồn hay thuật toán. Ô tô dùng `provider=auto`: OSRM trả các tuyến bám đường đã tiền xử lý, SmartEye xếp hạng theo thời gian/khoảng cách và cache ứng viên 10 phút. Không tải Overpass cho luồng ô tô thông thường. `scope=osrm_candidates`, `algorithm=null` trong kết quả phản ánh đúng việc không chạy A* trên đồ thị nội bộ OSRM. Dữ liệu mô phỏng chỉ điều chỉnh ETA cho đoạn khớp tên đường mẫu và được ghi rõ là mô phỏng.
 
-Xe máy dùng mạng OSM đầy đủ và A* để kiểm tra quyền phương tiện, nên tải đầu có thể chậm. Các phần “Đồ thị đường thực” bên dưới mô tả `provider=osm` hoặc nhánh xe máy, không phải nguồn ô tô nhanh. API vẫn hỗ trợ Dijkstra/compare để nghiên cứu; giao diện dùng A* khi chạy trên đồ thị đầy đủ. [Chạy thử](DEMO.md).
+Xe máy dùng `provider=auto` với **Valhalla motorcycle** trên mạng OSM đã tiền xử lý (`scope=valhalla_candidates`, `algorithm=null`). Không tải mạng Overpass trong luồng tìm đường thông thường và không thay bằng tuyến ô tô hay xe đạp. SmartEye xếp hạng tối đa ba ứng viên theo thời gian, khoảng cách và ưu tiên tránh đông xe; đây là lựa chọn trong các tuyến dịch vụ cung cấp, không chứng minh tối ưu toàn bộ mạng đường.
+
+Ứng viên xe máy được lưu tạm trong bộ nhớ 10 phút, tối đa 128 cặp tọa độ. Nhiều yêu cầu cùng hai ghim dùng chung một lượt tải; thay trọng số hoặc so sánh ba giờ đi chỉ tính lại phần đánh giá giao thông và xếp hạng. Tọa độ chỉ dùng để tìm đường, không gửi tên địa chỉ sang dịch vụ định tuyến. Không lưu ứng viên vào MongoDB, không dùng ETA của nguồn bản đồ làm dữ liệu huấn luyện.
+
+Yêu cầu dùng `costing=motorcycle`, giữ quyền phương tiện, chiều đường và hạn chế rẽ; `exclude_highways=true`, ghim không nối vào lớp motorway/trunk. SmartEye loại ứng viên nếu nguồn có cảnh báo bỏ qua tùy chọn, thiếu xác nhận `has_highway=false` ở tuyến/chặng, trả sai chế độ phương tiện, hình học lỗi hoặc ghim cách đường trên 200 m. Lối ra vào từ cửa nhà tới điểm nối chưa được xác minh và chưa tính vào ETA. Dữ liệu OSM và bộ định tuyến có thể thiếu thông tin; luôn kiểm tra biển báo thực tế. Các tùy chọn motorcycle và hard exclusions vẫn được Valhalla ghi là beta/experimental: [tài liệu chính thức](https://valhalla.github.io/valhalla/api/route/api-reference/).
+
+Biến `MOTORCYCLE_ROUTING_URL` mặc định là `https://valhalla1.openstreetmap.de`, không cần API key; `.env` cũ tự dùng giá trị này. Một yêu cầu nguồn xe máy bị giới hạn tuyệt đối 9 giây, hàng đợi tối đa 2 giây và giãn cách ít nhất 1 giây giữa các lượt tải khác nhau trong một tiến trình. Lỗi kết nối/hạn mức khiến các lần thử lại trong 10 giây kế tiếp trả thông báo sớm, không xếp thêm lượt chờ dài. Giới hạn này phù hợp demo một backend; triển khai nhiều tiến trình/người dùng cần máy chủ định tuyến riêng hoặc điều phối hạn mức dùng chung. Giao diện hiện trạng thái đang tìm, cho tìm lại khi lỗi và giới hạn chờ 15 giây với nguồn mặc định. Không hứa thời gian đáp ứng cố định của dịch vụ công cộng.
+
+Các phần “Đồ thị đường thực” bên dưới chỉ mô tả `provider=osm` được chọn tường minh qua API. Nhánh nghiên cứu này vẫn tải Overpass và chạy A*/Dijkstra trên đồ thị tự xây dựng, nên lần đầu có thể chậm. [Chạy thử](DEMO.md).
 
 ## Cập nhật và chạy
 

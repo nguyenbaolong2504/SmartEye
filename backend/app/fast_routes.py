@@ -1,4 +1,4 @@
-"""Bounded, cached OSRM candidates. No live-traffic or global A* claims."""
+"""Rank cached, preprocessed road candidates using fresh traffic and priorities."""
 import asyncio
 import copy
 import os
@@ -20,7 +20,9 @@ def clean(name):
 
 async def candidates(req):
     # Motorcycle access differs from driving; never substitute a bicycle profile.
-    if req.mode!='DRIVE': raise HTTPException(422,'Nguồn tìm nhanh hiện hỗ trợ ô tô. Xe máy cần mạng OSM có quyền phương tiện.')
+    if req.mode=='TWO_WHEELER':
+        from .motorcycle_routes import candidates as motorcycle_candidates
+        return await motorcycle_candidates(req)
     base=os.getenv('OSRM_URL','https://router.project-osrm.org').rstrip('/')
     coords=f'{req.origin.lng:.6f},{req.origin.lat:.6f};{req.destination.lng:.6f},{req.destination.lat:.6f}'
     key=(base,coords)
@@ -87,9 +89,13 @@ async def fast_routes(db,req):
             'risk_exposure_km':exposure,'high_share':high_km/max(distance,.001),'unknown_share':min(1,unknown/max(distance,.001)),
             'geometry':geometry,'segments':list(matches.values()),'traffic_intervals':[]})
     routes=rank_routes(routes,req.weights)
+    best_index=int(routes[0]['id'].rsplit('-',1)[1])
+    waypoints=raw['routes'][best_index].get('waypoints',raw.get('waypoints',[]))
     snaps=[{'label':label,'point':[p['location'][1],p['location'][0]],'distance_km':p['distance']/1000,'way_id':0}
-           for label,p in zip(('origin','destination'),raw.get('waypoints',[]))]
-    return routes,{'scope':'osrm_candidates','algorithm':None,'agreement':None,'primary_search':{},
+           for label,p in zip(('origin','destination'),waypoints)]
+    motorcycle=req.mode=='TWO_WHEELER'
+    return routes,{'scope':'valhalla_candidates' if motorcycle else 'osrm_candidates','algorithm':None,'agreement':None,'primary_search':{},
         'normalized_weights':normalized_weights(req.weights),'references':{'time_seconds':min(r['duration_seconds'] for r in routes),
         'distance_km':min(r['distance_km'] for r in routes)},'snaps':snaps,
-        'note':'Xếp hạng các tuyến OSRM cung cấp theo thời gian và khoảng cách; không chạy A* trên đồ thị nội bộ của OSRM.'}
+        'note':('Xếp hạng các tuyến xe máy do Valhalla cung cấp, đã loại tuyến có cao tốc; không chạy A* trên đồ thị nội bộ của dịch vụ.' if motorcycle else
+                'Xếp hạng các tuyến OSRM cung cấp theo thời gian và khoảng cách; không chạy A* trên đồ thị nội bộ của OSRM.')}

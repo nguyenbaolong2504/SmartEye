@@ -13,7 +13,7 @@ Google Maps đã được chuẩn bị: khi có cả hai khóa, trang tìm tuy�
 ## Bản giao diện rút gọn
 
 - Bản đồ OpenStreetMap có đường/ngõ, nhập số nhà và chọn ghim A/B.
-- Tìm tuyến tự động, cân bằng thời gian và khoảng cách; không cần chọn nguồn hay thuật toán. Ô tô dùng các tuyến OSRM đã tiền xử lý và cache 10 phút để tránh tải mạng Overpass mỗi lần. A* là mặc định cho mạng đường tự quản lý; Dijkstra giữ để đối chiếu qua API.
+- Tìm tuyến tự động, cân bằng thời gian và khoảng cách; không cần chọn nguồn hay thuật toán. Ô tô dùng OSRM, xe máy dùng chế độ motorcycle của Valhalla trên mạng đường đã tiền xử lý, cache ứng viên 10 phút. Không tải mạng Overpass mỗi lần tìm thông thường. A* là mặc định cho mạng đường tự quản lý; Dijkstra giữ để đối chiếu qua API.
 - Tình trạng từng đường, biểu đồ 24 giờ, bản đồ nhiệt theo tháng và tải CSV mẫu.
 - Dự báo ngày sắp tới và các mốc ngắn hạn bằng **XGBoost được huấn luyện thật trên dữ liệu mô phỏng**. Có thể chọn ngày mai hoặc một ngày trong 7 ngày tới.
 - Đã gỡ trang nhận diện video, lựa chọn kỹ thuật và liên kết mã nguồn khỏi giao diện. Không còn các thẻ camera trống. Upload video mặc định trả HTTP 410; bản ghi cũ vẫn được bảo toàn.
@@ -74,7 +74,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 | OSRM | Dịch vụ cung cấp nhanh các tuyến ô tô trên OSM. SmartEye xếp hạng các tuyến được trả về; không tuyên bố chạy A* trên đồ thị nội bộ của dịch vụ |
 | YOLO | Chức năng nhận diện đã tắt và gỡ khỏi giao diện; mã đọc dữ liệu cũ giữ để tương thích |
 
-Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy vẫn dùng mạng OSM và A* có kiểm tra quyền phương tiện nên lần tải đầu có thể chậm. Thời gian/khoảng cách là ước tính, chưa phải dẫn đường thời gian thực. Phần đường không có dữ liệu không được coi là thông thoáng. Các dịch vụ công cộng có thể gián đoạn; dùng máy chủ riêng khi cần tải lớn.
+Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle, yêu cầu loại cao tốc và kiểm tra kết quả trả về; không dùng tuyến ô tô/xe đạp thay thế. Cache chỉ giữ ứng viên hình học/ETA tham chiếu; ưu tiên và tình trạng giao thông được tính lại mỗi lần. Thời gian/khoảng cách là ước tính, chưa phải dẫn đường thời gian thực. Phần đường không có dữ liệu không được coi là thông thoáng. Các dịch vụ công cộng có thể gián đoạn; dùng máy chủ riêng khi cần tải lớn. [Chi tiết định tuyến và giới hạn](docs/MAPS.md).
 
 Đăng ký/đăng nhập, hồ sơ, hành trình yêu thích, cảnh báo theo quan sát thực, nhập CSV, phân quyền và nhật ký quản trị vẫn có sẵn. Dữ liệu mô phỏng không phát cảnh báo thật cho người dùng.
 

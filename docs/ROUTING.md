@@ -73,11 +73,15 @@ Hai thuật toán phải cho cùng chi phí tối ưu trong sai số số học;
 
 ### Google Routes
 
-Google chỉ cung cấp các tuyến ứng viên, không cấp đồ thị nội bộ. SmartEye giữ ETA Google và xếp hạng các ứng viên bằng cùng dạng mục tiêu, lấy T0/D0 trong tập Google trả về. Response ghi `scope=google_candidates`, `algorithm=null`; không tuyên bố Dijkstra/A* đã tìm tối ưu toàn bộ mạng đường Google. Giao diện chỉ cho chọn Dijkstra/A* khi dùng mạng SmartEye.
+Google chỉ cung cấp các tuyến ứng viên, không cấp đồ thị nội bộ. SmartEye giữ ETA Google và xếp hạng các ứng viên bằng cùng dạng mục tiêu, lấy T0/D0 trong tập Google trả về. Response ghi `scope=google_candidates`, `algorithm=null`; không tuyên bố Dijkstra/A* đã tìm tối ưu toàn bộ mạng đường Google. Giao diện tự chọn nguồn và không hiện lựa chọn thuật toán.
+
+### Nguồn mặc định nhanh trên OpenStreetMap
+
+Khi chưa cấu hình Google, `provider=auto` dùng OSRM cho ô tô và Valhalla motorcycle cho xe máy. Chỉ xếp hạng các tuyến ứng viên đã được dịch vụ tính sẵn (`scope=osrm_candidates/valhalla_candidates`, `algorithm=null`), cache hình học và ETA tham chiếu 10 phút; dữ liệu giao thông và ưu tiên vẫn được tính lại. Xe máy yêu cầu và kiểm tra loại trừ cao tốc, giữ chế độ phương tiện riêng. API `provider=osm` vẫn chạy A*/Dijkstra trên đồ thị tải về, tách khỏi luồng nhanh. [Chi tiết và giới hạn](MAPS.md).
 
 ## API và kiểm thử
 
-POST `/api/routes/search` thêm `algorithm: compare | dijkstra | astar`, mặc định compare. Response `optimization` có scope, thuật toán, đối chiếu chi phí, trọng số chuẩn hóa, mốc tham chiếu, số nút và thời gian. Route có `cost_components`, `optimization_cost` và `risk_exposure_km`.
+POST `/api/routes/search` thêm `algorithm: compare | dijkstra | astar`, mặc định astar trên đồ thị tự quản lý. Response `optimization` có scope, thuật toán, đối chiếu chi phí, trọng số chuẩn hóa, mốc tham chiếu, số nút và thời gian. Route có `cost_components`, `optimization_cost` và `risk_exposure_km`.
 
 Kiểm thử so sánh Dijkstra/A*/Yen với oracle vét cạn trên đồ thị nhỏ ngẫu nhiên, đường song song, chu trình, đồ thị không liên thông, heuristic khi km không khớp tọa độ, đổi ưu tiên, đường một chiều và giới hạn Google. E2E kiểm tra các lựa chọn/trọng số và việc thêm đường một chiều từ giao diện Admin. Các fixture chỉ nằm trong DB kiểm thử.
 

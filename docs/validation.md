@@ -5,6 +5,14 @@
 - Playwright: DB/server riêng, desktop Chromium và viewport iPhone 13 bằng Chromium.
 - Inference smoke: YOLO thật trên video hai giây đứng yên từ ảnh phương tiện, kiểm tra raw deletion; không đo accuracy Hà Nội.
 
+## Tốc độ tìm tuyến xe máy, ngày 01/11/2026
+
+- Đã bỏ việc tải toàn vùng đường qua Overpass trong nhánh `auto/TWO_WHEELER`. Valhalla nhận chế độ motorcycle riêng, yêu cầu loại cao tốc, giữ chiều đường/quyền phương tiện/hạn chế rẽ; kết quả được kiểm tra cờ cao tốc, chế độ, hình học polyline6 và ghim tối đa 200 m. Không dùng tuyến ô tô/xe đạp làm phương án dự phòng.
+- Đo qua Nginx Docker ở `localhost:8081`, giữa hai vị trí công cộng gần Công viên Hòa Bình và đường Âu Cơ: lần đầu HTTP 200, 3 tuyến, **2,961 giây**; lặp cùng yêu cầu **0,015 giây**; dự báo giờ ngày mai trong chế độ minh họa **0,026 giây** và so sánh ba giờ **0,101 giây**. Đây là một mẫu đo, không phải cam kết độ trễ nguồn công cộng. Các tuyến chưa khớp đường có lịch sử giữ ETA tham chiếu, không giả định đã có thông tin ùn tắc.
+- Trình duyệt chạy trực tiếp Docker: chọn hai kết quả địa chỉ Photon thật, xe máy và 17 giờ ngày hôm sau; API trả 3 tuyến trong **2,402 giây**, không tràn ngang màn hình desktop. Địa chỉ đầu là kết quả “Khu đô thị Hoàng Quốc Việt”, không khẳng định đó là số nhà cụ thể. [Ảnh giao diện thực](previews/motorcycle-fast-desktop.png).
+- Đã kiểm thử bộ nhớ tạm, thay ưu tiên, tính lại giao thông tương lai, nhiều yêu cầu dùng chung lượt tải, giới hạn chờ tuyệt đối, hàng đợi/hạn mức, từ chối cao tốc và dữ liệu nguồn lỗi. Backend dùng MongoDB thật riêng để kiểm tra hồi quy; bốn ca E2E mới về tiến độ tìm xe máy và tìm lại khi lỗi đạt trên desktop/mobile, cùng 28 ca giao diện có sẵn. Nguồn HTTP trong E2E là fixture riêng, không thay nguồn triển khai.
+- Build TypeScript/Vite và Docker backend/frontend đạt, triển khai giữ nguyên container/volume MongoDB. Trước/sau đều users=3, segments=14, cameras=4, observations=0. Backend/MongoDB healthy, frontend HTTP 200. Không tạo lại tài khoản hoặc chuẩn bị lại lịch sử một năm.
+
 ## Docker đã triển khai bản OSM/dự báo mới, ngày 29/10/2026
 
 - Đã build và recreate backend/frontend trên máy thật; `mongo` và `backend` healthy, frontend HTTP 200 tại `http://localhost:8081`. MongoDB giữ nguyên container/volume trước đó; đối chiếu số bản ghi users=3, segments=13, cameras=4, các nhóm quan sát/video/favorites ban đầu trống đều không đổi. Có 16 collection sau khi tự bổ sung ba collection dự báo.

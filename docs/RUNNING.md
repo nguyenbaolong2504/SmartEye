@@ -18,6 +18,8 @@ Bản 31/10/2026 bỏ thanh dữ liệu phía trên các trang. Mở **Dự báo
 
 ## Đã cài xong: chạy những lần sau
 
+Bản 01/11/2026 cải thiện tốc độ tìm tuyến xe máy bằng nguồn đường đã xử lý sẵn, không cần Google key. Sau khi lấy code mới, chạy `docker compose up -d --build --wait --wait-timeout 240`, rồi tải lại trang bằng **Ctrl+F5**. Không cần sửa `.env`, chuẩn bị lại lịch sử hoặc tạo lại database. [Nguồn xe máy, bộ nhớ tạm và giới hạn chờ](MAPS.md).
+
 Mở Docker Desktop, chờ Engine running, rồi chạy:
 
 ```powershell
