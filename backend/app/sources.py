@@ -14,13 +14,13 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import Field
 from pymongo.errors import DuplicateKeyError
-from .business_common import (Input, Revision, manager, road, get_record, changed, event, log_event, serialize,
+from .business_common import (Input, Revision, road, get_record, changed, event, log_event, serialize,
                               fingerprint, period)
 from .business_models import DataSource, RoadReading, SourceReceipt
 from .business_schemas import SourceInput, SourceEdit, MappingInput, Toggle
 from .db import get_db, stamp, now
 from .models import TrafficSample
-from .security import admin
+from .security import admin, permit
 
 router=APIRouter()
 MAX_BYTES=2*1024*1024
@@ -319,7 +319,7 @@ async def poll(ident:int,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.get('/api/management/cameras/{ident}/preview')
-async def camera_preview(ident:int,user=Depends(manager),db=Depends(get_db)):
+async def camera_preview(ident:int,user=Depends(permit('monitor.camera')),db=Depends(get_db)):
     from fastapi.responses import Response
     source=get_record(db,DataSource,ident)
     road(db,source.segment_id,source.direction,user)

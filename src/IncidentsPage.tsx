@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {MessageSquare,Plus,MapPin} from 'lucide-react';
+import {can} from './permissions';
 import {api,json} from './api';
 import {Empty,Modal,Spinner} from './components';
 import {TrafficMap} from './TrafficMap';
@@ -17,7 +18,7 @@ function Submission({segments,config,onClose,onCreated}:{segments:Segment[];conf
 
 export default function IncidentsPage({user,segments,config,onLogin}:{user:User|null;segments:Segment[];config:Config;onLogin:()=>void}){
  const[creating,setCreating]=useState(false);const[detail,setDetail]=useState<Incident|null>(null);const[success,setSuccess]=useState('');
- return <><div className="page-heading"><div><div className="eyebrow">CÙNG THEO DÕI GIAO THÔNG</div><h1>Phản ánh giao thông<span>.</span></h1><p>Gửi thông tin sự cố và theo dõi kết quả xác minh, xử lý.</p></div><button className="button primary" onClick={()=>user?setCreating(true):onLogin()}><Plus size={16}/>Gửi phản ánh</button></div><Feedback success={success}/>{!user?<section className="card"><Empty><p>Đăng nhập để gửi và theo dõi phản ánh của bạn.</p><button className="button primary" onClick={onLogin}>Đăng nhập</button></Empty></section>:<OwnReports key={success} onDetail={setDetail}/>} {creating&&<Submission segments={segments} config={config} onClose={()=>setCreating(false)} onCreated={item=>{setCreating(false);setSuccess(`Đã gửi phản ánh ${item.code}. Quản lý sẽ tiếp nhận và xác minh.`);setDetail(item);}}/>}{detail&&<Modal title={`Phản ánh ${detail.code}`} onClose={()=>setDetail(null)}><IncidentDetails item={detail}/></Modal>}</>;
+ return <><div className="page-heading"><div><div className="eyebrow">CÙNG THEO DÕI GIAO THÔNG</div><h1>Phản ánh giao thông<span>.</span></h1><p>Gửi thông tin sự cố và theo dõi kết quả xác minh, xử lý.</p></div>{(!user||can(user,'reports.add'))&&<button className="button primary" onClick={()=>user?setCreating(true):onLogin()}><Plus size={16}/>Gửi phản ánh</button>}</div><Feedback success={success}/>{!user?<section className="card"><Empty><p>Đăng nhập để gửi và theo dõi phản ánh của bạn.</p><button className="button primary" onClick={onLogin}>Đăng nhập</button></Empty></section>:can(user,'reports.view')&&<OwnReports key={success} onDetail={setDetail}/>} {creating&&can(user,'reports.add')&&<Submission segments={segments} config={config} onClose={()=>setCreating(false)} onCreated={item=>{setCreating(false);setSuccess(`Đã gửi phản ánh ${item.code}. Quản lý sẽ tiếp nhận và xác minh.`);if(can(user,'reports.view'))setDetail(item);}}/>}{detail&&<Modal title={`Phản ánh ${detail.code}`} onClose={()=>setDetail(null)}><IncidentDetails item={detail}/></Modal>}</>;
 }
 
 const reportStates = {

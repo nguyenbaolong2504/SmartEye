@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pymongo.errors import DuplicateKeyError
 from .db import get_db, stamp, now
 from .history import LOCAL
-from .business_common import (manager, road, allowed_query, get_record, changed, event, serialize,
+from .business_common import (road, allowed_query, get_record, changed, event, serialize,
                               fingerprint, Revision, NoteAction, utc)
 from .business_models import ManagedRule, DataSource, RoadReading, Warning
 from .business_schemas import RuleInput, RuleEdit, Toggle
+
+from .security import permit
 
 router=APIRouter()
 OPS={'gt':operator.gt,'gte':operator.ge,'lt':operator.lt,'lte':operator.le}
@@ -27,7 +29,7 @@ def record(db,ident,user):
 
 
 @router.get('/api/management/rules')
-def rules(q:str=Query(default='',max_length=100),active:bool|None=None,metric:str|None=None,user=Depends(manager),db=Depends(get_db)):
+def rules(q:str=Query(default='',max_length=100),active:bool|None=None,metric:str|None=None,user=Depends(permit('rules.view')),db=Depends(get_db)):
     query={**allowed_query(user),'deleted':False}
     if q:query['name']={'$regex':re.escape(q),'$options':'i'}
     if active is not None:query['active']=active
@@ -38,7 +40,7 @@ def rules(q:str=Query(default='',max_length=100),active:bool|None=None,metric:st
 
 
 @router.post('/api/management/rules',status_code=201)
-def create_rule(body:RuleInput,user=Depends(manager),db=Depends(get_db)):
+def create_rule(body:RuleInput,user=Depends(permit('rules.add')),db=Depends(get_db)):
     road(db,body.segment_id,body.direction,user)
     fields=body.model_dump()
     value=ManagedRule(**fields,signature=signature(body),name_key=body.name.casefold(),created_by=user.id,
@@ -47,7 +49,7 @@ def create_rule(body:RuleInput,user=Depends(manager),db=Depends(get_db)):
 
 
 @router.patch('/api/management/rules/{ident}')
-def edit_rule(ident:int,body:RuleEdit,user=Depends(manager),db=Depends(get_db)):
+def edit_rule(ident:int,body:RuleEdit,user=Depends(permit('rules.edit')),db=Depends(get_db)):
     item=record(db,ident,user);road(db,body.segment_id,body.direction,user)
     fields=body.model_dump(exclude={'revision'});version=item.content_version+1
     return serialize(changed(db,ManagedRule,item,body.revision,{**fields,'active':False,'tested':False,
@@ -83,7 +85,7 @@ def evaluation(db,rule,at=None):
 
 
 @router.post('/api/management/rules/{ident}/test')
-def test_rule(ident:int,body:Revision,user=Depends(manager),db=Depends(get_db)):
+def test_rule(ident:int,body:Revision,user=Depends(permit('rules.test')),db=Depends(get_db)):
     item=record(db,ident,user);result=evaluation(db,item)
     if not result['ready']:raise HTTPException(409,result['message'])
     value=changed(db,ManagedRule,item,body.revision,{'tested':True},event(user,'rule_tested',samples=result['samples']))
@@ -91,7 +93,7 @@ def test_rule(ident:int,body:Revision,user=Depends(manager),db=Depends(get_db)):
 
 
 @router.post('/api/management/rules/{ident}/toggle')
-def toggle_rule(ident:int,body:Toggle,user=Depends(manager),db=Depends(get_db)):
+def toggle_rule(ident:int,body:Toggle,user=Depends(permit('rules.toggle')),db=Depends(get_db)):
     item=record(db,ident,user)
     if body.active and (not item.tested or not evaluation(db,item)['ready']):
         raise HTTPException(409,'Quy tắc chưa đủ điều kiện kích hoạt. Kiểm tra nguồn và số liệu trước.')
@@ -99,7 +101,7 @@ def toggle_rule(ident:int,body:Toggle,user=Depends(manager),db=Depends(get_db)):
 
 
 @router.post('/api/management/rules/{ident}/delete')
-def delete_rule(ident:int,body:NoteAction,user=Depends(manager),db=Depends(get_db)):
+def delete_rule(ident:int,body:NoteAction,user=Depends(permit('rules.delete')),db=Depends(get_db)):
     item=record(db,ident,user)
     return serialize(changed(db,ManagedRule,item,body.revision,{'active':False,'deleted':True},event(user,'rule_deleted',body.note)))
 

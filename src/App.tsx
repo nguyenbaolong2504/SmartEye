@@ -3,6 +3,7 @@ import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, Ma
 import { api } from './api';
 import { AuthModal,ProfilePage } from './Auth';
 import { Modal,Notice,Spinner } from './components';
+import {can,managementSections} from './permissions';
 import { type Place,type Segment,type Camera,type Config,type User,type Favorite,type DemoStatus,type DataMode } from './types';
 const OverviewPage=lazy(()=>import('./OverviewPage'));
 const RoutesPage=lazy(()=>import('./RoutesPage'));
@@ -19,12 +20,19 @@ function readTab():Tab|null {
   const view=location.hash.slice(1);
   return view==='profile'||navigation.some(n=>n.id===view)?view as Tab:null;
 }
-function canOpen(tab:Tab, role:User['role']|undefined) {
+function canOpen(tab:Tab, user:User|null) {
+  const role=user?.role;
   if(tab==='profile')return Boolean(role);
   if(role==='admin')return tab==='admin';
   if(tab==='admin')return false;
-  if(tab==='management')return role==='analyst';
-  return true;
+  if(tab==='management')return managementSections.some(key=>can(user,key));
+  if(tab==='monitor')return can(user,'traffic.view');
+  if(tab==='forecast')return can(user,'forecast.view');
+  if(tab==='routes')return can(user,'routes.search');
+  if(tab==='history')return can(user,'favorites.view')||!user;
+  if(tab==='alerts')return can(user,'warnings.view')||can(user,'alerts.view');
+  if(tab==='incidents')return can(user,'reports.view')||can(user,'reports.add')||!user;
+  return tab==='overview';
 }
 type Bootstrap={places:Place[];segments:Segment[];cameras:Camera[];config:Config;user:User|null;demo:DemoStatus};
 export default function App(){
@@ -48,7 +56,7 @@ export default function App(){
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(timer);},[toast]);
   const role=user?.role;
   const home=role==='admin'?'admin':'overview';
-  const blocked=Boolean(requestedTab&&!canOpen(requestedTab,role));
+  const blocked=Boolean(requestedTab&&!canOpen(requestedTab,user));
   const tab=user&&blocked?home:requestedTab??home;
   useEffect(()=>{
     if(!config||!user||tab===requestedTab)return;
@@ -66,15 +74,15 @@ export default function App(){
   return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}>
     <a href={`#${home}`} className="brand" onClick={e=>{e.preventDefault();navigate(home);}}><span className="brand-icon"><span/><i/></span><span>SmartEye<small>{role==='admin'?'VẬN HÀNH HỆ THỐNG':'HIỂU ĐƯỜNG · CHỌN LỐI'}</small></span></a>
     <button className="mobile-close icon-button" onClick={()=>setMobileOpen(false)} aria-label="Đóng menu"><X size={20}/></button>
-    <nav aria-label="Điều hướng chính">{config&&navigation.filter(n=>canOpen(n.id,role)).map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin'||id==='management')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG HÀ NỘI':id==='history'?'CÁ NHÂN':id==='management'?'QUẢN LÝ':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
+    <nav aria-label="Điều hướng chính">{config&&navigation.filter(n=>canOpen(n.id,user)).map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin'||id==='management')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG':id==='history'?'CÁ NHÂN':id==='management'?'QUẢN LÝ':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
     {role!=='admin'&&config&&<div className="sidebar-project"><div><Radio size={17}/><b>Hà Nội</b></div><p>Theo dõi từng tuyến đường<br/>giao thông đô thị</p><div className="project-stats"><span><b>{segments.filter(s=>s.active).length}</b> tuyến đường</span><span>Giờ Việt Nam</span></div></div>}
     <div className="sidebar-bottom">{role!=='admin'&&config&&<p>Dữ liệu rõ ràng.<br/>Chủ động hành trình.</p>}<small>SmartEye · Phiên bản 1.1</small></div>
   </aside>{mobileOpen&&<div className="sidebar-scrim" onClick={()=>setMobileOpen(false)}/>}
     <div className="main-shell"><header className="topbar"><button className="mobile-toggle icon-button" onClick={()=>setMobileOpen(true)} aria-label="Mở menu"><Menu size={21}/></button><div className="breadcrumb"><span>Không gian làm việc</span><ChevronRight size={14}/><b>{current}</b></div><div className="topbar-actions"><span className="city-label"><MapPin size={14}/>Hà Nội, Việt Nam</span>{user?<button className="user-button" aria-label={`Hồ sơ ${user.name}`} onClick={()=>navigate('profile')}><span>{user.name.charAt(0).toUpperCase()}</span><div>{user.name}<small>{user.role==='admin'?'Quản trị viên':user.role==='analyst'?'Quản lý':'Người dùng'}</small></div><ChevronRight size={15}/></button>:<button className="button small" onClick={()=>setAuthOpen(true)}><LogIn size={15}/>Đăng nhập</button>}</div></header>
     <main>{error&&<div className="connection-error"><Notice kind="error">{error}</Notice><button className="button" onClick={refresh}>Thử kết nối lại</button></div>}
       {(!config||loadedMode!==dataMode)&&!error?<div className="loading-page"><Spinner/><p>Đang kết nối SmartEye…</p></div>:config&&<Suspense fallback={<div className="loading-page"><Spinner/><p>Đang mở trang…</p></div>}>
-        {tab==='overview'&&<OverviewPage segments={segments} places={places} onNavigate={navigate} dataMode={dataMode}/>}
-        {tab==='forecast'&&<ForecastPage segments={segments} user={user} dataMode={dataMode} demo={demo} initialRoad={initialRoad} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}} onUpdated={refresh}/>}
+        {tab==='overview'&&<OverviewPage user={user} segments={segments} places={places} onNavigate={navigate} dataMode={dataMode}/>}
+        {tab==='forecast'&&<ForecastPage segments={segments} user={user} initialRoad={initialRoad} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}}/>}
         {tab==='routes'&&<RoutesPage key={`${routeKey}-${dataMode}`} places={places} segments={segments} config={config} user={user} dataMode={dataMode} initialDeparture={initialDeparture} onLogin={()=>setAuthOpen(true)} preset={preset} onSaved={()=>setToast('Đã lưu hành trình yêu thích.')}/>}
         {tab==='monitor'&&<TrafficMonitor tileUrl={config.osm_tile_url} key={initialRoad||'all'} initialRoad={initialRoad} onForecast={id=>{setInitialRoad(id);navigate('forecast');}} segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
         {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}

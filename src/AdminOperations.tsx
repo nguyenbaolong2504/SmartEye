@@ -7,6 +7,7 @@ import {type Direction, type Source, Feedback, History, Loading, RoadFields, Sta
 
 const sourceKinds: Record<string, string> = {file:'Tệp lịch sử', api:'Dịch vụ dữ liệu', camera:'Camera'};
 const roles: Record<User['role'],string> = {user:'Người dùng', analyst:'Quản lý', admin:'Quản trị viên'};
+const permissionGroups:Record<string,string>={traffic:'Tình trạng và bản đồ',forecast:'Dự báo',routes:'Tìm đường',favorites:'Hành trình đã lưu',warnings:'Cảnh báo công khai',alerts:'Thông báo cá nhân',reports:'Phản ánh của mình',monitor:'Giám sát',incidents:'Xử lý phản ánh',publication:'Phát hành cảnh báo',rules:'Quy tắc cảnh báo'};
 const fieldNames: Record<string,string> = {observed_at:'Thời điểm quan sát', segment_id:'Mã tuyến', direction:'Chiều đường', count:'Số phương tiện', interval_seconds:'Khoảng đo (giây)', speed_kmh:'Vận tốc', score:'Chỉ số mật độ', density:'Mức mật độ', state:'Tình trạng ùn tắc'};
 const mandatory = new Set(['observed_at','segment_id','direction']);
 const receiptEmpty: Receipt[] = [];
@@ -225,8 +226,19 @@ function AccountForm({mode,user,segments,onClose,onSaved}: {mode:'create'|'edit'
   const [reason,setReason] = useState('');
   const [all,setAll] = useState(user?.managed_segment_ids == null);
   const [scope,setScope] = useState<number[]>(user?.managed_segment_ids || []);
+  const [permissions,setPermissions] = useState<string[]|null>(user?.uses_role_permissions===false?user.permissions:null);
+  const [catalog,setCatalog] = useState<Record<string,Record<string,string>>|null>(null);
+  const [catalogError,setCatalogError] = useState('');
   const action = useAction();
   const profile = mode === 'create' || mode === 'edit';
+  const options=catalog?.[role]||{};
+  const selected=permissions??Object.keys(options);
+  useEffect(()=>{
+    if(mode!=='role')return;
+    const controller=new AbortController();
+    api<Record<string,Record<string,string>>>('/admin/permission-options',{signal:controller.signal}).then(setCatalog).catch(e=>{if(!controller.signal.aborted)setCatalogError(e.message);});
+    return()=>controller.abort();
+  },[mode]);
   function submit(e:React.FormEvent) {
     e.preventDefault();
     void action.run(async () => {
@@ -236,7 +248,7 @@ function AccountForm({mode,user,segments,onClose,onSaved}: {mode:'create'|'edit'
         if (password !== confirmation) throw new Error('Mật khẩu và xác nhận không khớp.');
         await api(path,json({name,email,username,phone,password,password_confirmation:confirmation,role,managed_segment_ids}));
       } else if (mode === 'edit') await api(path,json({name,email,phone,active,revision:user?.profile_version},'PATCH'));
-      else if (mode === 'role') await api(`${path}/role`,json({role,managed_segment_ids,revision:user?.profile_version,confirmed:true}));
+      else if (mode === 'role') await api(`${path}/role`,json({role,managed_segment_ids,permissions:role==='admin'?null:permissions,revision:user?.profile_version,confirmed:true}));
       else await api(`${path}/disable`,json({revision:user?.profile_version,note:reason}));
       onSaved();
     });
@@ -252,13 +264,27 @@ function AccountForm({mode,user,segments,onClose,onSaved}: {mode:'create'|'edit'
     </>}
     {mode === 'edit' && <label className="check"><input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)}/>Tài khoản hoạt động</label>}
     {(mode === 'create' || mode === 'role') && <>
-      <label className="field">Vai trò<select value={role} onChange={e => setRole(e.target.value as User['role'])}>{Object.entries(roles).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      <label className="field">Vai trò<select value={role} onChange={e => {setRole(e.target.value as User['role']);setPermissions(null);}}>{Object.entries(roles).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       {role === 'analyst' && <><label className="check"><input type="checkbox" checked={all} onChange={e => setAll(e.target.checked)}/>Quản lý tất cả tuyến</label>
         {!all && <label className="field">Các tuyến được phân công<select multiple value={scope.map(String)} onChange={e => setScope(Array.from(e.target.selectedOptions,o => Number(o.value)))}>{segments.filter(s => s.active).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}</>}
+      {mode==='role'&&role!=='admin'&&<section className="permission-editor">
+        <h3>Quyền theo từng thao tác</h3>
+        <p className="micro">Bỏ chọn mục nào thì tài khoản sẽ không thấy mục đó. Để dùng nút trong một màn hình quản lý, bật cả quyền xem màn hình đó.</p>
+        <Feedback error={catalogError}/>
+        {!catalog&&!catalogError?<Spinner/>:catalog&&<>
+          <button className="button small" type="button" onClick={()=>setPermissions(null)} disabled={permissions===null}>Dùng quyền mặc định</button>
+          {Object.entries(permissionGroups).map(([group,label])=>{
+            const entries=Object.entries(options).filter(([key])=>key.startsWith(group+'.'));
+            return entries.length>0&&<fieldset key={group}><legend>{label}</legend>{entries.map(([key,title])=><label className="check" key={key}>
+              <input type="checkbox" checked={selected.includes(key)} onChange={e=>setPermissions(e.target.checked?[...selected,key]:selected.filter(item=>item!==key))}/>{title}
+            </label>)}</fieldset>;
+          })}
+        </>}
+      </section>}
       {mode === 'role' && <p className="micro">Quyền mới được áp dụng sau khi xác nhận. Tài khoản cần đăng nhập lại.</p>}
     </>}
     {mode === 'disable' && <><p>Tài khoản sẽ bị vô hiệu hóa và thu hồi phiên. Lịch sử nghiệp vụ được lưu để tra cứu.</p><label className="field">Lý do vô hiệu hóa<textarea required minLength={5} maxLength={2000} value={reason} onChange={e => setReason(e.target.value)}/></label></>}
-    <div className="workflow-buttons"><button className="button" type="button" onClick={onClose}>Hủy</button><button className="button primary" disabled={action.busy}>{action.busy && <Spinner/>}{mode === 'role' || mode === 'disable' ? 'Xác nhận' : 'Lưu tài khoản'}</button></div>
+    <div className="workflow-buttons"><button className="button" type="button" onClick={onClose}>Hủy</button><button className="button primary" disabled={action.busy||(mode==='role'&&role!=='admin'&&!catalog)}>{action.busy && <Spinner/>}{mode === 'role' || mode === 'disable' ? 'Xác nhận' : 'Lưu tài khoản'}</button></div>
   </form>;
 }
 

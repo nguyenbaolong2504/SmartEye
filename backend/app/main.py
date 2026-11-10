@@ -25,7 +25,7 @@ from . import schemas as S
 from .config import COOKIE_SECURE, PRODUCTION, UPLOADS, MAX_UPLOAD, MODEL_PATH, TTL_MINUTES
 from .db import initialize_database, get_database, get_db, SessionLocal, stamp, now
 from .models import User, LoginSession, ResetToken, Segment, Camera, Observation, VideoJob, Favorite, AlertRule, Notification, Audit
-from .security import optional_user, require_user, traffic_viewer, traffic_member, operator, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
+from .security import optional_user, require_user, can, permit, operator, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
 from .seed import seed, PLACES
 from .traffic import classify, latest_observations, observation_dict, emit_alerts
 from .routing import search_routes
@@ -103,7 +103,9 @@ async def guard(request, call_next):
             allowed |= {'http://127.0.0.1:5173','http://localhost:5173','http://127.0.0.1:8000','http://localhost:8000'}
         if origin and origin.rstrip('/') not in allowed:
             return JSONResponse({'detail':'Nguồn yêu cầu không được phép.'},status_code=403)
-    bucket = 'training' if request.url.path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if request.url.path.startswith('/api/auth/') and request.method == 'POST' else 'video' if request.url.path == '/api/videos' and request.method == 'POST' else 'route' if request.url.path in ('/api/routes/search','/api/routes/departures') else 'geocoding' if request.url.path=='/api/map/places' else 'general'
+    path=request.url.path
+    auth_attempt=path.startswith('/api/auth/') and path!='/api/auth/logout' and request.method=='POST'
+    bucket = 'training' if path == '/api/forecast/runs' and request.method == 'POST' else 'auth' if auth_attempt else 'video' if path == '/api/videos' and request.method == 'POST' else 'route' if path in ('/api/routes/search','/api/routes/departures') else 'geocoding' if path=='/api/map/places' else 'general'
     limit = {'training':2,'auth':20,'video':5,'route':20,'geocoding':45,'general':180}[bucket]
     ip = request.client.host if request.client else 'unknown'
     key = (ip,bucket)
@@ -190,7 +192,7 @@ def profile(body:S.ProfileInput,user=Depends(require_user),db=Depends(get_db)):
     row=item(db,User,user.id)
     if body.revision is not None and body.revision!=row.profile_version:raise HTTPException(409,'Hồ sơ đã thay đổi. Vui lòng tải lại.')
     updates=body.model_dump(exclude_unset=True,exclude={'revision'})
-    if user.role=='admin' and 'notifications_enabled' in updates:
+    if 'notifications_enabled' in updates and not can(user,'alerts.view'):
         raise HTTPException(403,'Tùy chọn nhận cảnh báo dành cho Người dùng và Quản lý.')
     if updates.get('email') is None:updates.pop('email',None)
     result=db.database.users.find_one_and_update({'_id':user.id,'$or':[{'profile_version':row.profile_version},{'profile_version':{'$exists':False}}]},
@@ -255,12 +257,12 @@ def places(db=Depends(get_db)):
 @app.get('/api/segments')
 def segments(db=Depends(get_db),data_mode:Literal['observed','demo']='observed',user=Depends(optional_user)):
     observations={}
-    if not user or user.role!='admin':
+    if can(user,'traffic.view'):
         if data_mode=='observed':
             observations={key:observation_dict(row) for key,row in latest_observations(db).items()}
         elif demo_enabled() and demo_status(db.database)['ready']:
             observations=current_states(db.database)
-    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},
+    return [{**{k:getattr(s,k) for k in ('id','name','area','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},
              'observation':observations.get(s.id)} for s in db.find(Segment,sort=[('id',1)])]
 
 @app.get('/api/bootstrap')
@@ -319,7 +321,7 @@ def manual_observation(body:S.ObservationInput,user=Depends(operator),db=Depends
     db.add(row); db.flush(); emit_alerts(db,row); audit(db,user.id,'manual_observation',str(body.segment_id)); db.commit()
     return observation_dict(row)
 
-@app.post('/api/routes/search',dependencies=[Depends(traffic_viewer)])
+@app.post('/api/routes/search',dependencies=[Depends(permit('routes.search'))])
 async def routes(body:S.RouteRequest,db=Depends(get_db)):
     # Provider route results are intentionally not persisted or used for training.
     return await search_routes(db,body)
@@ -410,11 +412,11 @@ def publish_video(ident:str,options:S.PublishOptions|None=None,user=Depends(oper
     return publish_job(db,own(item(db,VideoJob,ident),user),user,options or S.PublishOptions())
 
 @app.get('/api/favorites')
-def favorites(user=Depends(traffic_member),db=Depends(get_db)):
+def favorites(user=Depends(permit('favorites.view')),db=Depends(get_db)):
     return [{'id':r.id,'name':r.name,'request':r.request} for r in db.find(Favorite,{'user_id':user.id},sort=[('id',-1)])]
 
 @app.post('/api/favorites',status_code=201)
-def add_favorite(body:S.FavoriteInput,user=Depends(traffic_member),db=Depends(get_db)):
+def add_favorite(body:S.FavoriteInput,user=Depends(permit('favorites.add')),db=Depends(get_db)):
     if db.count(Favorite,{'user_id':user.id}) >= 50: raise HTTPException(422,'Mỗi tài khoản lưu tối đa 50 hành trình.')
     request=body.request.model_dump(mode='json'); request['departure_at']=None
     # Save user's inputs only; no Google geometry or provider results.
@@ -422,28 +424,31 @@ def add_favorite(body:S.FavoriteInput,user=Depends(traffic_member),db=Depends(ge
     return {'id':row.id,'name':row.name,'request':row.request}
 
 @app.delete('/api/favorites/{ident}')
-def delete_favorite(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
+def delete_favorite(ident:int,user=Depends(permit('favorites.delete')),db=Depends(get_db)):
     row=own(item(db,Favorite,ident),user); db.delete(row); db.commit(); return {'message':'Đã xóa hành trình.'}
 
 @app.get('/api/alerts')
-def alerts(user=Depends(traffic_member),db=Depends(get_db)):
+def alerts(user=Depends(permit('alerts.view')),db=Depends(get_db)):
+    from .warnings import active_query
+    active_warning_ids=db.database.traffic_warnings.distinct('_id',active_query(stamp()))
     rules=[{k:getattr(r,k) for k in ('id','segment_id','density','active')} for r in db.find(AlertRule,{'user_id':user.id})]
-    notices=[{k:getattr(n,k) for k in ('id','message','read','created_at','warning_id')} for n in db.find(Notification,{'user_id':user.id},sort=[('id',-1)],limit=100)]
+    notices=[{k:getattr(n,k) for k in ('id','message','read','created_at','warning_id')} for n in db.find(Notification,{'user_id':user.id,
+        '$or':[{'warning_id':None},{'warning_id':{'$in':active_warning_ids}}]},sort=[('id',-1)],limit=100)]
     return {'rules':rules,'notifications':notices}
 
 @app.post('/api/alerts',status_code=201)
-def add_alert(body:S.RuleInput,user=Depends(traffic_member),db=Depends(get_db)):
+def add_alert(body:S.RuleInput,user=Depends(permit('alerts.follow')),db=Depends(get_db)):
     item(db,Segment,body.segment_id)
     if db.find_one(AlertRule,{'user_id':user.id,'segment_id':body.segment_id,'density':body.density}):
         raise HTTPException(409,'Bạn đã theo dõi điều kiện này.')
     row=AlertRule(user_id=user.id,**body.model_dump()); db.add(row); db.commit(); return {'id':row.id}
 
 @app.delete('/api/alerts/{ident}')
-def remove_alert(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
+def remove_alert(ident:int,user=Depends(permit('alerts.follow')),db=Depends(get_db)):
     row=own(item(db,AlertRule,ident),user); db.delete(row); db.commit(); return {'message':'Đã bỏ theo dõi.'}
 
 @app.post('/api/notifications/{ident}/read')
-def read_notification(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
+def read_notification(ident:int,user=Depends(permit('alerts.read')),db=Depends(get_db)):
     row=own(item(db,Notification,ident),user); row.read=True; db.commit(); return {'message':'Đã đánh dấu đã đọc.'}
 
 def report_rows(db,segment_id=None,start=None,end=None):

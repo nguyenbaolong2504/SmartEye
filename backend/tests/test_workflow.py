@@ -117,33 +117,35 @@ def test_same_submission_key_is_idempotent(client):
     assert first['id']==second['id'] and len(client.get('/api/incidents').json())==1
 
 
-def test_publication_requires_verification_and_versions_do_not_leak(client):
+def test_published_warning_is_read_only_and_expires_automatically(client,monkeypatch):
+    from backend.app import warnings
     people(client);login(client,'viewer@test.vn')
     assert client.patch('/api/auth/profile',json={'name':'Viewer','notifications_enabled':True}).status_code==200
     login(client,'manager@test.vn');item,body=warning(client);ident=item['id']
     assert client.get('/api/warnings').json()==[]
-    assert client.post(f'/api/management/warnings/{ident}/publish',json={'revision':item['revision']}).status_code==409
-    item=client.post(f'/api/management/warnings/{ident}/verify',json={**note(item),'conclusion':'valid'}).json()
-    item=client.post(f'/api/management/warnings/{ident}/publish',json={'revision':item['revision']}).json()
-    first=client.get(f'/api/warnings/{ident}').json()
-    assert first['version']==1 and 'created_by' not in first and 'incident_id' not in first
-    assert client.post(f'/api/management/warnings/{ident}/publish',json={'revision':item['revision']}).status_code==409
-    body['content']='Nội dung chỉnh sửa mới vẫn đang chờ quản lý xác minh.'
-    item=client.patch(f'/api/management/warnings/{ident}',json={**body,'revision':item['revision']}).json()
+    path=f'/api/management/warnings/{ident}'
+    assert client.post(f'{path}/publish',json={'revision':item['revision']}).status_code==409
+    item=client.patch(path,json={**body,'content':'Bản nháp đã được cập nhật trước khi xác minh.','revision':item['revision']}).json()
     assert item['content_version']==2 and item['status']=='pending_verification'
-    assert client.get(f'/api/warnings/{ident}').json()['content']==first['content']
-    item=client.post(f'/api/management/warnings/{ident}/verify',json={**note(item),'conclusion':'valid'}).json()
-    item=client.post(f'/api/management/warnings/{ident}/publish',json={'revision':item['revision']}).json()
-    assert client.get(f'/api/warnings/{ident}').json()['version']==2
-    login(client,'viewer@test.vn')
-    with SessionLocal() as db:
-        notices=list(db.database.notifications.find({'warning_id':ident}));assert len(notices)==2
-    login(client,'manager@test.vn')
+    item=client.post(f'{path}/verify',json={**note(item),'conclusion':'valid'}).json()
+    item=client.post(f'{path}/publish',json={'revision':item['revision']}).json()
+    public=client.get(f'/api/warnings/{ident}').json()
+    assert public['version']==2 and public['end_at']==item['end_at']
+    assert 'created_by' not in public and 'incident_id' not in public
+    assert client.patch(path,json={**body,'revision':item['revision']}).status_code==409
+    for command in ('end','cancel'):
+        assert client.post(f'{path}/{command}',json=note(item)).status_code==409
+    assert client.get(f'/api/warnings/{ident}').json()==public
     client.post('/api/management/warnings/retry-deliveries')
-    with SessionLocal() as db:assert db.database.notifications.count_documents({'warning_id':ident})==2
-    item=client.post(f'/api/management/warnings/{ident}/end',json=note(item)).json()
-    assert item['status']=='ended' and client.get('/api/warnings').json()==[]
+    with SessionLocal() as db:assert db.database.notifications.count_documents({'warning_id':ident})==1
+
+    monkeypatch.setattr(warnings,'stamp',lambda:(now()+timedelta(hours=3)).isoformat())
+    assert client.get('/api/warnings').json()==[]
     assert client.get(f'/api/warnings/{ident}').status_code==404
+    expired=client.get('/api/management/warnings?status=ended').json()
+    assert expired[0]['id']==ident and expired[0]['history'][-1]['action']=='warning_expired'
+    login(client,'viewer@test.vn')
+    assert client.get('/api/alerts').json()['notifications']==[]
 
 
 def test_warning_hides_reporter_contacts_in_publication_and_inbox(client):
@@ -163,13 +165,35 @@ def test_warning_hides_reporter_contacts_in_publication_and_inbox(client):
         assert public in db.database.notifications.find_one({'warning_id':ident})['message']
 
 
-def test_cancel_withdraws_publication_and_retains_history(client):
-    people(client);login(client,'manager@test.vn');item,_=warning(client);ident=item['id']
-    item=client.post(f'/api/management/warnings/{ident}/verify',json={**note(item),'conclusion':'valid'}).json()
-    item=client.post(f'/api/management/warnings/{ident}/publish',json={'revision':item['revision']}).json()
-    item=client.post(f'/api/management/warnings/{ident}/cancel',json=note(item)).json()
-    assert item['status']=='cancelled' and len(item['versions'])==1 and len(item['history'])==4
+def test_warning_needs_an_expiry_to_publish_and_can_cancel_a_draft(client):
+    people(client);login(client,'manager@test.vn');item,body=warning(client);ident=item['id']
+    path=f'/api/management/warnings/{ident}'
+    item=client.patch(path,json={**body,'end_at':None,'revision':item['revision']}).json()
+    item=client.post(f'{path}/verify',json={**note(item),'conclusion':'valid'}).json()
+    assert client.post(f'{path}/publish',json={'revision':item['revision']}).status_code==422
+    item=client.post(f'{path}/cancel',json=note(item)).json()
+    assert item['status']=='cancelled' and item['public_snapshot'] is None
     assert client.get(f'/api/warnings/{ident}').status_code==404
+
+
+def test_admin_can_limit_report_actions_without_granting_other_roles(client):
+    people(client)
+    login(client,'viewer@test.vn')
+    viewer=client.get('/api/auth/me').json()
+    report=incident(client)
+    login(client,'admin@test.vn')
+    path=f'/api/admin/accounts/{viewer["id"]}/role'
+    request={'revision':viewer['profile_version'],'role':'user','permissions':['reports.view'],'confirmed':True}
+    assert client.post(path,json={**request,'permissions':['incidents.accept']}).status_code==422
+    result=client.post(path,json=request)
+    assert result.status_code==200 and result.json()['permissions']==['reports.view']
+    login(client,'viewer@test.vn')
+    assert client.get('/api/incidents').status_code==200
+    assert client.get(f'/api/incidents/{report["id"]}').status_code==200
+    assert client.get('/api/warnings').status_code==403
+    payload={'segment_id':1,'direction':'forward','kind':'congestion','position':report['position'],
+             'content':'Đường đông cần xử lý trong luồng kiểm thử.','occurred_at':stamp(),'submission_key':'permission-retry'}
+    assert client.post('/api/incidents',json=payload).status_code==403
 
 
 def test_source_mapping_check_enable_import_and_missing_speed_are_honest(client):

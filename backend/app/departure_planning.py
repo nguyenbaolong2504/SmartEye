@@ -5,12 +5,12 @@ from fastapi import APIRouter,Depends
 from .db import get_db,now
 from .schemas import RouteRequest
 from .routing import search_routes
-from .security import traffic_viewer
+from .security import permit
 
 router=APIRouter()
 
 
-@router.post('/api/routes/departures',dependencies=[Depends(traffic_viewer)])
+@router.post('/api/routes/departures',dependencies=[Depends(permit('routes.search'))])
 async def compare_departures(body:RouteRequest,db=Depends(get_db)):
     start=body.departure_at or now();gate=asyncio.Semaphore(2)
     async def compare(at):

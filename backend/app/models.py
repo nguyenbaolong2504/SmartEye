@@ -41,6 +41,7 @@ class User(Document):
     phone: str | None = None
     notifications_enabled: bool = False
     managed_segment_ids: list | None = None
+    permissions: list[str] | None = None
     protected: bool = False
     profile_version: int = 1
 
@@ -76,6 +77,7 @@ class Segment(Document):
     is_demo: bool = True
     active: bool = True
     one_way: bool = False
+    area: str = 'Hà Nội'
 
 
 @dataclass(kw_only=True)

@@ -136,12 +136,13 @@ class SegmentInput(BaseModel):
     active: bool = True
     is_demo: bool = False
     one_way: bool = False
+    area: str = Field(default='Hà Nội',min_length=2,max_length=100)
     @model_validator(mode='after')
     def coherent(self):
         if self.start_node == self.end_node:
             raise ValueError('Mã hai đầu đoạn đường phải khác nhau')
-        if any(len(p)!=2 or not (20.5<=p[0]<=21.5 and 105.2<=p[1]<=106.2) for p in self.geometry):
-            raise ValueError('Geometry cần các điểm [vĩ độ, kinh độ] tại Hà Nội')
+        if any(len(p)!=2 or not (8<=p[0]<=24 and 102<=p[1]<=111) for p in self.geometry):
+            raise ValueError('Cần tọa độ [vĩ độ, kinh độ] trong khu vực Việt Nam')
         if self.geometry[0]==self.geometry[-1]:
             raise ValueError('Hai đầu geometry phải khác nhau')
         return self

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from .db import get_db, now, stamp
 from .models import Segment, Camera
 from .business_models import DataSource, RoadReading, Warning
-from .business_common import road, manager, period, utc
-from .security import traffic_viewer
+from .business_common import road, period, utc
+from .security import can, permit
 
 router=APIRouter()
 STATE_TEXT={'FREE':'Thông thoáng','SLOW':'Bình thường','JAM':'Ùn tắc',None:'Chưa xác định'}
@@ -64,12 +64,12 @@ def current(db,segment_id,direction='forward',data_mode='observed'):
     return result
 
 
-@router.get('/api/traffic/road',dependencies=[Depends(traffic_viewer)])
+@router.get('/api/traffic/road',dependencies=[Depends(permit('traffic.view'))])
 def road_current(segment_id:int,direction:Literal['forward','reverse']='forward',data_mode:Literal['demo','observed']='observed',db=Depends(get_db)):
     return current(db,segment_id,direction,data_mode)
 
 
-@router.get('/api/traffic/readings',dependencies=[Depends(traffic_viewer)])
+@router.get('/api/traffic/readings',dependencies=[Depends(permit('traffic.view'))])
 def recorded_history(segment_id:int,start:str,end:str,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
     road(db,segment_id,direction)
     dates=period(start,end,max_days=31)
@@ -79,7 +79,7 @@ def recorded_history(segment_id:int,start:str,end:str,direction:Literal['forward
     return [{'at':row.observed_at,'metrics':row.metrics} for row in db.find(RoadReading,query,sort=[('observed_at',-1)],limit=1000)]
 
 
-@router.get('/api/traffic/forecast-options',dependencies=[Depends(traffic_viewer)])
+@router.get('/api/traffic/forecast-options',dependencies=[Depends(permit('forecast.view'))])
 def forecast_options(segment_id:int,direction:Literal['forward','reverse']='forward',data_mode:Literal['demo','observed']='demo',db=Depends(get_db)):
     road(db,segment_id,direction)
     if direction!='forward':return {'ready':False,'horizons':[],'message':'Chưa có mô hình cho chiều đường đã chọn.'}
@@ -96,7 +96,7 @@ def forecast_options(segment_id:int,direction:Literal['forward','reverse']='forw
             'message':'Chưa có mốc dự báo được hỗ trợ.' if not horizons else '', 'is_demo':False}
 
 
-@router.get('/api/traffic/forecast',dependencies=[Depends(traffic_viewer)])
+@router.get('/api/traffic/forecast',dependencies=[Depends(permit('forecast.view'))])
 def real_forecast(segment_id:int,horizon:int,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
     options=forecast_options(segment_id,direction,'observed',db)
     if horizon not in options['horizons']:raise HTTPException(422,'Mốc hoặc chiều dự báo chưa được mô hình hỗ trợ.')
@@ -115,7 +115,7 @@ def real_forecast(segment_id:int,horizon:int,direction:Literal['forward','revers
 
 
 @router.get('/api/management/monitor')
-def monitor(segment_id:int,direction:Literal['forward','reverse']='forward',user=Depends(manager),db=Depends(get_db)):
+def monitor(segment_id:int,direction:Literal['forward','reverse']='forward',user=Depends(permit('monitor.view')),db=Depends(get_db)):
     road(db,segment_id,direction,user)
     errors={}
     try:actual=current(db,segment_id,direction)
@@ -126,13 +126,13 @@ def monitor(segment_id:int,direction:Literal['forward','reverse']='forward',user
     except Exception:sources=[];errors['sources']='Chưa tải được trạng thái nguồn.'
     try:
         from .warnings import public_data
-        warnings=[v for w in db.find(Warning,{'segment_id':segment_id,'direction':direction},limit=100) if (v:=public_data(w))]
+        warnings=[v for w in db.find(Warning,{'segment_id':segment_id,'direction':direction},limit=100) if (v:=public_data(w))] if can(user,'warnings.view') else []
     except Exception:warnings=[];errors['warnings']='Chưa tải được cảnh báo.'
     try:
         from .forecast_ml import forecast
-        predictions=forecast(db.database,segment_id,'congestion') if direction=='forward' else {'state':'unavailable','predictions':[],'message':'Chưa có mô hình cho chiều này.'}
+        predictions=forecast(db.database,segment_id,'congestion') if direction=='forward' and can(user,'forecast.view') else {'state':'unavailable','predictions':[],'message':'Chưa có mô hình cho chiều này.'}
     except Exception:predictions={'state':'unavailable','predictions':[]};errors['forecast']='Chưa tải được dự báo.'
-    camera_sources=db.find(DataSource,{'segment_id':segment_id,'direction':direction,'kind':'camera','active':True,'tested':True})
+    camera_sources=db.find(DataSource,{'segment_id':segment_id,'direction':direction,'kind':'camera','active':True,'tested':True}) if can(user,'monitor.camera') else []
     # Browser media requests are direct, public HTTPS only, without secrets.
     cameras=[{'id':s.id,'name':s.name,'url':f'/api/management/cameras/{s.id}/preview','format':s.format,
               'checked_at':s.checked_at,'state':source_state(s),'message':'Nguồn chưa cung cấp thời điểm quay; không khẳng định hình ảnh trực tiếp.'} for s in camera_sources]

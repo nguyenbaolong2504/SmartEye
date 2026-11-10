@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import datetime,timedelta,timezone
 from backend.app import demo_data as demo,calendar_forecast as planning
 from backend.app.db import get_database,now,SessionLocal
 from backend.app.history import LOCAL
@@ -19,8 +19,8 @@ def test_year_history_day_ahead_forecast_and_no_future_leakage(client,monkeypatc
     today=now().astimezone(LOCAL).date();tomorrow=today+timedelta(days=1)
     response=client.get('/api/traffic/outlook',params={'segment_id':1,'date':tomorrow.isoformat(),'hour':17})
     assert response.status_code==200,response.text
-    data=response.json();assert data['history_days']==365 and data['date']==tomorrow.isoformat()
-    assert data['selected']['similar_days']>=52 and len(data['hourly'])==24
+    data=response.json();assert data['history_days']==100 and data['date']==tomorrow.isoformat()
+    assert 5<=data['selected']['similar_days']<=100 and len(data['hourly'])==24
     assert data['is_demo'] and data['source']=='history'
     assert all(row['label'] in ('FREE','SLOW','JAM') for row in data['hourly'])
     assert all(row['label']!='JAM' for row in data['alternatives'])
@@ -49,10 +49,44 @@ def test_year_history_day_ahead_forecast_and_no_future_leakage(client,monkeypatc
         departure_at=planning.datetime.combine(tomorrow,planning.datetime.min.time(),LOCAL)+timedelta(hours=17))
     with SessionLocal() as db:evidence=route_evidence(db,request,[db.get(Segment,1)])
     assert evidence[1].source=='forecast'
-    for day,hour in [(today-timedelta(days=1),17),(today+timedelta(days=8),17),(tomorrow,24)]:
+    retrospective=client.get('/api/traffic/outlook',params={'segment_id':1,'date':(today-timedelta(days=1)).isoformat(),'hour':17}).json()
+    assert retrospective['historical'] and retrospective['history_end']==(today-timedelta(days=2)).isoformat()
+    for day,hour in [(today-timedelta(days=366),17),(today+timedelta(days=8),17),(tomorrow,24)]:
         assert client.get('/api/traffic/outlook',params={'segment_id':1,'date':day.isoformat(),'hour':hour}).status_code==422
 
 
 def test_calendar_requires_history_and_preserves_missing_values(client):
     response=client.get('/api/traffic/outlook',params={'segment_id':1,'date':(now().astimezone(LOCAL).date()+timedelta(days=1)).isoformat()})
     assert response.status_code==409
+
+
+def test_hourly_forecast_uses_only_earlier_labeled_hours_and_preserves_direction(admin_client):
+    response=admin_client.post('/api/segments',json={'name':'Nguyễn Huệ','area':'Hồ Chí Minh','start_node':'nh_dau',
+        'end_node':'nh_cuoi','distance_km':.8,'geometry':[[10.775,106.701],[10.772,106.705]]})
+    assert response.status_code==201,response.text
+    sid=response.json()['id'];today=now().astimezone(LOCAL).date();target=today-timedelta(days=10)
+    database=get_database()
+    rows=[]
+    for offset in range(1,101):
+        day=target-timedelta(days=offset)
+        for hour,state in ((1,'FREE'),(7,'JAM')):
+            for minute in (0,5,10,30,35,40):
+                at=datetime.combine(day,datetime.min.time(),LOCAL)+timedelta(hours=hour,minutes=minute)
+                rows.append({'_id':len(rows)+1,'sample_key':f'hour-{len(rows)}','segment_id':sid,'source_id':1,
+                    'direction':'forward','observed_at':at.astimezone(timezone.utc).isoformat(),'metrics':{'state':state}})
+    # A future-of-target observation deliberately contradicts the historic pattern.
+    after=datetime.combine(target,datetime.min.time(),LOCAL)+timedelta(days=1,hours=7)
+    rows.extend({'_id':len(rows)+i+1,'sample_key':f'later-{i}','segment_id':sid,'source_id':1,'direction':'forward',
+        'observed_at':(after+timedelta(minutes=i)).astimezone(timezone.utc).isoformat(),'metrics':{'state':'FREE'}}
+        for i in (0,5,10,30,35,40))
+    database.road_readings.insert_many(rows)
+    params={'segment_id':sid,'date':target.isoformat(),'hour':1}
+    response=admin_client.get('/api/traffic/outlook',params=params,headers={'Cookie':''})
+    assert response.status_code==200,response.text
+    data=response.json()
+    assert not data['is_demo'] and data['historical'] and data['history_days']==100
+    assert data['selected']['label']=='FREE' and data['selected']['free_days']==data['selected']['similar_days']
+    assert data['hourly'][7]['label']=='JAM' and data['hourly'][8]['label'] is None
+    assert admin_client.get('/api/traffic/outlook',params={**params,'direction':'reverse'},headers={'Cookie':''}).status_code==409
+    evaluation=admin_client.get('/api/admin/hourly-backtest',params={'segment_id':sid,'end':(target-timedelta(days=1)).isoformat()}).json()
+    assert evaluation['scored_hours']==56 and evaluation['model']['accuracy']==1 and evaluation['model']['high_recall']==1

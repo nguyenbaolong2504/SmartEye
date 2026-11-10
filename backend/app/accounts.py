@@ -13,6 +13,7 @@ from .models import User
 from .security import admin, public_user
 from .passwords import hash_password
 from .schemas import Register
+from .permissions import choices
 
 router=APIRouter()
 
@@ -38,6 +39,12 @@ class RoleEdit(Input):
     role: str = Field(pattern=r'^(user|analyst|admin)$')
     managed_segment_ids: list[int] | None = None
     confirmed: bool
+    permissions: list[str] | None = Field(default=None,max_length=64)
+
+
+@router.get('/api/admin/permission-options')
+def permission_options(user=Depends(admin)):
+    return {role: choices(role) for role in ('user', 'analyst')}
 
 
 @contextmanager
@@ -113,7 +120,13 @@ def edit_account(ident:int,body:AccountEdit,user=Depends(admin),db=Depends(get_d
 def edit_role(ident:int,body:RoleEdit,user=Depends(admin),db=Depends(get_db)):
     if not body.confirmed:raise HTTPException(422,'Cần xác nhận thay đổi quyền.')
     validate_scope(db,body.managed_segment_ids)
-    return apply_account(db,user,ident,{'role':body.role,'managed_segment_ids':body.managed_segment_ids},body.revision)
+    if body.permissions is not None and (body.role=='admin' or set(body.permissions)-choices(body.role).keys()):
+        raise HTTPException(422,'Có quyền không thuộc vai trò đã chọn.')
+    updates={'role':body.role,'managed_segment_ids':body.managed_segment_ids}
+    target=db.get(User,ident)
+    if 'permissions' in body.model_fields_set or target and target.role!=body.role:
+        updates['permissions']=None if body.permissions is None else sorted(set(body.permissions))
+    return apply_account(db,user,ident,updates,body.revision)
 
 
 @router.post('/api/admin/accounts/{ident}/disable')

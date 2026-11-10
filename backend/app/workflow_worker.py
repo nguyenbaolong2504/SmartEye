@@ -9,10 +9,11 @@ from .business_common import log_event
 
 async def work():
     from .sources import source_request, decode_rows, receive
-    from .warnings import deliver_publications
+    from .warnings import deliver_publications, expire_publications
     while True:
         try:
             with SessionLocal() as db:
+                await asyncio.to_thread(expire_publications,db)
                 await asyncio.to_thread(deliver_publications,db.database)
                 sources=db.find(DataSource,{'active':True,'tested':True,'kind':'api',
                     '$or':[{'next_poll_at':None},{'next_poll_at':{'$lte':stamp()}}]},limit=10)

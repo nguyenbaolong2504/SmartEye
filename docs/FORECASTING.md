@@ -1,6 +1,6 @@
 # Pipeline XGBoost / GRU trên dữ liệu quan sát thực
 
-**Phạm vi:** tài liệu này mô tả phần **Dữ liệu & mô hình** của Quản lý/Admin trong chế độ quan sát thực. Bản chạy thử hiện có XGBoost huấn luyện trên dữ liệu tổng hợp và các collection riêng; xem [DEMO.md](DEMO.md). Các điều kiện đánh giá dưới đây vẫn được giữ cho dữ liệu thực.
+Phần **Dữ liệu & mô hình** nằm trong **Quản trị hệ thống**. Bản chạy thử có mô hình XGBoost học từ dữ liệu minh họa được lưu riêng. [Dữ liệu minh họa](DEMO.md)
 
 ![Trang Tổng quan](previews/overview-redesign.png)
 
@@ -14,13 +14,22 @@ Trang **Tổng quan** là điểm bắt đầu: Tình trạng & thống kê, D�
 
 1. Cập nhật và chạy Docker theo `docs/RUNNING.md`. Sau thay đổi này cần build **backend** để có `xgboost-cpu` và `scikit-learn`; PyTorch CPU đã có trong Dockerfile. Không cần cài TensorFlow.
 2. Mở `http://localhost:8081/#forecast` nếu `.env` đang dùng `FRONTEND_PORT=8081`.
-3. Người dùng chọn tuyến và mục tiêu: **Mật độ phương tiện** hoặc **Tình trạng ùn tắc**. Hai thẻ hiển thị mốc 15/30 phút, thời điểm dự báo và tên mô hình. Thiếu dữ liệu hoặc thiếu mô hình thì giữ trạng thái chưa có dự báo.
-4. Quản lý/Admin mở **Dữ liệu & mô hình**, chọn tuyến và khoảng 7–90 ngày, bấm **Kiểm tra dữ liệu**.
+3. Người dùng gõ tên đường, chọn ngày và khung giờ trên trang **Dự báo giao thông**. Mốc 15/30 phút của XGBoost và GRU thuộc luồng mô hình kỹ thuật bên dưới.
+4. Admin mở **Quản trị hệ thống → Dữ liệu & mô hình**, chọn tuyến và khoảng thời gian, rồi bấm **Kiểm tra dữ liệu**.
 5. Khi đủ dữ liệu, bấm **Huấn luyện XGBoost + GRU**. Một worker huấn luyện nền; có tiến độ và thao tác hủy. Chỉ một tác vụ chạy tại một thời điểm. Khởi động lại máy chủ sẽ đánh dấu tác vụ gián đoạn là thất bại, không tự phục hồi kết quả dở dang.
 6. Xem bảng so sánh XGBoost / GRU / Giữ nguyên trạng thái, điểm validation, ma trận nhầm lẫn và tải CSV báo cáo.
 7. **Admin** kích hoạt bản đủ điều kiện; mỗi mục tiêu có một bản đang phục vụ. Chỉ các mốc và tuyến đạt đánh giá được phép trả dự báo. Có thể kích hoạt lại một bản cũ hoặc ngừng phục vụ mà không xóa báo cáo.
 
 Code cung cấp luồng huấn luyện thật, không kèm mô hình dự báo đã huấn luyện cho Hà Nội và không thêm số liệu tổng hợp vào các collection quan sát/nhãn/mô hình thực. Bộ mẫu nằm riêng trong `demo_profiles` và `demo_registry`.
+
+## Đo độ chính xác của dự báo theo giờ
+
+1. **Đoạn đường**. Khai báo tuyến, tỉnh/thành, vị trí và chiều lưu thông để chọn đúng nơi cần dự báo.
+2. **Nguồn dữ liệu**. Nhập dữ liệu quan trắc đã xác nhận tình trạng `FREE`, `SLOW`, `JAM` theo tuyến và chiều. Có thể dùng tệp nguồn đã kiểm tra hoặc nhập CSV nhãn đã xác minh cho chiều đi trong **Dữ liệu & mô hình**. Mật độ hoặc số xe riêng lẻ chưa đủ để gán nhãn ùn tắc. Mỗi giờ cần ít nhất sáu ô năm phút khác nhau, với tối thiểu ba ô ở mỗi nửa giờ.
+3. **Đánh giá dự báo theo giờ**. Chọn tuyến, chiều và ngày cuối. Bản kiểm tra chấm trên 28 ngày quan trắc và dùng tối đa 100 ngày trước mỗi ngày cần chấm. Nó so sánh với cách lấy trạng thái của ngày tương tự gần nhất. Có thể cần đến 128 ngày dữ liệu để bao phủ trọn cả lịch sử và kỳ đánh giá. Giờ thiếu căn cứ được báo riêng qua tỷ lệ số giờ đã chấm trên số giờ có nhãn.
+4. **Đọc kết quả**. Muốn ghi 80–90% trong báo cáo, lấy tỷ lệ đúng trên những giờ quan trắc thực đã chấm, ghi kèm số mẫu, Macro-F1 và tỷ lệ phát hiện đúng giờ ùn tắc. Nếu đa số giờ thông thoáng, tỷ lệ đúng chung có thể cao trong khi khả năng phát hiện ùn tắc thấp. Giữ một giai đoạn mới để đánh giá lại sau khi điều chỉnh cách dự báo. [Cách tính độ chính xác cân bằng theo lớp](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html)
+
+Màn hình theo ngày và giờ dùng mẫu lặp từ lịch sử quan trắc khi đủ dữ liệu. Hai mô hình XGBoost và GRU cho mốc 15/30 phút sử dụng quy trình huấn luyện riêng ở phần dưới. Chỉ tiêu 80–90% cần được xác nhận riêng cho từng bài toán, tuyến và chiều.
 
 ## Chuẩn bị dữ liệu
 

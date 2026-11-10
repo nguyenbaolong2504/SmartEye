@@ -9,13 +9,13 @@ from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from fastapi.exceptions import RequestValidationError
 from pymongo.errors import DuplicateKeyError
-from .business_common import (manager, road, allowed_query, get_record, changed, event, log_event,
+from .business_common import (road, allowed_query, get_record, changed, event, log_event,
                               serialize, period, position_on_road, NoteAction, Verification)
 from .business_models import Incident
 from .business_schemas import IncidentInput, IncidentEdit
 from .config import DATA
 from .db import get_db, now, stamp
-from .security import traffic_member
+from .security import can, check_permission, permit, traffic_member
 
 router=APIRouter()
 IMAGES=DATA/'incident-images'
@@ -23,9 +23,11 @@ IMAGES=DATA/'incident-images'
 
 def accessible(db,ident,user,manage=False):
     item=get_record(db,Incident,ident)
-    if manage or item.user_id!=user.id:
-        if user.role!='analyst':raise HTTPException(403,'Bạn không có quyền xem phản ánh này.')
-        road(db,item.segment_id,item.direction,user)
+    if not manage and item.user_id==user.id and can(user,'reports.view'):
+        return item
+    if not manage:
+        check_permission(user,'incidents.view')
+    road(db,item.segment_id,item.direction,user)
     return item
 
 
@@ -63,12 +65,12 @@ def create(db,body,user,attachment=None):
 
 
 @router.post('/api/incidents',status_code=201)
-def submit(body:IncidentInput,user=Depends(traffic_member),db=Depends(get_db)):
+def submit(body:IncidentInput,user=Depends(permit('reports.add')),db=Depends(get_db)):
     return create(db,body,user)
 
 
 @router.post('/api/incidents/with-image',status_code=201)
-async def submit_image(payload:str=Form(...),image:UploadFile=File(...),user=Depends(traffic_member),db=Depends(get_db)):
+async def submit_image(payload:str=Form(...),image:UploadFile=File(...),user=Depends(permit('reports.add')),db=Depends(get_db)):
     try:body=IncidentInput.model_validate_json(payload)
     except ValidationError as exc:raise RequestValidationError(exc.errors()) from None
     raw=await image.read(5*1024*1024+1)
@@ -89,7 +91,7 @@ async def submit_image(payload:str=Form(...),image:UploadFile=File(...),user=Dep
 
 
 @router.get('/api/incidents')
-def own_reports(user=Depends(traffic_member),db=Depends(get_db),status:str|None=None):
+def own_reports(user=Depends(permit('reports.view')),db=Depends(get_db),status:str|None=None):
     query={'user_id':user.id}
     if status:
         if status not in ('pending','verifying','processing','resolved','rejected'):raise HTTPException(422,'Trạng thái phản ánh không hợp lệ.')
@@ -112,7 +114,7 @@ def image(ident:int,image_id:uuid.UUID,user=Depends(traffic_member),db=Depends(g
 
 @router.get('/api/management/incidents')
 def management_reports(q:str=Query(default='',max_length=100),status:str|None=None,start:str|None=None,end:str|None=None,
-                       segment_id:int|None=None,user=Depends(manager),db=Depends(get_db)):
+                       segment_id:int|None=None,user=Depends(permit('incidents.view')),db=Depends(get_db)):
     import re
     query=allowed_query(user)
     if segment_id:road(db,segment_id,user=user);query['segment_id']=segment_id
@@ -134,7 +136,7 @@ def editable(db,ident,user,revision,statuses):
 
 
 @router.post('/api/management/incidents/{ident}/accept')
-def accept(ident:int,body:NoteAction,user=Depends(manager),db=Depends(get_db)):
+def accept(ident:int,body:NoteAction,user=Depends(permit('incidents.accept')),db=Depends(get_db)):
     item=accessible(db,ident,user,manage=True)
     if item.status!='pending':raise HTTPException(409,'Phản ánh không còn ở trạng thái chờ tiếp nhận.')
     result=changed(db,Incident,item,body.revision,{'status':'verifying','assignee_id':user.id},event(user,'incident_accepted',body.note))
@@ -142,7 +144,7 @@ def accept(ident:int,body:NoteAction,user=Depends(manager),db=Depends(get_db)):
 
 
 @router.post('/api/management/incidents/{ident}/verify')
-def verify(ident:int,body:Verification,user=Depends(manager),db=Depends(get_db)):
+def verify(ident:int,body:Verification,user=Depends(permit('incidents.verify')),db=Depends(get_db)):
     item=editable(db,ident,user,body.revision,('verifying',))
     result=changed(db,Incident,item,body.revision,{'verification':body.conclusion,'status':'processing' if body.conclusion=='valid' else 'verifying'},
                    event(user,'incident_verified',body.note,conclusion=body.conclusion))
@@ -150,7 +152,7 @@ def verify(ident:int,body:Verification,user=Depends(manager),db=Depends(get_db))
 
 
 @router.patch('/api/management/incidents/{ident}')
-def update(ident:int,body:IncidentEdit,user=Depends(manager),db=Depends(get_db)):
+def update(ident:int,body:IncidentEdit,user=Depends(permit('incidents.edit')),db=Depends(get_db)):
     item=editable(db,ident,user,body.revision,('verifying','processing'))
     position_on_road(body.position,road(db,item.segment_id,item.direction,user))
     updates=body.model_dump(exclude={'revision','occurred_at'});updates['occurred_at']=body.occurred_at.isoformat()
@@ -158,20 +160,20 @@ def update(ident:int,body:IncidentEdit,user=Depends(manager),db=Depends(get_db))
 
 
 @router.post('/api/management/incidents/{ident}/progress')
-def progress(ident:int,body:NoteAction,user=Depends(manager),db=Depends(get_db)):
+def progress(ident:int,body:NoteAction,user=Depends(permit('incidents.progress')),db=Depends(get_db)):
     item=editable(db,ident,user,body.revision,('processing',))
     return incident_data(changed(db,Incident,item,body.revision,{},event(user,'incident_progress',body.note)),user)
 
 
 @router.post('/api/management/incidents/{ident}/reject')
-def reject(ident:int,body:NoteAction,user=Depends(manager),db=Depends(get_db)):
+def reject(ident:int,body:NoteAction,user=Depends(permit('incidents.reject')),db=Depends(get_db)):
     item=editable(db,ident,user,body.revision,('verifying',))
     if item.verification!='invalid':raise HTTPException(409,'Cần lưu kết luận không hợp lệ trước khi từ chối phản ánh.')
     return incident_data(changed(db,Incident,item,body.revision,{'status':'rejected'},event(user,'incident_rejected',body.note)),user)
 
 
 @router.post('/api/management/incidents/{ident}/resolve')
-def resolve(ident:int,body:NoteAction,user=Depends(manager),db=Depends(get_db)):
+def resolve(ident:int,body:NoteAction,user=Depends(permit('incidents.resolve')),db=Depends(get_db)):
     item=editable(db,ident,user,body.revision,('processing',))
     # Closing an incident deliberately leaves any related published warning alone.
     return incident_data(changed(db,Incident,item,body.revision,{'status':'resolved'},event(user,'incident_resolved',body.note)),user)

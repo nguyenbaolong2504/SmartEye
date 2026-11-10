@@ -6,6 +6,20 @@ from backend.app import map_services, osm_routing
 from backend.app.graph_search import haversine
 
 
+def test_forecast_address_search_covers_vietnam_without_widening_routing(client,monkeypatch):
+    async def places(url,params):
+        if 'countrycode' in params:
+            assert params['countrycode']=='VN' and 'lat' not in params
+        return {'features':[{'geometry':{'coordinates':[106.702,10.776]},
+            'properties':{'name':'Nguyễn Huệ','state':'Hồ Chí Minh','countrycode':'VN','osm_key':'highway'}}]}
+    monkeypatch.setattr(map_services,'fetch_json',places)
+    monkeypatch.setenv('OSM_ENABLED','true')
+    query={'q':'Nguyễn Huệ, Hồ Chí Minh'}
+    result=client.get('/api/map/places',params={**query,'scope':'vn'})
+    assert result.status_code==200 and 'Hồ Chí Minh' in result.json()['places'][0]['name']
+    assert client.get('/api/map/places',params=query).json()['places']==[]
+
+
 def network():
     points={1:[21.03,105.82],2:[21.03,105.825],3:[21.03,105.83],4:[21.035,105.825],5:[21.035,105.83]}
     nodes=[{'type':'node','id':node,'lat':p[0],'lon':p[1]} for node,p in points.items()]

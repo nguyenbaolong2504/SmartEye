@@ -9,12 +9,26 @@ test('day-ahead forecasts explain recurring congestion without technical banners
   await expect(page.getByText('XGBoost',{exact:false})).toHaveCount(0);await expect(page.getByRole('link',{name:'Mã nguồn dự án',exact:true})).toHaveCount(0);
   await navigate(page,'Dự báo giao thông');
   await expect(page.locator('.outlook-state')).toBeVisible();await expect(page.locator('.outlook-hours button')).toHaveCount(24);
-  await expect(page.getByText(/ngày cùng thứ đã qua/)).toBeVisible();await expect(page.getByText('365',{exact:true})).toBeVisible();
+  await expect(page.getByText(/Trong 100 ngày đối chiếu/)).toBeVisible();
+  await expect(page.getByText('Lịch sử minh họa',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Ngắn hạn',exact:true})).toHaveCount(0);
+  await page.getByLabel('Đường, tỉnh hoặc thành phố').fill('hoang quoc viet, ha noi');
+  await page.getByRole('button',{name:'Hoàng Quốc Việt, Hà Nội',exact:true}).click();
   await expect(page.getByRole('button',{name:'Quản lý dữ liệu',exact:true})).toHaveCount(0);
   await page.getByLabel('Giờ dự định đi').selectOption('18');await page.getByRole('button',{name:'Xem dự báo',exact:true}).click();await expect(page.locator('.outlook-summary')).toContainText('18:00–19:00');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth+1)).toBe(false);
   await page.screenshot({path:info.outputPath('day-ahead-forecast.png'),fullPage:true});
   await page.getByRole('button',{name:'Xem lịch sử tuyến đường',exact:true}).click();await expect(page.getByRole('heading',{name:'So sánh các tháng trong năm',exact:true})).toBeVisible();
+});
+
+test('an address found outside Hanoi clearly distinguishes missing traffic data',async({page})=>{
+  await page.route('**/api/map/places?scope=vn&*',route=>route.fulfill({json:{places:[{id:'nh',name:'Nguyễn Huệ, Hồ Chí Minh'}]}}));
+  await page.goto('/#forecast');
+  await page.getByLabel('Đường, tỉnh hoặc thành phố').fill('Nguyễn Huệ, Hồ Chí Minh');
+  await page.getByRole('button',{name:'Tìm địa điểm',exact:true}).click();
+  await page.getByRole('button',{name:'Nguyễn Huệ, Hồ Chí Minh',exact:true}).click();
+  await expect(page.getByText(/chưa có đoạn đường và lịch sử quan trắc/)).toBeVisible();
+  await expect(page.locator('.outlook-state')).toHaveCount(0);
 });
 test('admin dataset checks, CSV preview/commit and independent congestion labels',async({page},testInfo)=>{
   await page.goto('/#forecast',{waitUntil:'domcontentloaded'});

@@ -11,7 +11,8 @@ from fastapi import APIRouter,Depends,HTTPException
 from .db import get_db,now,stamp
 from .history import LOCAL
 from .forecast_data import CLASSES,split_indices
-from .security import traffic_viewer
+from .security import admin, permit
+from .hourly_history import LOOKBACK_DAYS, TEXT, backtest, evidence_by_hour, observed_profiles
 
 router=APIRouter()
 _cache={};_models={}
@@ -118,37 +119,73 @@ def project_day(database,sid,target):
     return result,profiles,active
 
 
-def outlook(database,sid,target,hour):
+def outlook(database,sid,target,hour,direction='forward',data_mode='auto'):
     today=now().astimezone(LOCAL).date()
-    if not today<=target<=today+timedelta(days=7):raise HTTPException(422,'Chọn ngày từ hôm nay đến 7 ngày tới.')
+    if not today-timedelta(days=365)<=target<=today+timedelta(days=7):
+        raise HTTPException(422,'Chọn ngày trong năm vừa qua hoặc tối đa 7 ngày tới.')
     if not 0<=hour<=23:raise HTTPException(422,'Chọn giờ từ 0 đến 23.')
     predicted_at=datetime.combine(target,datetime.min.time(),LOCAL)+timedelta(hours=hour)
-    if predicted_at<=now():raise HTTPException(422,'Chọn một giờ trong tương lai hoặc một ngày sắp tới.')
-    hourly,profiles,active=project_day(database,sid,target);selected=hourly[hour]
+    road=database.segments.find_one({'_id':sid,'active':True})
+    if not road:raise HTTPException(404,'Tuyến đường chưa được cấu hình hoặc đã ngừng theo dõi.')
+    if direction=='reverse' and road.get('one_way'):
+        raise HTTPException(422,'Tuyến này chỉ có một chiều lưu thông.')
+    historical=predicted_at<=now()
+    stop=min(today,target)
+    first=stop-timedelta(days=LOOKBACK_DAYS)
+    profiles=observed_profiles(database,sid,direction,first,stop) if data_mode!='demo' else {}
+    hourly,covered=evidence_by_hour(profiles,target,stop)
+    demo=False
+    model='Theo lịch sử khung giờ'
+    version=None
+    model_info={}
+    if (not hourly[hour]['label'] and data_mode=='auto' or data_mode=='demo') and direction=='forward':
+        from .demo_data import enabled, require_active
+        if enabled():
+            try:
+                active=require_active(database)
+                if sid in active['segment_ids']:
+                    demo_profiles=profiles_for(database,active,sid)
+                    evidence,demo_covered=evidence_by_hour(demo_profiles,target,stop)
+                    if evidence[hour]['label']:
+                        if not historical:
+                            predictions,_,active=project_day(database,sid,target)
+                            for row,prediction in zip(evidence,predictions):
+                                if row['label']:
+                                    row.update(label=prediction['label'],text=TEXT[prediction['label']])
+                            model='XGBoost'
+                            version=active['run_id']
+                            model_info=_models[version][1]
+                        hourly,covered,demo=evidence,demo_covered,True
+            except HTTPException as exc:
+                if data_mode=='demo':raise
+                if exc.status_code not in (404,409,503):raise
+    selected=hourly[hour]
+    if not selected['label']:
+        raise HTTPException(409,'Chưa đủ lịch sử cho tuyến, chiều và khung giờ đã chọn. Cần ít nhất 5 ngày tương tự có dữ liệu hợp lệ trong 100 ngày đối chiếu.')
     windows=[]
     for row in hourly:
         if row['label']!='JAM':continue
         if windows and windows[-1]['end_hour']==row['hour']:windows[-1]['end_hour']+=1
         else:windows.append({'start_hour':row['hour'],'end_hour':row['hour']+1})
     severity={'FREE':0,'SLOW':1,'JAM':2}
-    alternatives=sorted((row for row in hourly if severity[row['label']]<severity[selected['label']]
-        and (target!=today or row['hour']>now().astimezone(LOCAL).hour)),key=lambda row:(abs(row['hour']-hour),severity[row['label']],row['hour']))[:3]
-    road=database.segments.find_one({'_id':sid}) or {}
-    explanation=f"Trong {selected['similar_days']} ngày cùng thứ đã qua, có {selected['jam_days']} ngày dễ ùn tắc ở khung giờ này."
+    alternatives=sorted((row for row in hourly if row['label'] and severity[row['label']]<severity[selected['label']]
+        and (target!=today or historical or row['hour']>now().astimezone(LOCAL).hour)),key=lambda row:(abs(row['hour']-hour),severity[row['label']],row['hour']))[:3]
+    group='ngày làm việc' if target.weekday()<5 else 'ngày cuối tuần'
+    explanation=(f"Trong 100 ngày đối chiếu, có {selected['similar_days']} {group} đủ dữ liệu ở khung giờ này. "
+                 f"{selected['free_days']} ngày thông thoáng, {selected['slow_days']} ngày đông xe, {selected['jam_days']} ngày ùn tắc.")
     from .road_service import current
     from .db import MongoSession
-    try:actual=current(MongoSession(database),sid,'forward','demo')
+    try:actual=None if historical else current(MongoSession(database),sid,direction,'demo' if demo else 'observed')
     except HTTPException:actual=None
-    model_info=_models[active['run_id']][1]
     generated=stamp()
-    return {'state':'ready','is_demo':True,'source':'history','segment_id':sid,'segment_name':road.get('name','Tuyến đường'),
-        'direction':'forward','model':'XGBoost','model_version':active['run_id'],'trained_before':model_info.get('trained_before'),
+    return {'state':'ready','is_demo':demo,'historical':historical,'source':'history','segment_id':sid,'segment_name':road['name'],
+        'direction':direction,'model':model,'model_version':version,'trained_before':model_info.get('trained_before'),
         'supported_days':model_info.get('supported_days',7),'resolution_minutes':60,'predicted_at':predicted_at.isoformat(),
         'issue_at':generated,'comparison':{'current':actual,'forecast':{'label':selected['label'],'predicted_at':predicted_at.isoformat()}} if actual and actual['fresh'] and actual['state'] else None,
         'date':target.isoformat(),'hour':hour,'selected':selected,'hourly':hourly,'avoid_windows':windows,'alternatives':alternatives,
         'explanation':explanation,'advice':f"Nên cân nhắc đi vào giờ khác để tránh {hour:02d}:00–{hour+1:02d}:00." if selected['label']=='JAM' else 'Có thể cân nhắc khởi hành vào giờ đã chọn; kiểm tra lại tình hình trước khi đi.',
-        'history_start':min(profiles).isoformat() if profiles else None,'history_end':max(profiles).isoformat() if profiles else None,
-        'history_days':len(profiles),'generated_at':generated,'notice':'Ước tính từ lịch sử minh họa, không phải tình trạng giao thông thực tế.'}
+        'history_start':first.isoformat(),'history_end':(stop-timedelta(days=1)).isoformat(),
+        'history_days':covered,'generated_at':generated,'notice':'Lịch sử minh họa' if demo else 'Lịch sử quan trắc'}
 
 
 def aggregate(records):
@@ -176,7 +213,16 @@ def annual_report(database,active,sid):
         'method':'Lịch sử minh họa trong một năm gần nhất. Ngày chưa có quan sát không được coi là thông thoáng.','pattern_requirement':'Dùng các ngày đã qua để nhận biết khung giờ thường đông xe.'}
 
 
-@router.get('/api/traffic/outlook',dependencies=[Depends(traffic_viewer)])
-def road_outlook(segment_id:int,date:date,hour:int=17,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
-    if direction!='forward':raise HTTPException(409,'Chưa có mô hình và lịch sử cho chiều đường đã chọn.')
-    return outlook(db.database,segment_id,date,hour)
+@router.get('/api/traffic/outlook',dependencies=[Depends(permit('forecast.view'))])
+def road_outlook(segment_id:int,date:date,hour:int=17,direction:Literal['forward','reverse']='forward',
+                 data_mode:Literal['auto','observed','demo']='auto',db=Depends(get_db)):
+    return outlook(db.database,segment_id,date,hour,direction,data_mode)
+
+
+@router.get('/api/admin/hourly-backtest',dependencies=[Depends(admin)])
+def hourly_backtest(segment_id:int,end:date,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
+    from .business_common import road
+    road(db,segment_id,direction)
+    if end>=now().astimezone(LOCAL).date():
+        raise HTTPException(422,'Chọn ngày đánh giá muộn nhất là hôm qua.')
+    return backtest(db.database,segment_id,direction,end+timedelta(days=1))

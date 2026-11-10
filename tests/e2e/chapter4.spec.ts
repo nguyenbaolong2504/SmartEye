@@ -19,6 +19,32 @@ async function signOut(page:Page) {
   await expect(page.getByRole('button',{name:'Đăng nhập',exact:true})).toBeVisible();
 }
 
+test('admin can hide a single report action and an entire page for one account',async({page,request})=>{
+  const username=`permissions-${Date.now()}`;
+  const email=`${username}@example.invalid`;
+  const password='test-permissions-password';
+  expect((await request.post('/api/auth/register',{data:{name:'Người thử quyền',email,username,password,password_confirmation:password}})).status()).toBe(201);
+  await page.goto('/');
+  await signIn(page,'e2e-admin@example.invalid','test-only-password-123');
+  await page.getByRole('button',{name:'Người dùng',exact:true}).click();
+  await page.getByLabel('Tìm người dùng',{exact:true}).fill(email);
+  await page.getByRole('button',{name:'Tìm kiếm',exact:true}).click();
+  await page.locator('.workflow-row').filter({hasText:email}).getByRole('button',{name:'Phân quyền',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByLabel('Gửi phản ánh',{exact:true}).uncheck();
+  await dialog.getByLabel('Xem dự báo theo ngày và giờ',{exact:true}).uncheck();
+  await dialog.getByRole('button',{name:'Xác nhận',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  await signOut(page);
+  await signIn(page,username,password);
+  await navigate(page,'Phản ánh giao thông');
+  await expect(page.getByRole('heading',{name:'Phản ánh của tôi'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Gửi phản ánh',exact:true})).toHaveCount(0);
+  await page.goto('/#forecast');
+  await expect(page).toHaveURL(/#overview$/);
+  expect((await page.request.get('/api/traffic/forecast-options?segment_id=1')).status()).toBe(403);
+});
+
 test('chapter IV report verification and warning publication in the UI',async({page,request})=>{
   test.setTimeout(65000);
   const key=Date.now();
@@ -89,10 +115,16 @@ test('chapter IV report verification and warning publication in the UI',async({p
   await expect(dialog.getByText('Chờ phát hành',{exact:true})).toBeVisible();
   await dialog.getByRole('button',{name:'Phát hành',exact:true}).click();
   await expect(dialog.getByText('Đã phát hành',{exact:true})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:/Sửa bản nháp|Hủy bản nháp|Kết thúc/})).toHaveCount(0);
   await page.keyboard.press('Escape');
   await signOut(page);
 
   await signIn(page,viewer.username,viewer.password);
+  await navigate(page,'Tổng quan');
+  await page.getByRole('button',{name:new RegExp(warning)}).click();
+  await expect(page.getByRole('dialog').getByText(warning,{exact:true})).toBeVisible();
+  await expect(page.getByRole('dialog').getByText('Tự hết hiệu lực',{exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
   await navigate(page,'Cảnh báo giao thông');
   await expect(page.getByRole('button',{name:new RegExp(warning)})).toBeVisible();
   await expect(page.getByText(`Cảnh báo giao thông mới: ${warning}`,{exact:true})).toBeVisible();

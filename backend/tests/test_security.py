@@ -68,3 +68,4 @@ def test_upload_requires_valid_camera_and_video(client,monkeypatch):
 def test_rate_limit(client):
     for _ in range(20): client.post('/api/auth/login',json={'email':'none@test.vn','password':'wrong'})
     assert client.post('/api/auth/login',json={'email':'none@test.vn','password':'wrong'}).status_code==429
+    assert client.post('/api/auth/logout').status_code==200

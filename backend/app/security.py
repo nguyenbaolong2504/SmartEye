@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, Request
 from .db import get_db, stamp, now
 from .models import User, LoginSession, Audit
 from .passwords import hash_password, verify_password
+from .permissions import PUBLIC, allows, granted
 request_id = ContextVar('smarteye_request_id',default='')
 
 def token_hash(token):
@@ -39,6 +40,21 @@ def traffic_viewer(user=Depends(optional_user)):
 def traffic_member(user=Depends(require_user)):
     return traffic_viewer(user)
 
+def can(user, key):
+    return allows(user.role, user.permissions, key) if user else key in PUBLIC
+
+def check_permission(user, key):
+    if not user and key not in PUBLIC:
+        require_user(user)
+    if not can(user, key):
+        raise HTTPException(403, 'Tài khoản chưa được cấp quyền thực hiện thao tác này.')
+    return user
+
+def permit(key):
+    def check(user=Depends(optional_user)):
+        return check_permission(user, key)
+    return check
+
 def operator(user=Depends(require_user)):
     if user.role not in ('admin', 'analyst'):
         raise HTTPException(403, 'Chức năng này dành cho nhà phân tích và quản trị viên.')
@@ -53,5 +69,6 @@ def audit(db, user_id, action, detail=''):
     db.add(Audit(user_id=user_id, action=action, detail=detail[:300],event_id=str(uuid.uuid4()),request_id=request_id.get()))
 
 def public_user(user):
-    return {key: getattr(user, key) for key in ('id', 'email', 'name', 'username', 'phone', 'role', 'active',
+    data = {key: getattr(user, key) for key in ('id', 'email', 'name', 'username', 'phone', 'role', 'active',
             'notifications_enabled','managed_segment_ids','protected','profile_version','created_at')}
+    return {**data, 'permissions': granted(user.role, user.permissions), 'uses_role_permissions': user.permissions is None}

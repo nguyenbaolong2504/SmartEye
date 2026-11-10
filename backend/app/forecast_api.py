@@ -14,7 +14,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import BulkWriteError
 from .db import get_db, now, stamp
 from .models import Segment, ForecastRun, TrafficLabel, ForecastRegistry
-from .security import admin, audit, traffic_viewer
+from .security import admin, audit, permit
 from .history import parse_timestamp
 from .forecast_data import prepare, CLASSES, DataNotReady, STEP
 from . import forecast_ml
@@ -74,7 +74,7 @@ def status(db=Depends(get_db)):
         'horizons':[15,30],'notice':'Dự báo mật độ và dự báo ùn tắc là hai mục tiêu riêng.'}
 
 
-@router.get('/api/forecast/predict',dependencies=[Depends(traffic_viewer)])
+@router.get('/api/forecast/predict',dependencies=[Depends(permit('forecast.view'))])
 def predict(segment_id:int,target:Target='density',db=Depends(get_db)):
     valid_segments(db,[segment_id])
     try: return forecast_ml.forecast(db.database,segment_id,target)

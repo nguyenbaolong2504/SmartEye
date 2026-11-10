@@ -1,3 +1,4 @@
+import {can} from './permissions';
 import RoadObservation from './RoadObservation';
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowRight, CalendarDays, Clock3, Download, Search } from 'lucide-react';
@@ -21,7 +22,7 @@ export default function TrafficMonitor({segments,dataMode,demo,onFindRoute,user,
     return()=>{current=false;};
   },[road,period,value,dataMode,ready,demo?.generated_at]);
   function changePeriod(next:Period){setPeriod(next);setValue(next==='year'?today():next==='month'?value.slice(0,7):value.length===7?value+'-01':value);}
-  return <><div className="page-heading"><div><div className="eyebrow">HIỂU GIỜ CAO ĐIỂM · CHỌN GIỜ ĐI PHÙ HỢP</div><h1>Tình trạng & thống kê<span>.</span></h1><p>Xem giao thông trong một năm qua và tìm những giờ thường đông xe.</p></div><button className="button" onClick={()=>onForecast(Number(road))}>Xem dự báo tuyến này<ArrowRight size={16}/></button></div>
+  return <><div className="page-heading"><div><div className="eyebrow">HIỂU GIỜ CAO ĐIỂM · CHỌN GIỜ ĐI PHÙ HỢP</div><h1>Tình trạng & thống kê<span>.</span></h1><p>Xem giao thông trong một năm qua và tìm những giờ thường đông xe.</p></div>{can(user,'forecast.view')&&<button className="button" onClick={()=>onForecast(Number(road))}>Xem dự báo tuyến này<ArrowRight size={16}/></button>}</div>
     {segments.find(s=>s.id===Number(road))&&<RoadObservation segment={segments.find(s=>s.id===Number(road))!} tileUrl={tileUrl}/>}
     {!ready?<DemoSetup demo={demo} user={user} onUpdated={onUpdated}/>:<div className="traffic-workspace">
       <aside className="card road-browser"><label className="road-search"><Search size={17}/><input aria-label="Tìm tuyến đường thống kê" placeholder="Tìm tên đường…" value={query} onChange={e=>setQuery(e.target.value)}/></label><p className="micro">{roads.length} tuyến đường</p><div className="road-list">{roads.map(s=><button key={s.id} className={`road-list-item ${String(s.id)===road?'selected':''}`} onClick={()=>setRoad(String(s.id))}><b>{s.name}</b><span className={`density ${s.observation?.density||'unknown'}`}><i/>{s.observation?stateLabels[s.observation.density]:'Chưa có theo dõi mới'}</span></button>)}</div>{!roads.length&&<p className="muted">Không tìm thấy tuyến đường.</p>}</aside>
@@ -37,7 +38,7 @@ export default function TrafficMonitor({segments,dataMode,demo,onFindRoute,user,
         {period==='month'&&<section className="card monitor-heatmap-card"><div className="section-title"><CalendarDays size={18}/><h2>Bản đồ nhiệt ngày × giờ</h2></div><p className="micro">Bấm một ô để xem ngày đó. Xanh: ít đông · vàng: thường chậm · đỏ: thường ùn tắc · xám: chưa có theo dõi.</p><div className="monitor-heatmap-scroll"><div className="monitor-heatmap"><span className="monitor-heatmap-label">Ngày / giờ</span>{Array.from({length:24},(_,h)=><span className="monitor-heatmap-hour" key={h}>{h.toString().padStart(2,'0')}</span>)}{report.daily.map(day=><HeatmapRow key={day.date} date={day.date} report={report} onDay={()=>{setPeriod('day');setValue(day.date);}}/>)}</div></div></section>}
         </>}
         <div className="traffic-report-foot"><p className="data-footnote">{dataMode==='demo'?'Lịch sử minh họa':'Lịch sử theo dõi'} · Cập nhật {dateTime(report.generated_at)}</p>{dataMode==='demo'&&<a className="button small" href={`/api/demo/export.csv?segment_id=${road}`}><Download size={16}/>Tải dữ liệu</a>}</div>
-        <button className="text-button" onClick={onFindRoute}>Tìm đường cho hành trình của bạn<ArrowRight size={15}/></button>
+        {can(user,'routes.search')&&<button className="text-button" onClick={onFindRoute}>Tìm đường cho hành trình của bạn<ArrowRight size={15}/></button>}
       </>}
       </div>
     </div>}

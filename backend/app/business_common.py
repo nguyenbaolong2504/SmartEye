@@ -125,7 +125,7 @@ def clean_csv(value):
 
 def position_on_road(position, segment):
     from .routing import point_distance_to_line
-    if len(position) != 2 or not (20.5 <= position[0] <= 21.5 and 105.2 <= position[1] <= 106.2):
+    if len(position) != 2 or not (8 <= position[0] <= 24 and 102 <= position[1] <= 111):
         raise HTTPException(422, 'Vị trí không hợp lệ trong khu vực hỗ trợ.')
     if point_distance_to_line(position, segment.geometry) > 500:
         raise HTTPException(422, 'Vị trí cần nằm gần tuyến đường đã chọn (trong 500 m).')

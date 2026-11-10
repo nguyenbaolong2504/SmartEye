@@ -9,11 +9,12 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from .config import DATA
-from .security import traffic_viewer
+from .security import check_permission, optional_user
 
 router = APIRouter(prefix='/api/map', tags=['Street map'])
 _cache = OrderedDict()
@@ -65,11 +66,14 @@ async def fetch_json(url, *, params=None, data=None, service='photon'):
         raise HTTPException(502, 'Không đọc được dữ liệu từ nguồn bản đồ.') from None
 
 
-def _address(feature):
+def _address(feature, scope='hanoi'):
     prop=feature.get('properties', {});point=feature.get('geometry', {}).get('coordinates', [])
     if len(point)<2: return None
     lng,lat=map(float,point[:2])
-    if not (math.isfinite(lat) and math.isfinite(lng) and 20.5<=lat<=21.5 and 105.2<=lng<=106.2): return None
+    bounds=(8,24,102,111) if scope=='vn' else (20.5,21.5,105.2,106.2)
+    south,north,west,east=bounds
+    if not (math.isfinite(lat) and math.isfinite(lng) and south<=lat<=north and west<=lng<=east): return None
+    if scope=='vn' and prop.get('countrycode') and str(prop['countrycode']).upper()!='VN':return None
     street=' '.join(str(prop[k]) for k in ('housenumber','street') if prop.get(k))
     parts=list(dict.fromkeys(str(v) for v in [prop.get('name'),street,prop.get('locality'),prop.get('district'),prop.get('city'),prop.get('state')] if v))
     name=', '.join(parts)[:240] or f'{lat:.6f}, {lng:.6f}'
@@ -78,23 +82,25 @@ def _address(feature):
             'source':'photon'}
 
 
-@router.get('/places',dependencies=[Depends(traffic_viewer)])
-async def find_places(q: str=Query(min_length=3,max_length=240)):
+@router.get('/places')
+async def find_places(q: str=Query(min_length=3,max_length=240),scope:Literal['hanoi','vn']='hanoi',user=Depends(optional_user)):
+    check_permission(user,'forecast.view' if scope=='vn' else 'routes.search')
     base=os.getenv('PHOTON_URL','https://photon.komoot.io').strip().rstrip('/')
     if not settings()['osm_available'] or not base:
         raise HTTPException(503,'Tìm địa chỉ chưa được bật. Bạn có thể chọn vị trí trên bản đồ.')
-    key=q.strip().casefold()
-    if len(key)<3: raise HTTPException(422,'Nhập ít nhất 3 ký tự địa chỉ.')
+    if len(q.strip())<3: raise HTTPException(422,'Nhập ít nhất 3 ký tự địa chỉ.')
+    key=(scope,q.strip().casefold())
     with _lock:
         cached=_cache.get(key)
         if cached and cached[0]>time.monotonic(): return cached[1]
-    output=await fetch_json(base+'/api/',params={'q':q.strip(),'limit':7,'bbox':'105.2,20.5,106.2,21.5','lat':21.03,'lon':105.82})
+    filters={'countrycode':'VN','bbox':'102,8,111,24'} if scope=='vn' else {'bbox':'105.2,20.5,106.2,21.5','lat':21.03,'lon':105.82}
+    output=await fetch_json(base+'/api/',params={'q':q.strip(),'limit':7,**filters})
     if not isinstance(output,dict) or not isinstance(output.get('features'),list):
         raise HTTPException(502,'Nguồn địa chỉ trả dữ liệu không hợp lệ.')
     rows=[];seen=set()
     try:
         for feature in output['features'][:30]:
-            row=_address(feature)
+            row=_address(feature,scope)
             if row and row['id'] not in seen: rows.append(row);seen.add(row['id'])
     except (ValueError,TypeError,AttributeError):
         raise HTTPException(502,'Nguồn địa chỉ trả dữ liệu không hợp lệ.') from None
