@@ -7,6 +7,7 @@ os.environ['SEED_DEMO']='true'
 os.environ['APP_ENV']='development'
 os.environ['COOKIE_SECURE']='false'
 os.environ['DEMO_AUTO_PREPARE']='false'
+os.environ['WORKFLOW_WORKER_ENABLED']='false'
 os.environ['VIDEO_FEATURE_ENABLED']='true'  # Legacy archive/inference compatibility tests.
 os.environ['ADMIN_EMAIL']=''
 os.environ['ADMIN_PASSWORD']=''
@@ -18,6 +19,7 @@ from backend.app.main import app, _requests
 from backend.app import db as storage
 from backend.app.db import SessionLocal
 from backend.app.models import ALL_MODELS, User
+from backend.app.business_models import BUSINESS_MODELS
 from backend.app.passwords import hash_password
 
 
@@ -36,7 +38,7 @@ def client(monkeypatch):
     monkeypatch.setattr(storage,'MONGODB_DB',name)
     if not live_uri:
         # Mock cannot enforce server JSONSchema. Live CI tests create validators.
-        for model in ALL_MODELS: mongo[name].create_collection(model.collection)
+        for model in (*ALL_MODELS,*BUSINESS_MODELS): mongo[name].create_collection(model.collection)
         mongo[name].create_collection('counters')
     _requests.clear()
     try:

@@ -37,6 +37,12 @@ class User(Document):
     active: bool = True
     auth_version: int = 0
     created_at: str = field(default_factory=timestamp)
+    username: str = ''
+    phone: str | None = None
+    notifications_enabled: bool = False
+    managed_segment_ids: list | None = None
+    protected: bool = False
+    profile_version: int = 1
 
 
 @dataclass(kw_only=True)
@@ -165,6 +171,9 @@ class Notification(Document):
     message: str
     read: bool = False
     created_at: str = field(default_factory=timestamp)
+    warning_id: int | None = None
+    warning_version: int | None = None
+    delivery_key: str | None = None
 
 
 @dataclass(kw_only=True)
@@ -174,6 +183,10 @@ class Audit(Document):
     user_id: int | None = None
     detail: str = ''
     created_at: str = field(default_factory=timestamp)
+    event_id: str = ''
+    request_id: str = ''
+    service: str = 'application'
+    level: str = 'info'
 
 
 @dataclass(kw_only=True)

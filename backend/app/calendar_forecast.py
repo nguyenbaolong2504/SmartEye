@@ -4,6 +4,7 @@ import math
 import time
 from collections import defaultdict
 from datetime import date,datetime,timedelta
+from typing import Literal
 from pathlib import Path
 import numpy as np
 from fastapi import APIRouter,Depends,HTTPException
@@ -65,6 +66,7 @@ def train_calendar(folder,profiles,ids,estimators=72):
     model.fit(data['x'][train],data['y'][train],eval_set=[(data['x'][val],data['y'][val])],verbose=False)
     model.save_model(folder/'outlook.json')
     report={'model':'XGBoost','is_demo':True,'feature_lag_days':[7,14,21,28],'segment_ids':ids,'trained_before':today.isoformat(),
+        'supported_days':7,'resolution_minutes':60,'supported_directions':['forward'],
         'train_samples':len(train),'validation_samples':len(val),'test_samples':len(test),
         'validation':metrics(data['y'][val],model.predict(data['x'][val])),
         'test':metrics(data['y'][test],model.predict(data['x'][test])),
@@ -119,7 +121,8 @@ def outlook(database,sid,target,hour):
     today=now().astimezone(LOCAL).date()
     if not today<=target<=today+timedelta(days=7):raise HTTPException(422,'Chọn ngày từ hôm nay đến 7 ngày tới.')
     if not 0<=hour<=23:raise HTTPException(422,'Chọn giờ từ 0 đến 23.')
-    if target==today and hour<now().astimezone(LOCAL).hour:raise HTTPException(422,'Chọn giờ chưa qua hoặc một ngày sắp tới.')
+    predicted_at=datetime.combine(target,datetime.min.time(),LOCAL)+timedelta(hours=hour)
+    if predicted_at<=now():raise HTTPException(422,'Chọn một giờ trong tương lai hoặc một ngày sắp tới.')
     hourly,profiles,active=project_day(database,sid,target);selected=hourly[hour]
     windows=[]
     for row in hourly:
@@ -131,11 +134,20 @@ def outlook(database,sid,target,hour):
         and (target!=today or row['hour']>now().astimezone(LOCAL).hour)),key=lambda row:(abs(row['hour']-hour),severity[row['label']],row['hour']))[:3]
     road=database.segments.find_one({'_id':sid}) or {}
     explanation=f"Trong {selected['similar_days']} ngày cùng thứ đã qua, có {selected['jam_days']} ngày dễ ùn tắc ở khung giờ này."
+    from .road_service import current
+    from .db import MongoSession
+    try:actual=current(MongoSession(database),sid,'forward','demo')
+    except HTTPException:actual=None
+    model_info=_models[active['run_id']][1]
+    generated=stamp()
     return {'state':'ready','is_demo':True,'source':'history','segment_id':sid,'segment_name':road.get('name','Tuyến đường'),
+        'direction':'forward','model':'XGBoost','model_version':active['run_id'],'trained_before':model_info.get('trained_before'),
+        'supported_days':model_info.get('supported_days',7),'resolution_minutes':60,'predicted_at':predicted_at.isoformat(),
+        'issue_at':generated,'comparison':{'current':actual,'forecast':{'label':selected['label'],'predicted_at':predicted_at.isoformat()}} if actual and actual['fresh'] and actual['state'] else None,
         'date':target.isoformat(),'hour':hour,'selected':selected,'hourly':hourly,'avoid_windows':windows,'alternatives':alternatives,
         'explanation':explanation,'advice':f"Nên cân nhắc đi vào giờ khác để tránh {hour:02d}:00–{hour+1:02d}:00." if selected['label']=='JAM' else 'Có thể cân nhắc khởi hành vào giờ đã chọn; kiểm tra lại tình hình trước khi đi.',
         'history_start':min(profiles).isoformat() if profiles else None,'history_end':max(profiles).isoformat() if profiles else None,
-        'history_days':len(profiles),'generated_at':stamp(),'notice':'Ước tính từ lịch sử minh họa, không phải tình trạng giao thông thực tế.'}
+        'history_days':len(profiles),'generated_at':generated,'notice':'Ước tính từ lịch sử minh họa, không phải tình trạng giao thông thực tế.'}
 
 
 def aggregate(records):
@@ -164,5 +176,6 @@ def annual_report(database,active,sid):
 
 
 @router.get('/api/traffic/outlook')
-def road_outlook(segment_id:int,date:date,hour:int=17,db=Depends(get_db)):
+def road_outlook(segment_id:int,date:date,hour:int=17,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
+    if direction!='forward':raise HTTPException(409,'Chưa có mô hình và lịch sử cho chiều đường đã chọn.')
     return outlook(db.database,segment_id,date,hour)

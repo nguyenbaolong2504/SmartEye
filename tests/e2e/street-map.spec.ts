@@ -57,7 +57,7 @@ test('map zoom, expanding, picking a pin and address failure recovery',async({pa
 test('saved OSM journey retains addresses, coordinates and provider',async({page})=>{
   await page.goto('/#routes',{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
-  await page.getByLabel('Email',{exact:true}).fill('e2e-admin@example.invalid');
+  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill('e2e-admin@example.invalid');
   await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');
   await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

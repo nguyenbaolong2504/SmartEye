@@ -86,7 +86,8 @@ def test_private_training_and_labels_require_operator(client):
     assert client.post('/api/forecast/runs',json=body()).status_code==401
     assert client.get('/api/forecast/runs').status_code==401
     assert client.get('/api/forecast/status').status_code==200
-    client.post('/api/auth/register',json={'name':'Test user','email':'forecast@example.invalid','password':'valid-password-test'})
+    client.post('/api/auth/register',json={'name':'Test user','username':'forecast','email':'forecast@example.invalid','password':'valid-password-test','password_confirmation':'valid-password-test'})
+    client.post('/api/auth/login',json={'email':'forecast@example.invalid','password':'valid-password-test'})
     assert client.post('/api/forecast/readiness',json=body()).status_code==403
     assert client.get('/api/forecast/labels?segment_id=1').status_code==403
 

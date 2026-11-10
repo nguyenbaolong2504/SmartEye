@@ -124,7 +124,8 @@ def test_sharing_opt_in_range_requests_hide_and_delete(admin_client,media_paths)
 def test_user_cannot_publish_and_private_retained_video_remains_private(client,media_paths):
     job=completed_job(now()-timedelta(minutes=10),media=True,frames=True)
     assert client.get(f'/api/videos/{job.id}/source').status_code==401
-    client.post('/api/auth/register',json={'name':'Viewer','email':'viewer@example.invalid','password':'test-viewer-password'})
+    client.post('/api/auth/register',json={'name':'Viewer','username':'viewer','email':'viewer@example.invalid','password':'test-viewer-password','password_confirmation':'test-viewer-password'})
+    client.post('/api/auth/login',json={'email':'viewer@example.invalid','password':'test-viewer-password'})
     assert client.get(f'/api/videos/{job.id}/source').status_code==403
     assert client.post(f'/api/videos/{job.id}/archive',json={}).status_code==403
     assert client.get('/api/monitor/cameras/1/frame').status_code==404

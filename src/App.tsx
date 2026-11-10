@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, MapPin, LogIn, Activity, LayoutDashboard, BrainCircuit } from 'lucide-react';
+import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, MapPin, LogIn, Activity, LayoutDashboard, BrainCircuit, MessageSquare } from 'lucide-react';
 import { api } from './api';
 import { AuthModal,ProfilePage } from './Auth';
 import { Modal,Notice,Spinner } from './components';
@@ -11,11 +11,13 @@ const ForecastPage=lazy(()=>import('./ForecastPage'));
 const HistoryPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.HistoryPage})));
 const AlertsPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.AlertsPage})));
 const AdminPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.AdminPage})));
-type Tab='overview'|'forecast'|'routes'|'monitor'|'history'|'alerts'|'admin'|'profile';
-const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Tình trạng & thống kê',icon:Activity},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
+const IncidentsPage=lazy(()=>import('./IncidentsPage'));
+const ManagementPage=lazy(()=>import('./ManagementPage'));
+type Tab='overview'|'forecast'|'routes'|'monitor'|'history'|'alerts'|'incidents'|'management'|'admin'|'profile';
+const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Tình trạng & thống kê',icon:Activity},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'incidents',label:'Phản ánh giao thông',icon:MessageSquare},{id:'management',label:'Giám sát & xử lý',icon:Activity},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
 type Bootstrap={places:Place[];segments:Segment[];cameras:Camera[];config:Config;user:User|null;demo:DemoStatus};
 export default function App(){
-  const[tab,setTab]=useState<Tab>(()=>{const view=location.hash.slice(1);return navigation.some(n=>n.id===view)?view as Tab:'overview';});
+  const[tab,setTab]=useState<Tab>(()=>{const view=location.hash.slice(1);return view==='profile'||navigation.some(n=>n.id===view)?view as Tab:'overview';});
   const[dataMode,setDataMode]=useState<DataMode>('demo');
   const[places,setPlaces]=useState<Place[]>([]);const[segments,setSegments]=useState<Segment[]>([]);const[cameras,setCameras]=useState<Camera[]>([]);
   const[loadedMode,setLoadedMode]=useState<DataMode|null>(null);const[config,setConfig]=useState<Config|null>(null);const[demo,setDemo]=useState<DemoStatus|null>(null);const[user,setUser]=useState<User|null>(null);
@@ -34,12 +36,17 @@ export default function App(){
   useEffect(()=>{const changed=()=>{const view=location.hash.slice(1);if(navigation.some(n=>n.id===view)||view==='profile')setTab(view as Tab);else{setTab('overview');location.hash='overview';}setMobileOpen(false);};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(timer);},[toast]);
   function navigate(id:Tab){setTab(id);location.hash=id;setMobileOpen(false);window.scrollTo({top:0});}
-  function onUser(next:User|null){version.current++;setUser(next);if(!next)navigate('overview');}
+  function onUser(next:User|null){version.current++;setUser(next);if(!next){navigate('overview');setToast('Đã đăng xuất.');}}
+  useEffect(()=>{
+    const expire=()=>{version.current++;setUser(null);setAuthOpen(true);setToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');};
+    window.addEventListener('smarteye-session-expired',expire);
+    return ()=>window.removeEventListener('smarteye-session-expired',expire);
+  },[]);
   const current=tab==='profile'?'Hồ sơ cá nhân':navigation.find(n=>n.id===tab)?.label;
   return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}>
     <a href="#overview" className="brand" onClick={e=>{e.preventDefault();navigate('overview');}}><span className="brand-icon"><span/><i/></span><span>SmartEye<small>HIỂU ĐƯỜNG · CHỌN LỐI</small></span></a>
     <button className="mobile-close icon-button" onClick={()=>setMobileOpen(false)} aria-label="Đóng menu"><X size={20}/></button>
-    <nav aria-label="Điều hướng chính">{navigation.filter(n=>n.id!=='admin'||user?.role==='admin').map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG HÀ NỘI':id==='history'?'CÁ NHÂN':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
+    <nav aria-label="Điều hướng chính">{navigation.filter(n=>(n.id!=='admin'||user?.role==='admin')&&(n.id!=='management'||user?.role==='analyst')).map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin'||id==='management')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG HÀ NỘI':id==='history'?'CÁ NHÂN':id==='management'?'QUẢN LÝ':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
     <div className="sidebar-project"><div><Radio size={17}/><b>Hà Nội</b></div><p>Theo dõi từng tuyến đường<br/>giao thông đô thị</p><div className="project-stats"><span><b>{segments.filter(s=>s.active).length}</b> tuyến đường</span><span>Giờ Việt Nam</span></div></div>
     <div className="sidebar-bottom"><p>Dữ liệu rõ ràng.<br/>Chủ động hành trình.</p><small>SmartEye · Phiên bản 1.1</small></div>
   </aside>{mobileOpen&&<div className="sidebar-scrim" onClick={()=>setMobileOpen(false)}/>}
@@ -49,11 +56,14 @@ export default function App(){
         {tab==='overview'&&<OverviewPage segments={segments} places={places} onNavigate={navigate} dataMode={dataMode}/>}
         {tab==='forecast'&&<ForecastPage segments={segments} user={user} dataMode={dataMode} demo={demo} onLogin={()=>setAuthOpen(true)} initialRoad={initialRoad} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}} onUpdated={refresh}/>}
         {tab==='routes'&&<RoutesPage key={`${routeKey}-${dataMode}`} places={places} segments={segments} config={config} user={user} dataMode={dataMode} initialDeparture={initialDeparture} onLogin={()=>setAuthOpen(true)} preset={preset} onSaved={()=>setToast('Đã lưu hành trình yêu thích.')}/>}
-        {tab==='monitor'&&<TrafficMonitor key={initialRoad||'all'} initialRoad={initialRoad} onForecast={id=>{setInitialRoad(id);navigate('forecast');}} segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
+        {tab==='monitor'&&<TrafficMonitor tileUrl={config.osm_tile_url} key={initialRoad||'all'} initialRoad={initialRoad} onForecast={id=>{setInitialRoad(id);navigate('forecast');}} segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
         {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
         {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
+        {tab==='incidents'&&<IncidentsPage user={user} segments={segments} config={config} onLogin={()=>setAuthOpen(true)}/>}
+        {tab==='management'&&user?.role==='analyst'&&<ManagementPage user={user} segments={segments}/>}
         {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} cameras={cameras} segments={segments} onUpdated={refresh}/>}
         {tab==='profile'&&user&&<ProfilePage user={user} onUser={onUser}/>}
+        {((tab==='management'&&user?.role!=='analyst')||(tab==='admin'&&user?.role!=='admin')||(tab==='profile'&&!user))&&<section className="card"><Notice>{user?'Bạn không có quyền mở chức năng này.':'Vui lòng đăng nhập để tiếp tục.'}</Notice><button className="button" onClick={()=>user?navigate('overview'):setAuthOpen(true)}>{user?'Về tổng quan':'Đăng nhập'}</button></section>}
       </Suspense>}
       <footer className="footer"><span>© SmartEye · Hệ thống hỗ trợ quyết định giao thông</span><button className="text-button" onClick={()=>setLegal(true)}>Điều khoản & quyền riêng tư</button></footer>
     </main></div>

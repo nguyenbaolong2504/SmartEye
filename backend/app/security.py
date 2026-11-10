@@ -1,10 +1,13 @@
 import hashlib
 import secrets
+import uuid
+from contextvars import ContextVar
 from datetime import timedelta
 from fastapi import Depends, HTTPException, Request
 from .db import get_db, stamp, now
 from .models import User, LoginSession, Audit
 from .passwords import hash_password, verify_password
+request_id = ContextVar('smarteye_request_id',default='')
 
 def token_hash(token):
     return hashlib.sha256(token.encode()).hexdigest()
@@ -25,7 +28,7 @@ def optional_user(request: Request, db=Depends(get_db)):
 
 def require_user(user=Depends(optional_user)):
     if not user:
-        raise HTTPException(401, 'Vui lòng đăng nhập để tiếp tục.')
+        raise HTTPException(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.')
     return user
 
 def operator(user=Depends(require_user)):
@@ -39,7 +42,8 @@ def admin(user=Depends(require_user)):
     return user
 
 def audit(db, user_id, action, detail=''):
-    db.add(Audit(user_id=user_id, action=action, detail=detail[:300]))
+    db.add(Audit(user_id=user_id, action=action, detail=detail[:300],event_id=str(uuid.uuid4()),request_id=request_id.get()))
 
 def public_user(user):
-    return {key: getattr(user, key) for key in ('id', 'email', 'name', 'role', 'active', 'created_at')}
+    return {key: getattr(user, key) for key in ('id', 'email', 'name', 'username', 'phone', 'role', 'active',
+            'notifications_enabled','managed_segment_ids','protected','profile_version','created_at')}

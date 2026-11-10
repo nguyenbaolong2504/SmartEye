@@ -1,4 +1,5 @@
 import csv
+import asyncio
 import hashlib
 import io
 import logging
@@ -56,7 +57,14 @@ async def lifespan(app):
         db.delete_many(ResetToken,{'expires_at':{'$lt':stamp()}})
         db.commit()
     if os.getenv('DEMO_AUTO_PREPARE','true').lower()=='true': start_demo()
-    yield
+    from .workflow_worker import start
+    worker=start()
+    try:yield
+    finally:
+        if worker:
+            worker.cancel()
+            try:await worker
+            except asyncio.CancelledError:pass
 
 app = FastAPI(title='SmartEye API', version='1.0.0', lifespan=lifespan)
 app.include_router(map_router)
@@ -77,12 +85,15 @@ async def duplicate_record(request,exc):
 
 @app.exception_handler(PyMongoError)
 async def mongo_unavailable(request,exc):
-    return JSONResponse({'detail':'MongoDB chưa sẵn sàng. Kiểm tra dịch vụ database và thử lại.'},status_code=503)
+    return JSONResponse({'detail':'Không thể tải hoặc lưu dữ liệu lúc này. Vui lòng thử lại.'},status_code=503)
 _requests = defaultdict(deque)
 _rate_lock = threading.Lock()
 
 @app.middleware('http')
 async def guard(request, call_next):
+    from .security import request_id
+    correlation=str(uuid.uuid4())
+    request_id.set(correlation)
     if request.method=='POST' and request.url.path=='/api/videos' and os.getenv('VIDEO_FEATURE_ENABLED','false').lower()!='true':
         return JSONResponse({'detail':'Chức năng nhận diện video đã được gỡ khỏi phiên bản này.'},status_code=410)
     if request.method not in ('GET','HEAD','OPTIONS'):
@@ -107,6 +118,7 @@ async def guard(request, call_next):
             for old_key in list(_requests):
                 if not _requests[old_key] or _requests[old_key][-1] < clock-60: del _requests[old_key]
     response = await call_next(request)
+    response.headers['X-Request-ID']=correlation
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     response.headers['Cache-Control'] = 'no-store'
@@ -121,7 +133,7 @@ def camera_dict(c):
     return {k:getattr(c,k) for k in ('id','name','segment_id','active','capacity','low_threshold','high_threshold','roi')}
 
 def own(row, user):
-    if row.user_id != user.id and user.role != 'admin': raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
+    if row.user_id != user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
     return row
 
 def job_dict(j,summary=False):
@@ -144,20 +156,21 @@ def config():
 
 @app.post('/api/auth/register',status_code=201)
 def register(body:S.Register,response:Response,db=Depends(get_db)):
-    user = User(**body.model_dump(exclude={'password'}),password=hash_password(body.password))
+    user = User(**body.model_dump(exclude={'password','password_confirmation'}),password=hash_password(body.password))
     db.add(user)
     try: db.commit()
     except DuplicateKeyError:
-        db.rollback(); raise HTTPException(409,'Email đã được đăng ký.')
-    cookie(response,create_session(db,user))
-    audit(db,user.id,'register'); db.commit()
+        db.rollback(); raise HTTPException(409,'Tên đăng nhập hoặc thông tin liên hệ đã được sử dụng.')
+    from .business_common import log_event
+    log_event(db,user.id,'register',str(user.id))
     return public_user(user)
 
 @app.post('/api/auth/login')
 def login(body:S.Login,response:Response,db=Depends(get_db)):
-    user = db.find_one(User,{'email':body.email.strip().lower()})
-    if not user or not verify_password(body.password,user.password) or not user.active:
-        raise HTTPException(401,'Email hoặc mật khẩu không đúng, hoặc tài khoản bị khóa.')
+    user = db.find_one(User,{'$or':[{'email':body.email.strip().lower()},{'username':body.email.strip().lower()}]})
+    if not user or not verify_password(body.password,user.password):
+        raise HTTPException(401,'Tên đăng nhập hoặc mật khẩu không đúng.')
+    if not user.active:raise HTTPException(403,'Tài khoản đang bị khóa.')
     cookie(response,create_session(db,user)); audit(db,user.id,'login'); db.commit()
     return public_user(user)
 
@@ -173,14 +186,22 @@ def me(user=Depends(optional_user)):
 
 @app.patch('/api/auth/profile')
 def profile(body:S.ProfileInput,user=Depends(require_user),db=Depends(get_db)):
-    row = item(db,User,user.id); row.name=body.name.strip(); db.commit()
-    return public_user(row)
+    from pymongo import ReturnDocument
+    row=item(db,User,user.id)
+    if body.revision is not None and body.revision!=row.profile_version:raise HTTPException(409,'Hồ sơ đã thay đổi. Vui lòng tải lại.')
+    updates=body.model_dump(exclude_unset=True,exclude={'revision'})
+    if updates.get('email') is None:updates.pop('email',None)
+    result=db.database.users.find_one_and_update({'_id':user.id,'$or':[{'profile_version':row.profile_version},{'profile_version':{'$exists':False}}]},
+        {'$set':{**updates,'profile_version':row.profile_version+1}},return_document=ReturnDocument.AFTER)
+    if not result:raise HTTPException(409,'Hồ sơ đã thay đổi. Vui lòng tải lại.')
+    return public_user(User.from_mongo(result))
 
 @app.post('/api/auth/password')
 def change_password(body:S.PasswordChange,response:Response,user=Depends(require_user),db=Depends(get_db)):
     row = item(db,User,user.id)
     if not verify_password(body.current_password,row.password): raise HTTPException(400,'Mật khẩu hiện tại không đúng.')
-    row = db.update(User,user.id,{'password':hash_password(body.new_password)},increment={'auth_version':1})
+    row = db.update(User,user.id,{'password':hash_password(body.new_password)},condition={'auth_version':row.auth_version,'active':True},increment={'auth_version':1})
+    if row is None:raise HTTPException(409,'Tài khoản đã thay đổi. Vui lòng đăng nhập lại.')
     db.delete_many(LoginSession,{'user_id':user.id}); audit(db,user.id,'password_changed'); db.commit()
     cookie(response,create_session(db,row))
     return {'message':'Đã đổi mật khẩu và thu hồi các phiên cũ.'}
@@ -206,13 +227,19 @@ def forgot_password(body:S.ResetRequest,db=Depends(get_db)):
 
 @app.post('/api/auth/reset-password')
 def reset_password(body:S.ResetPassword,db=Depends(get_db)):
-    token = db.pop(ResetToken,{'token_hash':token_hash(body.token),'expires_at':{'$gt':stamp()}})
+    token = db.find_one(ResetToken,{'token_hash':token_hash(body.token),'expires_at':{'$gt':stamp()}})
     if not token: raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
     row = item(db,User,token.user_id)
     if not row.active: raise HTTPException(400,'Tài khoản đã bị khóa.')
-    changed=db.update(User,row.id,{'password':hash_password(body.password)},condition={'auth_version':token.auth_version},increment={'auth_version':1})
+    changed=db.update(User,row.id,{'password':hash_password(body.password)},condition={'auth_version':token.auth_version,'active':True},increment={'auth_version':1})
     if not changed: raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
-    db.delete_many(LoginSession,{'user_id':row.id}); audit(db,row.id,'password_reset'); db.commit()
+    try:
+        db.delete_many(ResetToken,{'user_id':row.id})
+        db.delete_many(LoginSession,{'user_id':row.id})
+    except PyMongoError:
+        logger.warning('Password reset token cleanup deferred')
+    from .business_common import log_event
+    log_event(db,row.id,'password_reset')
     return {'message':'Đã đặt lại mật khẩu. Vui lòng đăng nhập.'}
 
 @app.get('/api/places')
@@ -326,8 +353,7 @@ async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),r
 
 @app.get('/api/videos')
 def videos(user=Depends(require_user),db=Depends(get_db)):
-    filters={} if user.role=='admin' else {'user_id':user.id}
-    return [job_dict(j,summary=True) for j in db.find(VideoJob,filters,sort=[('created_at',-1)],limit=50,exclude=['result.samples'])]
+    return [job_dict(j,summary=True) for j in db.find(VideoJob,{'user_id':user.id},sort=[('created_at',-1)],limit=50,exclude=['result.samples'])]
 
 @app.get('/api/videos/{ident}')
 def get_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
@@ -395,7 +421,7 @@ def delete_favorite(ident:int,user=Depends(require_user),db=Depends(get_db)):
 @app.get('/api/alerts')
 def alerts(user=Depends(require_user),db=Depends(get_db)):
     rules=[{k:getattr(r,k) for k in ('id','segment_id','density','active')} for r in db.find(AlertRule,{'user_id':user.id})]
-    notices=[{k:getattr(n,k) for k in ('id','message','read','created_at')} for n in db.find(Notification,{'user_id':user.id},sort=[('id',-1)],limit=100)]
+    notices=[{k:getattr(n,k) for k in ('id','message','read','created_at','warning_id')} for n in db.find(Notification,{'user_id':user.id},sort=[('id',-1)],limit=100)]
     return {'rules':rules,'notifications':notices}
 
 @app.post('/api/alerts',status_code=201)
@@ -450,11 +476,8 @@ def users(q:str='',user=Depends(admin),db=Depends(get_db)):
 
 @app.patch('/api/admin/users/{ident}')
 def edit_user(ident:int,body:S.UserUpdate,user=Depends(admin),db=Depends(get_db)):
-    row=item(db,User,ident)
-    if ident == user.id and (body.role!='admin' or not body.active): raise HTTPException(422,'Không thể tự khóa hoặc hạ quyền quản trị của mình.')
-    row=db.update(User,ident,{'role':body.role,'active':body.active},increment={'auth_version':1})
-    db.delete_many(LoginSession,{'user_id':ident}); audit(db,user.id,'user_updated',f'{ident}: {body.role}, active={body.active}'); db.commit()
-    return public_user(row)
+    from .accounts import apply_account
+    return apply_account(db,user,ident,{'role':body.role,'active':body.active})
 
 @app.post('/api/admin/users/{ident}/revoke')
 def revoke(ident:int,user=Depends(admin),db=Depends(get_db)):
@@ -469,3 +492,12 @@ from .monitoring import router as monitoring_router
 app.include_router(monitoring_router)
 from .forecast_api import router as forecast_router
 app.include_router(forecast_router)
+from .incidents import router as incidents_router
+from .warnings import router as warnings_router
+from .managed_rules import router as rules_router
+from .sources import router as sources_router
+from .accounts import router as accounts_router
+from .road_service import router as road_router
+from .operations import router as operations_router
+for workflow_router in (incidents_router,warnings_router,rules_router,sources_router,accounts_router,road_router,operations_router):
+    app.include_router(workflow_router)

@@ -9,6 +9,21 @@ NUMBER={'bsonType':['int','long','double','decimal']}
 INTEGER={'bsonType':['int','long']}
 BOOL={'bsonType':'bool'}
 SCHEMAS={
+    'incidents':validator(['user_id','segment_id','direction','status','revision','history'],{
+        'user_id':INTEGER,'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},
+        'status':{'enum':['pending','verifying','processing','resolved','rejected']},'revision':INTEGER,'history':{'bsonType':'array'}}),
+    'traffic_warnings':validator(['segment_id','direction','status','revision','content_version','history'],{
+        'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},'revision':INTEGER,'content_version':INTEGER,
+        'status':{'enum':['pending_verification','pending_publication','published','ended','cancelled']},'history':{'bsonType':'array'}}),
+    'managed_alert_rules':validator(['name','segment_id','direction','active','tested','deleted','revision'],{
+        'name':TEXT,'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},'active':BOOL,'tested':BOOL,'deleted':BOOL,'revision':INTEGER}),
+    'data_sources':validator(['name','kind','segment_id','direction','active','tested','authorized','version','revision'],{
+        'name':TEXT,'kind':{'enum':['file','api','camera']},'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},
+        'active':BOOL,'tested':BOOL,'authorized':BOOL,'version':INTEGER,'revision':INTEGER}),
+    'road_readings':validator(['sample_key','source_id','segment_id','direction','observed_at','metrics'],{
+        'sample_key':TEXT,'source_id':INTEGER,'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},'observed_at':TEXT,'metrics':{'bsonType':'object'}}),
+    'source_receipts':validator(['source_id','source_version','accepted','rejected','received_at'],{
+        'source_id':INTEGER,'source_version':INTEGER,'accepted':INTEGER,'rejected':INTEGER,'received_at':TEXT}),
     'forecast_runs':validator(['user_id','target','segment_ids','status','running'],{
         '_id':TEXT,'user_id':INTEGER,'target':{'enum':['density','congestion']},
         'segment_ids':{'bsonType':'array'},'status':{'enum':['queued','training','completed','failed','cancelled']},'running':BOOL}),

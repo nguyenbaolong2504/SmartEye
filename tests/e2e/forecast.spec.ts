@@ -19,7 +19,7 @@ test('day-ahead forecasts explain recurring congestion without technical banners
 test('admin dataset checks, CSV preview/commit and independent congestion labels',async({page},testInfo)=>{
   await page.goto('/#forecast',{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).first().click();
-  await page.getByLabel('Email',{exact:true}).fill('e2e-admin@example.invalid');
+  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill('e2e-admin@example.invalid');
   await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');
   await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

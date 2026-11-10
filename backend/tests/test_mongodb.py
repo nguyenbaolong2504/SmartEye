@@ -7,6 +7,7 @@ import pytest
 from pymongo.errors import DuplicateKeyError, OperationFailure
 from backend.app.db import SessionLocal, get_database, initialize_database, now, stamp
 from backend.app.models import ALL_MODELS, User, LoginSession, ResetToken, Observation, VideoJob
+from backend.app.business_models import BUSINESS_MODELS
 from backend.app.database_config import resolve_mongodb_settings
 from backend.app.demo_accounts import DEMO_ACCOUNTS, seed_demo_accounts
 from backend.app.passwords import hash_password, verify_password
@@ -17,7 +18,7 @@ ROOT=Path(__file__).resolve().parents[2]
 
 def test_mongodb_collections_and_unique_indexes(client):
     database=get_database()
-    assert set(database.list_collection_names()) == {m.collection for m in ALL_MODELS}|{'counters'}
+    assert set(database.list_collection_names()) == {m.collection for m in (*ALL_MODELS, *BUSINESS_MODELS)}|{'counters'}
     assert database.users.index_information()['unique_email']['unique']
     assert database.observations.index_information()['one_publication_per_video']['partialFilterExpression'] == {'job_id':{'$type':'string'}}
     assert database.sessions.index_information()['expire_tokens']['expireAfterSeconds']==0
@@ -57,8 +58,9 @@ def test_counter_sync_after_compass_import(client):
 
 
 def test_session_version_revokes_without_deleting_token(client):
-    response=client.post('/api/auth/register',json={'name':'Version test','email':'version@smarteye.test','password':'test-version-password'})
+    response=client.post('/api/auth/register',json={'name':'Version test','username':'version','email':'version@smarteye.test','password':'test-version-password','password_confirmation':'test-version-password'})
     assert response.status_code==201
+    client.post('/api/auth/login',json={'email':'version@smarteye.test','password':'test-version-password'})
     with SessionLocal() as db:
         db.update(User,response.json()['id'],{},increment={'auth_version':1})
         assert db.count(LoginSession)==1
@@ -156,7 +158,7 @@ def test_restore_compass_fixture_and_register_next_id(client):
         response=client.post('/api/auth/login',json={'email':account['email'],'password':account['password']})
         assert response.status_code==200 and response.json()['role']==account['role']
         client.post('/api/auth/logout')
-    response=client.post('/api/auth/register',json={'name':'After import','email':'after-import@example.invalid','password':'after-import-password'})
+    response=client.post('/api/auth/register',json={'name':'After import','username':'after-import','email':'after-import@example.invalid','password':'after-import-password','password_confirmation':'after-import-password'})
     assert response.status_code==201 and response.json()['id']==4
 
 

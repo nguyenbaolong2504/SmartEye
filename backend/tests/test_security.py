@@ -4,13 +4,17 @@ from backend.app.db import SessionLocal
 from backend.app.models import VideoJob
 
 def register(client,email='user@test.vn'):
-    return client.post('/api/auth/register',json={'name':'Người kiểm thử','email':email,'password':'valid-test-password'})
+    result=client.post('/api/auth/register',json={'name':'Người kiểm thử','username':email.split('@')[0], 'email':email,'password':'valid-test-password','password_confirmation':'valid-test-password'})
+    if result.status_code==201:assert client.post('/api/auth/login',json={'email':email,'password':'valid-test-password'}).status_code==200
+    return result
 
 def test_register_role_cookie_and_private_endpoints(client):
     assert client.get('/api/videos').status_code==401
     response=register(client)
     assert response.status_code==201 and response.json()['role']=='user'
-    assert 'HttpOnly' in response.headers['set-cookie'] and 'SameSite=strict' in response.headers['set-cookie']
+    assert 'set-cookie' not in response.headers
+    login=client.post('/api/auth/login',json={'email':'user@test.vn','password':'valid-test-password'})
+    assert 'HttpOnly' in login.headers['set-cookie'] and 'SameSite=strict' in login.headers['set-cookie']
     assert client.get('/api/admin/users').status_code==403
     assert client.get('/api/reports').status_code==403
     assert register(client).status_code==409
@@ -23,7 +27,7 @@ def test_logout_revokes_session(client):
 
 def test_password_change_revokes_old_session(client):
     register(client); old=client.cookies.get('smarteye_session')
-    assert client.post('/api/auth/password',json={'current_password':'valid-test-password','new_password':'new-valid-test-password'}).status_code==200
+    assert client.post('/api/auth/password',json={'current_password':'valid-test-password','new_password':'new-valid-test-password','password_confirmation':'new-valid-test-password'}).status_code==200
     client.cookies.clear();client.cookies.set('smarteye_session',old)
     assert client.get('/api/videos').status_code==401
 

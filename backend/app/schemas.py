@@ -8,6 +8,23 @@ class Register(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: str = Field(max_length=254)
     password: str = Field(min_length=10, max_length=128)
+    username: str = Field(min_length=3,max_length=40,pattern=r'^[A-Za-z0-9_.-]+$')
+    password_confirmation: str = Field(min_length=10,max_length=128)
+    phone: str | None = None
+    @field_validator('username')
+    @classmethod
+    def username_valid(cls,value):return value.strip().lower()
+    @field_validator('phone')
+    @classmethod
+    def phone_valid(cls,value):
+        if value in ('',None):return None
+        value=re.sub(r'[\s().-]','',value)
+        if not re.fullmatch(r'\+?[0-9]{9,15}',value):raise ValueError('Số điện thoại cần 9–15 chữ số, có thể bắt đầu bằng +')
+        return value
+    @model_validator(mode='after')
+    def confirmation_valid(self):
+        if self.password!=self.password_confirmation:raise ValueError('Mật khẩu và xác nhận không khớp')
+        return self
     @field_validator('email')
     @classmethod
     def email_valid(cls, value):
@@ -25,6 +42,11 @@ class Register(BaseModel):
 class Login(BaseModel):
     email: str = Field(max_length=254)
     password: str = Field(min_length=1, max_length=128)
+    @field_validator('email')
+    @classmethod
+    def identifier_valid(cls,value):
+        if not value.strip():raise ValueError('Vui lòng nhập tên đăng nhập hoặc email')
+        return value.strip().lower()
 
 class CameraInput(BaseModel):
     name: str = Field(min_length=2, max_length=120)
@@ -127,12 +149,28 @@ class SegmentInput(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str = Field(max_length=128)
     new_password: str = Field(min_length=10, max_length=128)
+    password_confirmation: str = Field(min_length=10,max_length=128)
+    @model_validator(mode='after')
+    def confirmation_valid(self):
+        if self.new_password!=self.password_confirmation:raise ValueError('Mật khẩu mới và xác nhận không khớp')
+        if self.new_password==self.current_password:raise ValueError('Mật khẩu mới phải khác mật khẩu hiện tại')
+        return self
 
 class ProfileInput(BaseModel):
     name: str = Field(min_length=2, max_length=100)
+    email: str | None = None
+    phone: str | None = None
+    notifications_enabled: bool | None = None
+    revision: int | None = Field(default=None,ge=1)
+    _name = field_validator('name')(Register.name_valid.__func__)
+    _phone = field_validator('phone')(Register.phone_valid.__func__)
+    @field_validator('email')
+    @classmethod
+    def email_valid(cls,value):return Register.email_valid(value) if value is not None else None
 
 class ResetRequest(BaseModel):
     email: str = Field(max_length=254)
+    _email = field_validator('email')(Register.email_valid.__func__)
 
 class ResetPassword(BaseModel):
     token: str = Field(max_length=200)

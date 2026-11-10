@@ -45,14 +45,32 @@ def _query(model, value):
 def initialize_database():
     from .models import ALL_MODELS, LoginSession, ResetToken
     from .mongo_schema import SCHEMAS
+    from .business_models import BUSINESS_MODELS
+    from .models import ALL_MODELS
+    models = [*ALL_MODELS, *BUSINESS_MODELS]
     database = get_database()
     database.command('ping')
     existing = set(database.list_collection_names())
-    for name in [m.collection for m in ALL_MODELS] + ['counters']:
+    for name in [m.collection for m in models] + ['counters']:
         if name not in existing:
             try: database.create_collection(name,**({'validator':SCHEMAS[name]} if name in SCHEMAS else {}))
             except CollectionInvalid: pass
     database.users.create_index('email', unique=True, name='unique_email')
+    database.users.create_index('username', unique=True, partialFilterExpression={'username':{'$type':'string','$gt':''}}, name='unique_username')
+    database.users.create_index('phone', unique=True, partialFilterExpression={'phone':{'$type':'string','$gt':''}}, name='unique_phone')
+    database.incidents.create_index([('user_id',1),('created_at',-1)])
+    database.incidents.create_index([('user_id',1),('submission_key',1)], unique=True)
+    database.incidents.create_index([('segment_id',1),('status',1),('created_at',-1)])
+    database.traffic_warnings.create_index('origin_key', unique=True, partialFilterExpression={'origin_key':{'$type':'string'}})
+    database.traffic_warnings.create_index([('segment_id',1),('direction',1),('status',1)])
+    database.traffic_warnings.create_index('notification_state')
+    database.managed_alert_rules.create_index('signature',unique=True,partialFilterExpression={'deleted':False})
+    database.managed_alert_rules.create_index([('segment_id',1),('direction',1),('name_key',1)],unique=True,partialFilterExpression={'deleted':False})
+    database.data_sources.create_index('signature',unique=True)
+    database.source_receipts.create_index([('source_id',1),('received_at',-1)])
+    database.road_readings.create_index('sample_key',unique=True)
+    database.road_readings.create_index([('segment_id',1),('direction',1),('observed_at',-1)])
+    database.notifications.create_index('delivery_key',unique=True,partialFilterExpression={'delivery_key':{'$type':'string'}})
     database.observations.create_index('job_id', unique=True,
         partialFilterExpression={'job_id':{'$type':'string'}}, name='one_publication_per_video')
     database.observations.create_index([('segment_id',ASCENDING),('observed_at',DESCENDING)], name='latest_segment_observation')
@@ -74,7 +92,7 @@ def initialize_database():
     for model in (LoginSession,ResetToken):
         database[model.collection].create_index('expires_on',expireAfterSeconds=0,name='expire_tokens')
     # Synchronize counters after a Compass JSON import. Never move a counter back.
-    for model in ALL_MODELS:
+    for model in models:
         if model.primary != 'id' or model.collection in ('video_jobs','forecast_runs','forecast_registry'): continue
         largest = database[model.collection].find_one({'_id':{'$type':'number'}},sort=[('_id',-1)])
         database.counters.update_one({'_id':model.collection},{'$max':{'seq':largest['_id'] if largest else 0}},upsert=True)
