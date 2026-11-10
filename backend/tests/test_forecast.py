@@ -58,7 +58,7 @@ def test_readiness_and_public_no_model_are_honest(admin_client):
     output=admin_client.post('/api/forecast/readiness',json=body())
     assert output.status_code==200 and not output.json()['ready']
     assert output.json()['horizons']['15']['windows']==0
-    result=admin_client.get('/api/forecast/predict?segment_id=1').json()
+    result=admin_client.get('/api/forecast/predict?segment_id=1',headers={'Cookie':''}).json()
     assert result['state']=='no_model' and result['predictions']==[]
 
 
@@ -244,7 +244,7 @@ def test_real_xgboost_and_gru_training_persistence_and_inference(client,tmp_path
         database.forecast_runs.replace_one({'_id':ident},{'_id':ident,'user_id':1,'target':'density','status':'completed','running':False,
             'segment_ids':[1],'end_at':now().isoformat(),'report':report},upsert=True)
         assert client.post(f'/api/forecast/runs/{ident}/activate').status_code==200
-        output=client.get('/api/forecast/predict?segment_id=1').json()
+        output=client.get('/api/forecast/predict?segment_id=1',headers={'Cookie':''}).json()
         assert output['state']=='ready',output
         assert output['predictions'][0]['model']==selected
         assert output['predictions'][0]['label'] in ('LOW','NORMAL','HIGH')

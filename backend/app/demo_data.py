@@ -21,7 +21,7 @@ from .db import get_db, get_database, now, stamp, MongoSession
 from .models import Segment
 from .history import LOCAL, window, summary
 from .forecast_data import features, examples, split_indices, CLASSES, STEP
-from .security import admin
+from .security import admin, traffic_viewer
 
 router=APIRouter(prefix='/api/demo',tags=['Synthetic traffic'])
 FOLDER=DATA/'demo-forecasts'
@@ -247,14 +247,14 @@ def demo_prepare(user=Depends(admin),db=Depends(get_db)):
     return {'message':'Đang tạo lại dữ liệu mô phỏng ở vùng riêng; dữ liệu thực được giữ nguyên.','is_demo':True}
 
 
-@router.get('/predict')
+@router.get('/predict',dependencies=[Depends(traffic_viewer)])
 def prediction(segment_id:int,issue_at:datetime|None=None,db=Depends(get_db)):
     if issue_at and (not issue_at.tzinfo or not now()-timedelta(days=30)<=issue_at<=now()):
         raise HTTPException(422,'Mốc chạy thử cần múi giờ và nằm trong 30 ngày đã qua.')
     return predict_demo(db.database,segment_id,issue_at.astimezone(LOCAL) if issue_at else None)
 
 
-@router.get('/history')
+@router.get('/history',dependencies=[Depends(traffic_viewer)])
 def history(segment_id:int,period:str='day',value:str|None=None,db=Depends(get_db)):
     active=require_active(db.database)
     if segment_id not in active['segment_ids']: raise HTTPException(404,'Tuyến chưa có dữ liệu mẫu.')
@@ -282,7 +282,7 @@ def history(segment_id:int,period:str='day',value:str|None=None,db=Depends(get_d
     return report
 
 
-@router.get('/export.csv')
+@router.get('/export.csv',dependencies=[Depends(traffic_viewer)])
 def export(segment_id:int,days:int=Query(default=365,ge=1,le=365),db=Depends(get_db)):
     active=require_active(db.database)
     if segment_id not in active['segment_ids']:raise HTTPException(404,'Tuyến chưa có dữ liệu mẫu.')

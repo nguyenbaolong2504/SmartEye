@@ -15,9 +15,20 @@ const IncidentsPage=lazy(()=>import('./IncidentsPage'));
 const ManagementPage=lazy(()=>import('./ManagementPage'));
 type Tab='overview'|'forecast'|'routes'|'monitor'|'history'|'alerts'|'incidents'|'management'|'admin'|'profile';
 const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Tình trạng & thống kê',icon:Activity},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'incidents',label:'Phản ánh giao thông',icon:MessageSquare},{id:'management',label:'Giám sát & xử lý',icon:Activity},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
+function readTab():Tab|null {
+  const view=location.hash.slice(1);
+  return view==='profile'||navigation.some(n=>n.id===view)?view as Tab:null;
+}
+function canOpen(tab:Tab, role:User['role']|undefined) {
+  if(tab==='profile')return Boolean(role);
+  if(role==='admin')return tab==='admin';
+  if(tab==='admin')return false;
+  if(tab==='management')return role==='analyst';
+  return true;
+}
 type Bootstrap={places:Place[];segments:Segment[];cameras:Camera[];config:Config;user:User|null;demo:DemoStatus};
 export default function App(){
-  const[tab,setTab]=useState<Tab>(()=>{const view=location.hash.slice(1);return view==='profile'||navigation.some(n=>n.id===view)?view as Tab:'overview';});
+  const[requestedTab,setRequestedTab]=useState(readTab);
   const[dataMode,setDataMode]=useState<DataMode>('demo');
   const[places,setPlaces]=useState<Place[]>([]);const[segments,setSegments]=useState<Segment[]>([]);const[cameras,setCameras]=useState<Camera[]>([]);
   const[loadedMode,setLoadedMode]=useState<DataMode|null>(null);const[config,setConfig]=useState<Config|null>(null);const[demo,setDemo]=useState<DemoStatus|null>(null);const[user,setUser]=useState<User|null>(null);
@@ -33,9 +44,18 @@ export default function App(){
   },[dataMode]);
   useEffect(()=>{refresh();return()=>{version.current++;};},[refresh]);
   useEffect(()=>{const interval=setInterval(()=>{if(!document.hidden)refresh();},demo?.enabled&&!demo.ready?5000:30000);return()=>clearInterval(interval);},[refresh,demo?.ready,demo?.enabled]);
-  useEffect(()=>{const changed=()=>{const view=location.hash.slice(1);if(navigation.some(n=>n.id===view)||view==='profile')setTab(view as Tab);else{setTab('overview');location.hash='overview';}setMobileOpen(false);};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
+  useEffect(()=>{const changed=()=>{setRequestedTab(readTab());setMobileOpen(false);};window.addEventListener('hashchange',changed);return()=>window.removeEventListener('hashchange',changed);},[]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(timer);},[toast]);
-  function navigate(id:Tab){setTab(id);location.hash=id;setMobileOpen(false);window.scrollTo({top:0});}
+  const role=user?.role;
+  const home=role==='admin'?'admin':'overview';
+  const blocked=Boolean(requestedTab&&!canOpen(requestedTab,role));
+  const tab=user&&blocked?home:requestedTab??home;
+  useEffect(()=>{
+    if(!config||!user||tab===requestedTab)return;
+    window.history.replaceState(null,'',`#${tab}`);
+    setRequestedTab(tab);
+  },[config,user,requestedTab,tab]);
+  function navigate(id:Tab){setRequestedTab(id);location.hash=id;setMobileOpen(false);window.scrollTo({top:0});}
   function onUser(next:User|null){version.current++;setUser(next);if(!next){navigate('overview');setToast('Đã đăng xuất.');}}
   useEffect(()=>{
     const expire=()=>{version.current++;setUser(null);setAuthOpen(true);setToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');};
@@ -44,26 +64,26 @@ export default function App(){
   },[]);
   const current=tab==='profile'?'Hồ sơ cá nhân':navigation.find(n=>n.id===tab)?.label;
   return <div className="app-shell"><aside className={`sidebar ${mobileOpen?'open':''}`}>
-    <a href="#overview" className="brand" onClick={e=>{e.preventDefault();navigate('overview');}}><span className="brand-icon"><span/><i/></span><span>SmartEye<small>HIỂU ĐƯỜNG · CHỌN LỐI</small></span></a>
+    <a href={`#${home}`} className="brand" onClick={e=>{e.preventDefault();navigate(home);}}><span className="brand-icon"><span/><i/></span><span>SmartEye<small>{role==='admin'?'VẬN HÀNH HỆ THỐNG':'HIỂU ĐƯỜNG · CHỌN LỐI'}</small></span></a>
     <button className="mobile-close icon-button" onClick={()=>setMobileOpen(false)} aria-label="Đóng menu"><X size={20}/></button>
-    <nav aria-label="Điều hướng chính">{navigation.filter(n=>(n.id!=='admin'||user?.role==='admin')&&(n.id!=='management'||user?.role==='analyst')).map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin'||id==='management')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG HÀ NỘI':id==='history'?'CÁ NHÂN':id==='management'?'QUẢN LÝ':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
-    <div className="sidebar-project"><div><Radio size={17}/><b>Hà Nội</b></div><p>Theo dõi từng tuyến đường<br/>giao thông đô thị</p><div className="project-stats"><span><b>{segments.filter(s=>s.active).length}</b> tuyến đường</span><span>Giờ Việt Nam</span></div></div>
-    <div className="sidebar-bottom"><p>Dữ liệu rõ ràng.<br/>Chủ động hành trình.</p><small>SmartEye · Phiên bản 1.1</small></div>
+    <nav aria-label="Điều hướng chính">{config&&navigation.filter(n=>canOpen(n.id,role)).map(({id,label,icon:Icon})=><div className="nav-entry" key={id}>{(id==='overview'||id==='history'||id==='admin'||id==='management')&&<div className="nav-group-label">{id==='overview'?'GIAO THÔNG HÀ NỘI':id==='history'?'CÁ NHÂN':id==='management'?'QUẢN LÝ':'QUẢN TRỊ'}</div>}<button className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>navigate(id)}><Icon size={19}/>{label}{tab===id&&<ChevronRight size={15}/>}</button></div>)}</nav>
+    {role!=='admin'&&config&&<div className="sidebar-project"><div><Radio size={17}/><b>Hà Nội</b></div><p>Theo dõi từng tuyến đường<br/>giao thông đô thị</p><div className="project-stats"><span><b>{segments.filter(s=>s.active).length}</b> tuyến đường</span><span>Giờ Việt Nam</span></div></div>}
+    <div className="sidebar-bottom">{role!=='admin'&&config&&<p>Dữ liệu rõ ràng.<br/>Chủ động hành trình.</p>}<small>SmartEye · Phiên bản 1.1</small></div>
   </aside>{mobileOpen&&<div className="sidebar-scrim" onClick={()=>setMobileOpen(false)}/>}
     <div className="main-shell"><header className="topbar"><button className="mobile-toggle icon-button" onClick={()=>setMobileOpen(true)} aria-label="Mở menu"><Menu size={21}/></button><div className="breadcrumb"><span>Không gian làm việc</span><ChevronRight size={14}/><b>{current}</b></div><div className="topbar-actions"><span className="city-label"><MapPin size={14}/>Hà Nội, Việt Nam</span>{user?<button className="user-button" aria-label={`Hồ sơ ${user.name}`} onClick={()=>navigate('profile')}><span>{user.name.charAt(0).toUpperCase()}</span><div>{user.name}<small>{user.role==='admin'?'Quản trị viên':user.role==='analyst'?'Quản lý':'Người dùng'}</small></div><ChevronRight size={15}/></button>:<button className="button small" onClick={()=>setAuthOpen(true)}><LogIn size={15}/>Đăng nhập</button>}</div></header>
     <main>{error&&<div className="connection-error"><Notice kind="error">{error}</Notice><button className="button" onClick={refresh}>Thử kết nối lại</button></div>}
       {(!config||loadedMode!==dataMode)&&!error?<div className="loading-page"><Spinner/><p>Đang kết nối SmartEye…</p></div>:config&&<Suspense fallback={<div className="loading-page"><Spinner/><p>Đang mở trang…</p></div>}>
         {tab==='overview'&&<OverviewPage segments={segments} places={places} onNavigate={navigate} dataMode={dataMode}/>}
-        {tab==='forecast'&&<ForecastPage segments={segments} user={user} dataMode={dataMode} demo={demo} onLogin={()=>setAuthOpen(true)} initialRoad={initialRoad} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}} onUpdated={refresh}/>}
+        {tab==='forecast'&&<ForecastPage segments={segments} user={user} dataMode={dataMode} demo={demo} initialRoad={initialRoad} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}} onUpdated={refresh}/>}
         {tab==='routes'&&<RoutesPage key={`${routeKey}-${dataMode}`} places={places} segments={segments} config={config} user={user} dataMode={dataMode} initialDeparture={initialDeparture} onLogin={()=>setAuthOpen(true)} preset={preset} onSaved={()=>setToast('Đã lưu hành trình yêu thích.')}/>}
         {tab==='monitor'&&<TrafficMonitor tileUrl={config.osm_tile_url} key={initialRoad||'all'} initialRoad={initialRoad} onForecast={id=>{setInitialRoad(id);navigate('forecast');}} segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
-        {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
+        {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
         {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
         {tab==='incidents'&&<IncidentsPage user={user} segments={segments} config={config} onLogin={()=>setAuthOpen(true)}/>}
         {tab==='management'&&user?.role==='analyst'&&<ManagementPage user={user} segments={segments}/>}
-        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} cameras={cameras} segments={segments} onUpdated={refresh}/>}
+        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} cameras={cameras} segments={segments} demo={demo} onUpdated={refresh}/>}
         {tab==='profile'&&user&&<ProfilePage user={user} onUser={onUser}/>}
-        {((tab==='management'&&user?.role!=='analyst')||(tab==='admin'&&user?.role!=='admin')||(tab==='profile'&&!user))&&<section className="card"><Notice>{user?'Bạn không có quyền mở chức năng này.':'Vui lòng đăng nhập để tiếp tục.'}</Notice><button className="button" onClick={()=>user?navigate('overview'):setAuthOpen(true)}>{user?'Về tổng quan':'Đăng nhập'}</button></section>}
+        {!user&&blocked&&<section className="card"><Notice>Vui lòng đăng nhập để tiếp tục.</Notice><button className="button" onClick={()=>setAuthOpen(true)}>Đăng nhập</button></section>}
       </Suspense>}
       <footer className="footer"><span>© SmartEye · Hệ thống hỗ trợ quyết định giao thông</span><button className="text-button" onClick={()=>setLegal(true)}>Điều khoản & quyền riêng tư</button></footer>
     </main></div>

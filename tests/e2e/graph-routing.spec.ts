@@ -20,6 +20,7 @@ test('configured network still defaults to A* and obeys one-way roads',async({re
   await request.post('/api/auth/login',{data:{email:'e2e-admin@example.invalid',password:'test-only-password-123'}});
   const suffix=Date.now();const start=`west_${suffix}`,end=`east_${suffix}`;
   const created=await request.post('/api/segments',{data:{name:`Đường kiểm thử ${suffix}`,start_node:start,end_node:end,distance_km:2,geometry:[[21.04,105.79],[21.04,105.81]],one_way:true}});expect(created.status()).toBe(201);
+  expect((await request.post('/api/auth/logout')).status()).toBe(200);
   const a={node:start,name:'Đầu đường',lat:21.04,lng:105.79},b={node:end,name:'Cuối đường',lat:21.04,lng:105.81};
   const response=await request.post('/api/routes/search',{data:{origin:a,destination:b,provider:'demo'}});
   expect(response.ok()).toBe(true);expect((await response.json()).optimization.algorithm).toBe('astar');

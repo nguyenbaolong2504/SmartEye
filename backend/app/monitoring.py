@@ -11,7 +11,7 @@ from pymongo.errors import BulkWriteError
 from .config import DATA, UPLOADS, TTL_MINUTES
 from .db import get_db, now, stamp
 from .models import Camera, Segment, VideoJob, Observation, TrafficSample
-from .security import operator, require_user, audit
+from .security import operator, require_user, traffic_viewer, audit
 from .schemas import PublishOptions
 from .history import history_report, parse_timestamp
 from .traffic import emit_alerts, observation_dict
@@ -77,7 +77,7 @@ def share_media(db, camera, job, share):
 
 
 def publish_job(db, job, user, options, historical=False):
-    if job.user_id!=user.id and user.role!='admin': raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
+    if job.user_id!=user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
     if job.status!='completed' or not job.result: raise HTTPException(409,'Video chưa phân tích xong.')
     if not job.observed_at: raise HTTPException(422,'Cần thời điểm ghi hình để đưa video vào thống kê giao thông.')
     start = parse_timestamp(job.observed_at)
@@ -119,7 +119,7 @@ def camera_for_media(db, camera_id):
     return camera
 
 
-@router.get('/api/monitor/cameras/{camera_id}/frame')
+@router.get('/api/monitor/cameras/{camera_id}/frame',dependencies=[Depends(traffic_viewer)])
 def shared_frame(camera_id:int,db=Depends(get_db)):
     camera = camera_for_media(db,camera_id)
     path = media_folder(camera_id,camera.preview_job_id)/'poster.jpg'
@@ -127,7 +127,7 @@ def shared_frame(camera_id:int,db=Depends(get_db)):
     return FileResponse(path,media_type='image/jpeg')
 
 
-@router.get('/api/monitor/cameras/{camera_id}/video')
+@router.get('/api/monitor/cameras/{camera_id}/video',dependencies=[Depends(traffic_viewer)])
 def shared_video(camera_id:int,db=Depends(get_db)):
     camera = camera_for_media(db,camera_id)
     path = media_folder(camera_id,camera.preview_job_id)/'video.bin'
@@ -139,7 +139,7 @@ def shared_video(camera_id:int,db=Depends(get_db)):
 def private_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
     job = db.get(VideoJob,ident)
     if not job: raise HTTPException(404,'Không tìm thấy video.')
-    if job.user_id!=user.id and user.role!='admin': raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
+    if job.user_id!=user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
     path = UPLOADS/f'{job.id}.retained'
     if not job.retain_video or not path.is_file(): raise HTTPException(404,'Video gốc không được giữ lại.')
     return FileResponse(path,media_type=MIME.get(Path(job.filename).suffix.lower(),'application/octet-stream'))
@@ -156,7 +156,7 @@ def archive_video(ident:str,options:PublishOptions,user=Depends(operator),db=Dep
 def change_preview(ident:str,options:PublishOptions,user=Depends(operator),db=Depends(get_db)):
     job = db.get(VideoJob,ident)
     if not job: raise HTTPException(404,'Không tìm thấy video.')
-    if job.user_id!=user.id and user.role!='admin': raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
+    if job.user_id!=user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
     if not db.find_one(Observation,{'job_id':ident}): raise HTTPException(409,'Hãy công bố hoặc lưu lịch sử trước khi chia sẻ ảnh/video.')
     camera = db.get(Camera,job.camera_id)
     if not camera or camera.segment_id!=job.camera_config['segment_id']: raise HTTPException(409,'Camera đã đổi vị trí.')
@@ -173,7 +173,7 @@ def latest_by(collection,field):
         {'$group':{'_id':'$'+field,'item':{'$first':'$$ROOT'}}}])}
 
 
-@router.get('/api/monitor/cameras')
+@router.get('/api/monitor/cameras',dependencies=[Depends(traffic_viewer)])
 def camera_board(db=Depends(get_db)):
     segments = {s.id:s for s in db.find(Segment)}
     latest = latest_by(db.database.traffic_samples,'camera_id')
@@ -204,7 +204,7 @@ def camera_board(db=Depends(get_db)):
     return {'generated_at':stamp(),'ttl_minutes':TTL_MINUTES,'cameras':result}
 
 
-@router.get('/api/traffic/history')
+@router.get('/api/traffic/history',dependencies=[Depends(traffic_viewer)])
 def road_history(segment_id:int,period:str,value:str,db=Depends(get_db)):
     segment = db.get(Segment,segment_id)
     if not segment: raise HTTPException(404,'Không tìm thấy đoạn đường.')

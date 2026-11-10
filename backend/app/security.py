@@ -31,6 +31,14 @@ def require_user(user=Depends(optional_user)):
         raise HTTPException(401, 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.')
     return user
 
+def traffic_viewer(user=Depends(optional_user)):
+    if user and user.role not in ('user','analyst'):
+        raise HTTPException(403, 'Chức năng này dành cho Người dùng và Quản lý.')
+    return user
+
+def traffic_member(user=Depends(require_user)):
+    return traffic_viewer(user)
+
 def operator(user=Depends(require_user)):
     if user.role not in ('admin', 'analyst'):
         raise HTTPException(403, 'Chức năng này dành cho nhà phân tích và quản trị viên.')

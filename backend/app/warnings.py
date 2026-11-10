@@ -10,7 +10,7 @@ from .business_schemas import WarningInput, WarningEdit
 from .models import User
 from .business_common import (manager, road, allowed_query, get_record, changed, event, log_event, serialize,
                               period, position_on_road, NoteAction, Verification, Revision)
-from .security import require_user
+from .security import traffic_viewer
 
 router=APIRouter()
 STATES=('pending_verification','pending_publication','published','ended','cancelled')
@@ -38,7 +38,7 @@ def public_data(item):
             'upcoming':value['start_at']>stamp()}
 
 
-@router.get('/api/warnings')
+@router.get('/api/warnings',dependencies=[Depends(traffic_viewer)])
 def public_warnings(segment_id:int|None=None,direction:str|None=None,db=Depends(get_db)):
     if direction and direction not in ('forward','reverse'):raise HTTPException(422,'Chiều đường không hợp lệ.')
     query={'public_snapshot':{'$ne':None},'status':{'$nin':['ended','cancelled']}}
@@ -47,7 +47,7 @@ def public_warnings(segment_id:int|None=None,direction:str|None=None,db=Depends(
     return [value for item in db.find(Warning,query,sort=[('id',-1)],limit=200) if (value:=public_data(item))]
 
 
-@router.get('/api/warnings/{ident}')
+@router.get('/api/warnings/{ident}',dependencies=[Depends(traffic_viewer)])
 def public_detail(ident:int,db=Depends(get_db)):
     item=get_record(db,Warning,ident);value=public_data(item)
     if value is None:raise HTTPException(404,'Cảnh báo không tồn tại, chưa được công bố hoặc đã hết hiệu lực.')
@@ -136,7 +136,7 @@ def deliver_publications(database,limit=20):
                     {'$set':{'notification_queue.$.state':'withdrawn'}})
                 continue
             try:
-                for user in database.users.find({'active':True,'notifications_enabled':True}):
+                for user in database.users.find({'active':True,'notifications_enabled':True,'role':{'$in':['user','analyst']}}):
                     key=f'warning:{warning["_id"]}:{job["version"]}:{user["_id"]}'
                     counter=database.counters.find_one_and_update({'_id':'notifications'},{'$inc':{'seq':1}},upsert=True,return_document=ReturnDocument.AFTER)
                     database.notifications.update_one({'delivery_key':key},{'$setOnInsert':{

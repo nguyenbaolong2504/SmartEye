@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from .db import now
-from .models import Observation, AlertRule, Notification, Segment, Camera
+from .models import Observation, AlertRule, Notification, Segment, Camera, User
 from .config import TTL_MINUTES
 
 LABELS = {'LOW':'Thấp','NORMAL':'Bình thường','HIGH':'Cao'}
@@ -47,6 +47,9 @@ def emit_alerts(db, observation):
     observation = latest
     segment = db.get(Segment, observation.segment_id)
     for rule in db.find(AlertRule,{'active':True,'segment_id':observation.segment_id,'density':observation.density}):
+        recipient=db.get(User,rule.user_id)
+        if not recipient or not recipient.active or recipient.role not in ('user','analyst'):
+            continue
         cutoff=(now()-timedelta(minutes=10)).isoformat()
         claimed=db.update(AlertRule,rule.id,{'last_sent':now().isoformat()},condition={'$or':[{'last_sent':None},{'last_sent':{'$lte':cutoff}}]})
         if not claimed: continue

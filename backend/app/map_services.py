@@ -11,8 +11,9 @@ from collections import OrderedDict
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from .config import DATA
+from .security import traffic_viewer
 
 router = APIRouter(prefix='/api/map', tags=['Street map'])
 _cache = OrderedDict()
@@ -77,7 +78,7 @@ def _address(feature):
             'source':'photon'}
 
 
-@router.get('/places')
+@router.get('/places',dependencies=[Depends(traffic_viewer)])
 async def find_places(q: str=Query(min_length=3,max_length=240)):
     base=os.getenv('PHOTON_URL','https://photon.komoot.io').strip().rstrip('/')
     if not settings()['osm_available'] or not base:

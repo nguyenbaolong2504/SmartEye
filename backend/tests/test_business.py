@@ -52,26 +52,27 @@ def test_fresh_density_changes_recommendation(admin_client,route_request):
     for segment_id in range(1,7):
         response=admin_client.post('/api/observations',json={'segment_id':segment_id,'score':.95 if segment_id<=3 else .05,'count':25,'note':'Quan sát kiểm thử đường','observed_at':now().isoformat()})
         assert response.status_code==201
+    assert admin_client.post('/api/auth/logout').status_code==200
     result=admin_client.post('/api/routes/search',json=route_request).json()
     assert result['routes'][0]['high_share']==0
     assert result['routes'][0]['unknown_share']==0
 
-def test_stale_and_future_data(admin_client):
-    response=admin_client.post('/api/observations',json={'segment_id':1,'score':.9,'note':'Dữ liệu cũ kiểm thử','observed_at':(now()-timedelta(hours=1)).isoformat()})
+def test_stale_and_future_data(analyst_client):
+    response=analyst_client.post('/api/observations',json={'segment_id':1,'score':.9,'note':'Dữ liệu cũ kiểm thử','observed_at':(now()-timedelta(hours=1)).isoformat()})
     assert response.status_code==201
-    assert admin_client.get('/api/segments').json()[0]['observation'] is None
-    response=admin_client.post('/api/observations',json={'segment_id':1,'score':.9,'note':'Thời gian tương lai','observed_at':(now()+timedelta(hours=1)).isoformat()})
+    assert analyst_client.get('/api/segments').json()[0]['observation'] is None
+    response=analyst_client.post('/api/observations',json={'segment_id':1,'score':.9,'note':'Thời gian tương lai','observed_at':(now()+timedelta(hours=1)).isoformat()})
     assert response.status_code==422
 
-def test_alert_cooldown_and_read(admin_client):
-    assert admin_client.post('/api/alerts',json={'segment_id':1,'density':'HIGH'}).status_code==201
-    assert admin_client.post('/api/alerts',json={'segment_id':1,'density':'HIGH'}).status_code==409
+def test_alert_cooldown_and_read(analyst_client):
+    assert analyst_client.post('/api/alerts',json={'segment_id':1,'density':'HIGH'}).status_code==201
+    assert analyst_client.post('/api/alerts',json={'segment_id':1,'density':'HIGH'}).status_code==409
     for _ in range(2):
-        assert admin_client.post('/api/observations',json={'segment_id':1,'score':.8,'note':'Kiểm thử cảnh báo','observed_at':now().isoformat()}).status_code==201
-    notices=admin_client.get('/api/alerts').json()['notifications']
+        assert analyst_client.post('/api/observations',json={'segment_id':1,'score':.8,'note':'Kiểm thử cảnh báo','observed_at':now().isoformat()}).status_code==201
+    notices=analyst_client.get('/api/alerts').json()['notifications']
     assert len(notices)==1
-    assert admin_client.post(f'/api/notifications/{notices[0]["id"]}/read').status_code==200
-    assert admin_client.get('/api/alerts').json()['notifications'][0]['read']
+    assert analyst_client.post(f'/api/notifications/{notices[0]["id"]}/read').status_code==200
+    assert analyst_client.get('/api/alerts').json()['notifications'][0]['read']
 
 def test_historical_video_cannot_publish(admin_client):
     with SessionLocal() as db:

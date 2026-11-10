@@ -15,7 +15,7 @@ from .business_models import Incident
 from .business_schemas import IncidentInput, IncidentEdit
 from .config import DATA
 from .db import get_db, now, stamp
-from .security import require_user
+from .security import traffic_member
 
 router=APIRouter()
 IMAGES=DATA/'incident-images'
@@ -63,12 +63,12 @@ def create(db,body,user,attachment=None):
 
 
 @router.post('/api/incidents',status_code=201)
-def submit(body:IncidentInput,user=Depends(require_user),db=Depends(get_db)):
+def submit(body:IncidentInput,user=Depends(traffic_member),db=Depends(get_db)):
     return create(db,body,user)
 
 
 @router.post('/api/incidents/with-image',status_code=201)
-async def submit_image(payload:str=Form(...),image:UploadFile=File(...),user=Depends(require_user),db=Depends(get_db)):
+async def submit_image(payload:str=Form(...),image:UploadFile=File(...),user=Depends(traffic_member),db=Depends(get_db)):
     try:body=IncidentInput.model_validate_json(payload)
     except ValidationError as exc:raise RequestValidationError(exc.errors()) from None
     raw=await image.read(5*1024*1024+1)
@@ -89,7 +89,7 @@ async def submit_image(payload:str=Form(...),image:UploadFile=File(...),user=Dep
 
 
 @router.get('/api/incidents')
-def own_reports(user=Depends(require_user),db=Depends(get_db),status:str|None=None):
+def own_reports(user=Depends(traffic_member),db=Depends(get_db),status:str|None=None):
     query={'user_id':user.id}
     if status:
         if status not in ('pending','verifying','processing','resolved','rejected'):raise HTTPException(422,'Trạng thái phản ánh không hợp lệ.')
@@ -98,12 +98,12 @@ def own_reports(user=Depends(require_user),db=Depends(get_db),status:str|None=No
 
 
 @router.get('/api/incidents/{ident}')
-def detail(ident:int,user=Depends(require_user),db=Depends(get_db)):
+def detail(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
     return incident_data(accessible(db,ident,user),user)
 
 
 @router.get('/api/incidents/{ident}/images/{image_id}')
-def image(ident:int,image_id:uuid.UUID,user=Depends(require_user),db=Depends(get_db)):
+def image(ident:int,image_id:uuid.UUID,user=Depends(traffic_member),db=Depends(get_db)):
     item=accessible(db,ident,user)
     attachment=next((a for a in item.attachments if a['id']==str(image_id)),None)
     if not attachment or not (IMAGES/attachment['file']).is_file():raise HTTPException(404,'Ảnh đính kèm không còn tồn tại.')

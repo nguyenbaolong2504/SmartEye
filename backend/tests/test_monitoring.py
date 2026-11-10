@@ -95,8 +95,8 @@ def test_archive_old_video_saves_series_without_current_status(admin_client,medi
     response=admin_client.post(f'/api/videos/{job.id}/archive',json={'share_preview':False})
     assert response.status_code==200
     assert get_database().traffic_samples.count_documents({'job_id':job.id})==4
-    assert admin_client.get('/api/segments').json()[0]['observation'] is None
-    board=admin_client.get('/api/monitor/cameras').json()['cameras'][0]
+    assert admin_client.get('/api/segments',headers={'Cookie':''}).json()[0]['observation'] is None
+    board=admin_client.get('/api/monitor/cameras',headers={'Cookie':''}).json()['cameras'][0]
     assert board['state']=='stale' and board['density'] is None and board['last_density']=='HIGH'
     assert board['image_url'] is None
     assert admin_client.post(f'/api/videos/{job.id}/archive',json={}).status_code==409
@@ -106,15 +106,15 @@ def test_archive_old_video_saves_series_without_current_status(admin_client,medi
 def test_sharing_opt_in_range_requests_hide_and_delete(admin_client,media_paths):
     job=completed_job(now()-timedelta(minutes=10),media=True,frames=True)
     assert admin_client.post(f'/api/videos/{job.id}/publish',json={}).status_code==200
-    assert admin_client.get('/api/monitor/cameras/1/frame').status_code==404
+    assert admin_client.get('/api/monitor/cameras/1/frame',headers={'Cookie':''}).status_code==404
     assert admin_client.post(f'/api/videos/{job.id}/share-preview',json={'share_preview':True}).status_code==200
     assert admin_client.get(f'/api/videos/{job.id}').json()['preview_shared'] is True
-    assert admin_client.get('/api/monitor/cameras/1/frame').content==b'test-jpeg-bytes'
-    response=admin_client.get('/api/monitor/cameras/1/video',headers={'Range':'bytes=0-4'})
+    assert admin_client.get('/api/monitor/cameras/1/frame',headers={'Cookie':''}).content==b'test-jpeg-bytes'
+    response=admin_client.get('/api/monitor/cameras/1/video',headers={'Range':'bytes=0-4','Cookie':''})
     assert response.status_code==206 and response.content==b'01234'
     assert admin_client.post(f'/api/videos/{job.id}/share-preview',json={'share_preview':False}).status_code==200
     assert admin_client.get(f'/api/videos/{job.id}').json()['preview_shared'] is False
-    assert admin_client.get('/api/monitor/cameras/1/video').status_code==404
+    assert admin_client.get('/api/monitor/cameras/1/video',headers={'Cookie':''}).status_code==404
     assert admin_client.delete(f'/api/videos/{job.id}').status_code==200
     assert not (monitoring.UPLOADS/f'{job.id}.retained').exists()
     assert get_database().traffic_samples.count_documents({'job_id':job.id})==4
@@ -137,8 +137,8 @@ def test_moving_camera_revokes_old_preview(admin_client,media_paths):
     camera=admin_client.get('/api/cameras').json()[0]
     camera['segment_id']=2
     assert admin_client.put('/api/cameras/1',json=camera).status_code==200
-    assert admin_client.get('/api/monitor/cameras/1/frame').status_code==404
-    row=admin_client.get('/api/monitor/cameras').json()['cameras'][0]
+    assert admin_client.get('/api/monitor/cameras/1/frame',headers={'Cookie':''}).status_code==404
+    row=admin_client.get('/api/monitor/cameras',headers={'Cookie':''}).json()['cameras'][0]
     assert row['density'] is None and row['image_url'] is None
 
 
@@ -197,13 +197,16 @@ def test_partial_publication_can_be_retried_without_duplicate_samples(admin_clie
 
 def test_latest_published_frame_updates_current_road_density(admin_client,media_paths):
     job=completed_job(now()-timedelta(minutes=10))
+    auth={'name':'Test Viewer','username':'test-viewer','email':'test-viewer@example.invalid','password':'viewer-test-password','password_confirmation':'viewer-test-password'}
+    viewer=admin_client.post('/api/auth/register',json=auth).json()
     with SessionLocal() as db:
         item=db.get(VideoJob,job.id)
-        db.add(AlertRule(user_id=1,segment_id=1,density='HIGH'))
+        db.add(AlertRule(user_id=viewer['id'],segment_id=1,density='HIGH'))
         item.result['density']='LOW';item.result['score']=.1
         item.result['samples'][0]['density']='LOW';item.result['samples'][0]['score']=.1
         db.commit()
     assert admin_client.post(f'/api/videos/{job.id}/publish',json={}).status_code==200
+    assert admin_client.post('/api/auth/login',json={'email':auth['email'],'password':auth['password']}).status_code==200
     assert admin_client.get('/api/segments').json()[0]['observation']['density']=='HIGH'
     notices=admin_client.get('/api/alerts').json()['notifications']
     assert len(notices)==1 and 'mật độ cao' in notices[0]['message']
@@ -212,7 +215,7 @@ def test_latest_published_frame_updates_current_road_density(admin_client,media_
 def test_future_route_does_not_reuse_present_density(admin_client,route_request):
     assert admin_client.post('/api/observations',json={'segment_id':1,'score':.1,'count':1,'note':'Current observation only','observed_at':now().isoformat()}).status_code==201
     route_request['departure_at']=(now()+timedelta(days=1)).isoformat()
-    data=admin_client.post('/api/routes/search',json=route_request).json()
+    data=admin_client.post('/api/routes/search',json=route_request,headers={'Cookie':''}).json()
     assert all(s['density'] is None for r in data['routes'] for s in r['segments'])
 
 
@@ -245,19 +248,19 @@ def test_worker_decodes_video_and_applies_explicit_retention(admin_client,media_
     assert not (monitoring.UPLOADS/f'{job_id}.video').exists()
     assert (monitoring.UPLOADS/f'{job_id}.retained').is_file()==retain
     assert admin_client.post(f'/api/videos/{job_id}/archive',json={'share_preview':True}).status_code==200
-    board=admin_client.get('/api/monitor/cameras').json()['cameras'][0]
+    board=admin_client.get('/api/monitor/cameras',headers={'Cookie':''}).json()['cameras'][0]
     assert bool(board['video_url'])==retain and board['image_url']
     assert board['vehicle_counts']['car']==board['vehicle_counts']['motorcycle']==0
 
 
-def test_route_api_labels_weekday_hour_history(admin_client,route_request):
+def test_route_api_labels_weekday_hour_history(client,route_request):
     departure=(now().astimezone(history.LOCAL)+timedelta(days=1)).replace(hour=7,minute=0,second=0,microsecond=0)
     for weeks in (1,2,3):
         for minute in (0,10,20,30): sample(1,departure-timedelta(weeks=weeks)+timedelta(minutes=minute))
     route_request['departure_at']=departure.isoformat()
     # Use an endpoint pair that keeps the monitored direct road among candidates.
     route_request['destination']={'node':'badinh','name':'Quảng trường Ba Đình','lat':21.0368,'lng':105.8346}
-    response=admin_client.post('/api/routes/search',json=route_request)
+    response=client.post('/api/routes/search',json=route_request)
     assert response.status_code==200
     matched=[s for r in response.json()['routes'] for s in r['segments'] if s['id']==1]
     assert matched and all(s['source']=='historical' and s['density']=='HIGH' and s['evidence_days']==3 for s in matched)

@@ -97,7 +97,7 @@ export function ProfilePage({user, onUser}: {user: User; onUser: (user: User | n
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
     await action.run(async () => {
-      const next = await api<User>('/auth/profile', json({name, email, phone, notifications_enabled: notifications, revision: user.profile_version}, 'PATCH'));
+      const next = await api<User>('/auth/profile', json({name, email, phone, ...(user.role!=='admin'&&{notifications_enabled:notifications}), revision:user.profile_version}, 'PATCH'));
       onUser(next);
     }, 'Đã cập nhật hồ sơ.');
   }
@@ -124,7 +124,7 @@ export function ProfilePage({user, onUser}: {user: User; onUser: (user: User | n
           <label className="field">Họ và tên<input value={name} onChange={e => setName(e.target.value)} minLength={2} maxLength={100} required/></label>
           <label className="field">Email<input type="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={254} required/></label>
           <label className="field">Số điện thoại<input type="tel" value={phone} onChange={e => setPhone(e.target.value)} maxLength={24}/></label>
-          <label className="check"><input type="checkbox" checked={notifications} onChange={e => setNotifications(e.target.checked)}/>Nhận thông báo khi có cảnh báo được phát hành</label>
+          {user.role!=='admin'&&<label className="check"><input type="checkbox" checked={notifications} onChange={e => setNotifications(e.target.checked)}/>Nhận thông báo khi có cảnh báo được phát hành</label>}
           <div className="workflow-buttons"><button type="button" className="button" onClick={resetProfile}>Hủy</button><button className="button primary" disabled={action.busy}>Lưu hồ sơ</button></div>
         </form>
       </section>

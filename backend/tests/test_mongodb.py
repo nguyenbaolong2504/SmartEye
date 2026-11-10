@@ -89,13 +89,23 @@ def test_demo_accounts_idempotent_and_preserve_existing_password(client):
         assert verify_password('private-changed-password',existing.password)
 
 
-def test_all_mongodb_demo_accounts_login_correct_roles(client):
+def test_demo_accounts_are_limited_to_their_workspaces(client,route_request):
     with SessionLocal() as db: seed_demo_accounts(db);db.commit()
     for account in DEMO_ACCOUNTS:
         response=client.post('/api/auth/login',json={'email':account['email'],'password':account['password']})
         assert response.status_code==200 and response.json()['role']==account['role']
-        assert client.get('/api/admin/users').status_code==(200 if account['role']=='admin' else 403)
-        assert client.get('/api/reports').status_code==(403 if account['role']=='user' else 200)
+        role=account['role']
+        technical=200 if role=='admin' else 403
+        traffic=403 if role=='admin' else 200
+        for path in ('/api/admin/accounts','/api/admin/sources','/api/admin/events','/api/reports','/api/forecast/runs'):
+            assert client.get(path).status_code==technical,path
+        for path in ('/api/traffic/road?segment_id=1','/api/forecast/predict?segment_id=1','/api/warnings','/api/incidents','/api/alerts','/api/favorites','/api/monitor/cameras'):
+            assert client.get(path).status_code==traffic,path
+        assert client.post('/api/routes/search',json=route_request).status_code==traffic
+        for path in ('/api/management/monitor?segment_id=1','/api/management/incidents','/api/management/warnings','/api/management/rules'):
+            assert client.get(path).status_code==(200 if role=='analyst' else 403),path
+        assert client.patch('/api/auth/profile',json={'name':'Hồ sơ kiểm thử'}).status_code==200
+        assert client.patch('/api/auth/profile',json={'name':'Hồ sơ kiểm thử','notifications_enabled':True}).status_code==traffic
         assert 'password' not in response.json()
         client.post('/api/auth/logout')
 

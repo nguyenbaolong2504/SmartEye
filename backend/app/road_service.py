@@ -6,6 +6,7 @@ from .db import get_db, now, stamp
 from .models import Segment, Camera
 from .business_models import DataSource, RoadReading, Warning
 from .business_common import road, manager, period, utc
+from .security import traffic_viewer
 
 router=APIRouter()
 STATE_TEXT={'FREE':'Thông thoáng','SLOW':'Bình thường','JAM':'Ùn tắc',None:'Chưa xác định'}
@@ -63,12 +64,12 @@ def current(db,segment_id,direction='forward',data_mode='observed'):
     return result
 
 
-@router.get('/api/traffic/road')
+@router.get('/api/traffic/road',dependencies=[Depends(traffic_viewer)])
 def road_current(segment_id:int,direction:Literal['forward','reverse']='forward',data_mode:Literal['demo','observed']='observed',db=Depends(get_db)):
     return current(db,segment_id,direction,data_mode)
 
 
-@router.get('/api/traffic/readings')
+@router.get('/api/traffic/readings',dependencies=[Depends(traffic_viewer)])
 def recorded_history(segment_id:int,start:str,end:str,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
     road(db,segment_id,direction)
     dates=period(start,end,max_days=31)
@@ -78,7 +79,7 @@ def recorded_history(segment_id:int,start:str,end:str,direction:Literal['forward
     return [{'at':row.observed_at,'metrics':row.metrics} for row in db.find(RoadReading,query,sort=[('observed_at',-1)],limit=1000)]
 
 
-@router.get('/api/traffic/forecast-options')
+@router.get('/api/traffic/forecast-options',dependencies=[Depends(traffic_viewer)])
 def forecast_options(segment_id:int,direction:Literal['forward','reverse']='forward',data_mode:Literal['demo','observed']='demo',db=Depends(get_db)):
     road(db,segment_id,direction)
     if direction!='forward':return {'ready':False,'horizons':[],'message':'Chưa có mô hình cho chiều đường đã chọn.'}
@@ -95,7 +96,7 @@ def forecast_options(segment_id:int,direction:Literal['forward','reverse']='forw
             'message':'Chưa có mốc dự báo được hỗ trợ.' if not horizons else '', 'is_demo':False}
 
 
-@router.get('/api/traffic/forecast')
+@router.get('/api/traffic/forecast',dependencies=[Depends(traffic_viewer)])
 def real_forecast(segment_id:int,horizon:int,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
     options=forecast_options(segment_id,direction,'observed',db)
     if horizon not in options['horizons']:raise HTTPException(422,'Mốc hoặc chiều dự báo chưa được mô hình hỗ trợ.')

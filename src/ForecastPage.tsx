@@ -1,31 +1,29 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, CalendarDays, Clock3, Settings2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, CalendarDays, Clock3 } from 'lucide-react';
 import { api } from './api';
 import { Notice,Spinner } from './components';
 import DemoSetup from './DemoSetup';
 import {ForecastInfo, NearForecast, type Comparison} from './ForecastTools';
 import { type Segment,type User,type DataMode,type DemoStatus } from './types';
-const Management=lazy(()=>import('./ForecastManagement'));
 const localDay=(offset=0)=>new Date(Date.now()+7*3600000+offset*86400000).toISOString().slice(0,10);
 const hourText=(hour:number)=>`${String(hour).padStart(2,'0')}:00`;
 type Hour={hour:number;label:'FREE'|'SLOW'|'JAM';text:string;similar_days:number;jam_days:number;jam_frequency:number|null};
 type Outlook={state:string;date:string;hour:number;segment_id:number;segment_name:string;selected:Hour;hourly:Hour[];avoid_windows:{start_hour:number;end_hour:number}[];alternatives:Hour[];explanation:string;advice:string;history_days:number;history_start:string;history_end:string;is_demo:boolean;model?:string;model_version?:string;issue_at?:string;predicted_at?:string;comparison?:Comparison|null};
-export default function ForecastPage({segments,user,dataMode,demo,onLogin,onHistory,onUpdated,onFindRoute,initialRoad}:{segments:Segment[];user:User|null;dataMode:DataMode;demo:DemoStatus|null;onLogin:()=>void;onHistory:(id:number)=>void;onUpdated:()=>void;onFindRoute:(at:string)=>void;initialRoad?:number}){
+export default function ForecastPage({segments,user,dataMode,demo,onHistory,onUpdated,onFindRoute,initialRoad}:{segments:Segment[];user:User|null;dataMode:DataMode;demo:DemoStatus|null;onHistory:(id:number)=>void;onUpdated:()=>void;onFindRoute:(at:string)=>void;initialRoad?:number}){
   const[road,setRoad]=useState(String(initialRoad||segments.find(s=>s.name==='Hoàng Quốc Việt')?.id||segments.find(s=>s.active)?.id||''));
   const[day,setDay]=useState(localDay(1));const[hour,setHour]=useState(17);const[query,setQuery]=useState({road,day,hour,version:0});
-  const[result,setResult]=useState<Outlook|null>(null);const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[manage,setManage]=useState(false);
+  const[result,setResult]=useState<Outlook|null>(null);const[error,setError]=useState('');const[loading,setLoading]=useState(false);
   const [near,setNear]=useState(dataMode==='observed');
-  const manager=user?.role==='admin'||user?.role==='analyst';const ready=dataMode!=='demo'||demo?.planning_ready;
+  const ready=dataMode!=='demo'||demo?.planning_ready;
   useEffect(()=>{let current=true;if(!query.road||!ready||near){setResult(null);return;}
     setLoading(true);setError('');setResult(null);
     api<Outlook>(`/traffic/outlook?segment_id=${query.road}&date=${query.day}&hour=${query.hour}`).then(value=>{if(current)setResult(value);}).catch(e=>{if(current)setError(e.message);}).finally(()=>{if(current)setLoading(false);});
     return()=>{current=false;};
   },[query,ready,demo?.generated_at,near]);
   function view(nextHour=hour){setHour(nextHour);setQuery({road,day,hour:nextHour,version:query.version+1});}
-  if(manage&&manager)return <><button className="text-button back-link" onClick={()=>setManage(false)}><ArrowLeft size={16}/>Quay lại dự báo</button><Notice>Phần quản lý dành cho lịch sử theo dõi thực tế. Dữ liệu minh họa được lưu riêng.</Notice><Suspense fallback={<Spinner/>}><Management segments={segments} user={user} onLogin={onLogin} onUpload={()=>setManage(false)}/></Suspense></>;
   const edited=road!==query.road||day!==query.day||hour!==query.hour;
   const dateLabel=result?new Date(`${result.date}T12:00:00+07:00`).toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit'}):'';
-  return <><div className="page-heading"><div><div className="eyebrow">CHỦ ĐỘNG CHO NGÀY SẮP TỚI</div><h1>Dự báo giao thông<span>.</span></h1><p>Chọn tuyến đường và giờ dự định đi để tránh những khung giờ thường ùn tắc.</p></div>{manager&&<button className="button small" onClick={()=>setManage(true)}><Settings2 size={16}/>Quản lý dữ liệu</button>}</div>
+  return <><div className="page-heading"><div><div className="eyebrow">CHỦ ĐỘNG CHO NGÀY SẮP TỚI</div><h1>Dự báo giao thông<span>.</span></h1><p>Chọn tuyến đường và giờ dự định đi để tránh những khung giờ thường ùn tắc.</p></div></div>
     <div className="tabs workflow-tabs"><button className={!near?'active':''} onClick={()=>setNear(false)}>Theo ngày và giờ</button><button className={near?'active':''} onClick={()=>setNear(true)}>Ngắn hạn</button></div>
     {near?<NearForecast segments={segments} initialRoad={Number(road)||initialRoad}/>:<>
     <form className="card outlook-form" onSubmit={e=>{e.preventDefault();view();}}>

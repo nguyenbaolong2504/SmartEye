@@ -176,7 +176,7 @@ def test_source_mapping_check_enable_import_and_missing_speed_are_honest(client)
     value,sample=source(client,speed=False,state=False)
     response=client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample,{**sample,'segment_id':999}]})
     assert response.status_code==200 and response.json()['accepted']==1 and response.json()['rejected']==1
-    actual=client.get('/api/traffic/road?segment_id=1').json()
+    actual=client.get('/api/traffic/road?segment_id=1',headers={'Cookie':''}).json()
     assert actual['state'] is None and actual['fresh']
     assert 'speed_kmh' not in actual['metrics'] and actual['metrics']['count']['value']==20
     assert 'flow_per_minute' not in actual['metrics']
@@ -184,7 +184,7 @@ def test_source_mapping_check_enable_import_and_missing_speed_are_honest(client)
     assert duplicate['duplicates']==1
     value=client.post(f'/api/admin/sources/{value["id"]}/toggle',json={'revision':value['revision'],'active':False,'confirmed':True}).json()
     assert client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample]}).status_code==409
-    assert not client.get('/api/traffic/road?segment_id=1').json()['fresh']
+    assert not client.get('/api/traffic/road?segment_id=1',headers={'Cookie':''}).json()['fresh']
     with SessionLocal() as db:assert db.database.road_readings.count_documents({})==1
 
 
@@ -200,7 +200,7 @@ def test_import_retry_recovers_forecast_input_without_counting_reading_twice(cli
         assert client.post(url,json=rows).status_code==503
     response=client.post(url,json=rows)
     assert response.status_code==200 and response.json()['duplicates']==1
-    actual=client.get('/api/traffic/road?segment_id=1').json()
+    actual=client.get('/api/traffic/road?segment_id=1',headers={'Cookie':''}).json()
     assert actual['metrics']['flow_per_minute']['value']==10
     with SessionLocal() as db:
         assert db.database.road_readings.count_documents({})==1
@@ -216,6 +216,7 @@ def test_source_rejects_secret_urls_and_unsafe_targets(admin_client,bad):
 def test_current_conditions_are_scoped_and_stale_values_are_not_current(client):
     value,sample=source(client)
     client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample]})
+    assert client.post('/api/auth/logout').status_code==200
     current=client.get('/api/traffic/road?segment_id=1').json()
     assert current['state']=='JAM' and current['metrics']['speed_kmh']['value']==12
     assert client.get('/api/traffic/road?segment_id=1&direction=reverse').json()['state'] is None
@@ -238,7 +239,7 @@ def test_rule_proposes_only_pending_warning_and_keeps_version(client):
     login(client,'admin@test.vn')
     result=client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[{**sample,'observed_at':(base-timedelta(seconds=10)).isoformat()}]})
     assert result.status_code==200,result.text
-    assert client.get('/api/warnings').json()==[]
+    assert client.get('/api/warnings',headers={'Cookie':''}).json()==[]
     with SessionLocal() as db:
         warning=db.database.traffic_warnings.find_one({});assert warning and warning['status']=='pending_verification'
         assert warning['rule_id']==rule['id'] and warning['rule_version']==1

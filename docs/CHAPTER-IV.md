@@ -1,5 +1,24 @@
 # Nghiệp vụ SmartEye theo Chương IV
 
+## Phân quyền theo tác nhân
+
+| Use case | Người dùng | Quản lý | Admin (phòng IT) |
+| --- | --- | --- | --- |
+| LOGIN.1–3, UC01 · Đăng nhập, khôi phục mật khẩu, đăng xuất và hồ sơ cá nhân | Có | Có | Có |
+| UC02 · Xem tuyến, tình trạng, chỉ số, lịch sử và bản đồ | Có | Có | — |
+| UC03 · Chọn mốc, xem dự báo, xu hướng và so sánh với hiện tại | Có | Có | — |
+| UC04 · Xem cảnh báo, nhận thông báo, gửi và theo dõi phản ánh của mình | Có | Có | — |
+| UC05 · Giám sát giao thông và xem camera được cấp quyền | — | Theo phạm vi được phân công | — |
+| UC06 · Tiếp nhận, xác minh và xử lý phản ánh | — | Theo phạm vi được phân công | — |
+| UC07 · Xác minh, phát hành và quản lý cảnh báo | — | Theo phạm vi được phân công | — |
+| UC08 · Quản lý quy tắc đề xuất cảnh báo | — | Theo phạm vi được phân công | — |
+| UC09 · Thống kê theo giờ và xuất báo cáo | — | — | Có |
+| UC10 · Quản lý tài khoản và phân quyền | — | — | Có |
+| UC11 · Theo dõi hệ thống, tình trạng tiếp nhận và tra cứu nhật ký | — | — | Có |
+| UC12 · Cấu hình, ánh xạ, kiểm tra và bật/tắt nguồn dữ liệu | — | — | Có |
+
+UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang công khai. Phản ánh, hành trình đã lưu và thông báo cá nhân cần tài khoản Người dùng hoặc Quản lý. Tìm tuyến và lưu hành trình là chức năng có sẵn của SmartEye ngoài danh mục Chương IV, dùng chung cho Người dùng và Quản lý. Cấu hình đoạn đường, hiệu chỉnh camera và quản lý mô hình nằm trong không gian kỹ thuật của Admin.
+
 ## Chạy thử theo vai trò
 
 1. **Người dùng.** Vào **Tình trạng & thống kê**, chọn tuyến và chiều để xem quan sát, thời điểm ghi nhận và lịch sử. Mở **Dự báo giao thông** để chọn giờ khởi hành, xem dự báo và so sánh với hiện tại khi có đủ dữ liệu cùng loại. Bật nhận cảnh báo trong **Hồ sơ cá nhân** nếu muốn nhận thông báo trong ứng dụng.

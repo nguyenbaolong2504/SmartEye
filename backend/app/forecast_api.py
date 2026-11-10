@@ -14,7 +14,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import BulkWriteError
 from .db import get_db, now, stamp
 from .models import Segment, ForecastRun, TrafficLabel, ForecastRegistry
-from .security import operator, admin, audit
+from .security import admin, audit, traffic_viewer
 from .history import parse_timestamp
 from .forecast_data import prepare, CLASSES, DataNotReady, STEP
 from . import forecast_ml
@@ -74,7 +74,7 @@ def status(db=Depends(get_db)):
         'horizons':[15,30],'notice':'Dự báo mật độ và dự báo ùn tắc là hai mục tiêu riêng.'}
 
 
-@router.get('/api/forecast/predict')
+@router.get('/api/forecast/predict',dependencies=[Depends(traffic_viewer)])
 def predict(segment_id:int,target:Target='density',db=Depends(get_db)):
     valid_segments(db,[segment_id])
     try: return forecast_ml.forecast(db.database,segment_id,target)
@@ -85,7 +85,7 @@ def predict(segment_id:int,target:Target='density',db=Depends(get_db)):
 
 
 @router.post('/api/forecast/readiness')
-def readiness(body:TrainInput,user=Depends(operator),db=Depends(get_db)):
+def readiness(body:TrainInput,user=Depends(admin),db=Depends(get_db)):
     valid_segments(db,body.segment_ids)
     try: result,_=prepare(db.database,body.segment_ids,body.start_at,body.end_at,body.target)
     except DataNotReady as exc: raise HTTPException(422,str(exc))
@@ -94,12 +94,12 @@ def readiness(body:TrainInput,user=Depends(operator),db=Depends(get_db)):
 
 
 @router.get('/api/forecast/runs')
-def runs(user=Depends(operator),db=Depends(get_db)):
+def runs(user=Depends(admin),db=Depends(get_db)):
     return [public_run(row) for row in db.database.forecast_runs.find().sort('created_at',-1).limit(20)]
 
 
 @router.post('/api/forecast/runs',status_code=202)
-def start_training(body:TrainInput,user=Depends(operator),db=Depends(get_db)):
+def start_training(body:TrainInput,user=Depends(admin),db=Depends(get_db)):
     valid_segments(db,body.segment_ids)
     if any(importlib.util.find_spec(name) is None for name in ('xgboost','sklearn','torch')):
         raise HTTPException(503,'Thiếu thư viện dự báo. Cài backend/requirements.txt và PyTorch CPU hoặc build lại backend Docker.')
@@ -112,7 +112,7 @@ def start_training(body:TrainInput,user=Depends(operator),db=Depends(get_db)):
 
 
 @router.post('/api/forecast/runs/{run_id}/cancel')
-def cancel(run_id:uuid.UUID,user=Depends(operator),db=Depends(get_db)):
+def cancel(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
     row=db.database.forecast_runs.find_one({'_id':str(run_id)})
     if not row: raise HTTPException(404,'Không tìm thấy lần huấn luyện.')
     if row['user_id']!=user.id and user.role!='admin': raise HTTPException(403,'Chỉ người tạo hoặc Admin được hủy.')
@@ -146,7 +146,7 @@ def deactivate(target:Target,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.get('/api/forecast/runs/{run_id}/report.csv')
-def export_report(run_id:uuid.UUID,user=Depends(operator),db=Depends(get_db)):
+def export_report(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
     run=db.database.forecast_runs.find_one({'_id':str(run_id),'status':'completed'})
     if not run: raise HTTPException(404,'Chưa có báo cáo hoàn tất.')
     output=io.StringIO();writer=csv.writer(output)
@@ -159,12 +159,12 @@ def export_report(run_id:uuid.UUID,user=Depends(operator),db=Depends(get_db)):
 
 
 @router.get('/api/forecast/labels')
-def labels(segment_id:int,user=Depends(operator),db=Depends(get_db)):
+def labels(segment_id:int,user=Depends(admin),db=Depends(get_db)):
     return [dict(row,id=row['_id']) for row in db.database.traffic_labels.find({'segment_id':segment_id}).sort('observed_at',-1).limit(50)]
 
 
 @router.post('/api/forecast/labels')
-def label(body:LabelInput,user=Depends(operator),db=Depends(get_db)):
+def label(body:LabelInput,user=Depends(admin),db=Depends(get_db)):
     valid_segments(db,[body.segment_id])
     existing=db.find_one(TrafficLabel,{'segment_id':body.segment_id,'observed_at':body.observed_at.isoformat()})
     if existing: db.update(TrafficLabel,existing.id,{'state':body.state,'note':body.note,'reviewer_id':user.id,'updated_at':stamp()})
@@ -174,7 +174,7 @@ def label(body:LabelInput,user=Depends(operator),db=Depends(get_db)):
 
 
 @router.post('/api/forecast/import')
-async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(operator),db=Depends(get_db)):
+async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(admin),db=Depends(get_db)):
     content=await file.read(2_000_001)
     if len(content)>2_000_000: raise HTTPException(413,'CSV tối đa 2 MB.')
     try:
@@ -208,14 +208,14 @@ async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(o
     return {'rows':len(documents),'inserted':inserted,'duplicates':len(documents)-inserted,'message':'Đã nhập mẫu lịch sử. CSV không tự tạo nhãn ùn tắc.'}
 
 
-@router.get('/api/forecast/templates/{kind}.csv')
+@router.get('/api/forecast/templates/{kind}.csv',dependencies=[Depends(admin)])
 def template(kind:Literal['observations','labels']):
     header='segment_id,observed_at,score,count,density' if kind=='observations' else 'segment_id,observed_at,state,note'
     return Response(header+'\r\n',media_type='text/csv',headers={'Content-Disposition':f'attachment; filename=traffic-{kind}.csv'})
 
 
 @router.post('/api/forecast/labels/import')
-async def import_labels(file:UploadFile=File(...),dry_run:bool=True,user=Depends(operator),db=Depends(get_db)):
+async def import_labels(file:UploadFile=File(...),dry_run:bool=True,user=Depends(admin),db=Depends(get_db)):
     content=await file.read(2_000_001)
     if len(content)>2_000_000: raise HTTPException(413,'CSV tối đa 2 MB.')
     try:

@@ -27,11 +27,13 @@ test('chapter IV report verification and warning publication in the UI',async({p
   expect((await request.post('/api/auth/register',{data:viewer})).status()).toBe(201);
   expect((await request.post('/api/auth/login',{data:{email:'e2e-admin@example.invalid',password:'test-only-password-123'}})).status()).toBe(200);
   expect((await request.post('/api/admin/accounts',{data:manager})).status()).toBe(201);
+  expect((await request.post('/api/auth/logout')).status()).toBe(200);
   page.on('dialog',dialog=>dialog.accept());
 
   await page.goto('/#incidents');
   await expect(page.getByRole('heading',{name:'Phản ánh giao thông.'})).toBeVisible();
   await signIn(page,viewer.username,viewer.password);
+  await expect(page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:'Giám sát & xử lý'})).toHaveCount(0);
   await page.getByRole('button',{name:/^Hồ sơ /}).click();
   await page.getByLabel('Nhận thông báo khi có cảnh báo được phát hành').check();
   await page.getByRole('button',{name:'Lưu hồ sơ',exact:true}).click();
@@ -50,6 +52,9 @@ test('chapter IV report verification and warning publication in the UI',async({p
   await signOut(page);
 
   await signIn(page,manager.username,manager.password);
+  await navigate(page,'Dự báo giao thông');
+  await expect(page.getByRole('heading',{name:'Dự báo giao thông.'})).toBeVisible();
+  await expect(page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:'Quản trị hệ thống'})).toHaveCount(0);
   await navigate(page,'Giám sát & xử lý');
   await page.getByRole('button',{name:'Quản lý phản ánh',exact:true}).click();
   await page.getByRole('button',{name:new RegExp(content)}).click();

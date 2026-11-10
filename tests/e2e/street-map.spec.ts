@@ -54,11 +54,14 @@ test('map zoom, expanding, picking a pin and address failure recovery',async({pa
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);
 });
 
-test('saved OSM journey retains addresses, coordinates and provider',async({page})=>{
+test('saved OSM journey retains addresses, coordinates and provider',async({page,request})=>{
+  const username=`journey-${Date.now()}`;
+  const password='test-only-journey-password';
+  expect((await request.post('/api/auth/register',{data:{name:'Người dùng thử hành trình',username,email:`${username}@example.invalid`,password,password_confirmation:password}})).status()).toBe(201);
   await page.goto('/#routes',{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
-  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill('e2e-admin@example.invalid');
-  await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');
+  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill(username);
+  await page.getByLabel('Mật khẩu',{exact:true}).fill(password);
   await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await address(page,'Điểm xuất phát','12 Đường kiểm thử Hà Nội');await address(page,'Điểm đến','84 Đường kiểm thử Hà Nội');

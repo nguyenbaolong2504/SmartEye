@@ -11,6 +11,7 @@ from fastapi import APIRouter,Depends,HTTPException
 from .db import get_db,now,stamp
 from .history import LOCAL
 from .forecast_data import CLASSES,split_indices
+from .security import traffic_viewer
 
 router=APIRouter()
 _cache={};_models={}
@@ -175,7 +176,7 @@ def annual_report(database,active,sid):
         'method':'Lịch sử minh họa trong một năm gần nhất. Ngày chưa có quan sát không được coi là thông thoáng.','pattern_requirement':'Dùng các ngày đã qua để nhận biết khung giờ thường đông xe.'}
 
 
-@router.get('/api/traffic/outlook')
+@router.get('/api/traffic/outlook',dependencies=[Depends(traffic_viewer)])
 def road_outlook(segment_id:int,date:date,hour:int=17,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
     if direction!='forward':raise HTTPException(409,'Chưa có mô hình và lịch sử cho chiều đường đã chọn.')
     return outlook(db.database,segment_id,date,hour)

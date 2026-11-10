@@ -23,7 +23,8 @@ test('admin dataset checks, CSV preview/commit and independent congestion labels
   await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');
   await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await page.getByRole('button',{name:'Quản lý dữ liệu',exact:true}).click();
+  await expect(page).toHaveURL(/#admin$/);
+  await page.getByRole('button',{name:'Dữ liệu & mô hình',exact:true}).click();
   await page.getByRole('button',{name:'Kiểm tra dữ liệu',exact:true}).click();
   await expect(page.getByText('Cần dữ liệu ít nhất 7 ngày khác nhau.',{exact:true})).toHaveCount(2);
   await expect(page.getByRole('button',{name:'Huấn luyện XGBoost + GRU',exact:true})).toBeDisabled();

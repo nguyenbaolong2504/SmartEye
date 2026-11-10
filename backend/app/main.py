@@ -25,7 +25,7 @@ from . import schemas as S
 from .config import COOKIE_SECURE, PRODUCTION, UPLOADS, MAX_UPLOAD, MODEL_PATH, TTL_MINUTES
 from .db import initialize_database, get_database, get_db, SessionLocal, stamp, now
 from .models import User, LoginSession, ResetToken, Segment, Camera, Observation, VideoJob, Favorite, AlertRule, Notification, Audit
-from .security import optional_user, require_user, operator, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
+from .security import optional_user, require_user, traffic_viewer, traffic_member, operator, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
 from .seed import seed, PLACES
 from .traffic import classify, latest_observations, observation_dict, emit_alerts
 from .routing import search_routes
@@ -190,6 +190,8 @@ def profile(body:S.ProfileInput,user=Depends(require_user),db=Depends(get_db)):
     row=item(db,User,user.id)
     if body.revision is not None and body.revision!=row.profile_version:raise HTTPException(409,'Hồ sơ đã thay đổi. Vui lòng tải lại.')
     updates=body.model_dump(exclude_unset=True,exclude={'revision'})
+    if user.role=='admin' and 'notifications_enabled' in updates:
+        raise HTTPException(403,'Tùy chọn nhận cảnh báo dành cho Người dùng và Quản lý.')
     if updates.get('email') is None:updates.pop('email',None)
     result=db.database.users.find_one_and_update({'_id':user.id,'$or':[{'profile_version':row.profile_version},{'profile_version':{'$exists':False}}]},
         {'$set':{**updates,'profile_version':row.profile_version+1}},return_document=ReturnDocument.AFTER)
@@ -251,14 +253,19 @@ def places(db=Depends(get_db)):
     return list(result.values())
 
 @app.get('/api/segments')
-def segments(db=Depends(get_db),data_mode:Literal['observed','demo']='observed'):
-    latest = latest_observations(db)
-    simulated=current_states(db.database) if data_mode=='demo' and demo_enabled() and demo_status(db.database)['ready'] else {}
-    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},'observation':simulated.get(s.id) if data_mode=='demo' else observation_dict(latest[s.id]) if s.id in latest else None} for s in db.find(Segment,sort=[('id',1)])]
+def segments(db=Depends(get_db),data_mode:Literal['observed','demo']='observed',user=Depends(optional_user)):
+    observations={}
+    if not user or user.role!='admin':
+        if data_mode=='observed':
+            observations={key:observation_dict(row) for key,row in latest_observations(db).items()}
+        elif demo_enabled() and demo_status(db.database)['ready']:
+            observations=current_states(db.database)
+    return [{**{k:getattr(s,k) for k in ('id','name','start_node','end_node','distance_km','geometry','active','is_demo','one_way')},
+             'observation':observations.get(s.id)} for s in db.find(Segment,sort=[('id',1)])]
 
 @app.get('/api/bootstrap')
 def bootstrap(db=Depends(get_db),user=Depends(optional_user),data_mode:Literal['observed','demo']='observed'):
-    return {'places':places(db),'segments':segments(db,data_mode),'cameras':[camera_dict(c) for c in db.find(Camera)],
+    return {'places':places(db),'segments':segments(db,data_mode,user),'cameras':[camera_dict(c) for c in db.find(Camera)],
             'config':config(),'user':public_user(user) if user else None,'demo':demo_status(db.database)}
 
 @app.post('/api/segments',status_code=201)
@@ -312,7 +319,7 @@ def manual_observation(body:S.ObservationInput,user=Depends(operator),db=Depends
     db.add(row); db.flush(); emit_alerts(db,row); audit(db,user.id,'manual_observation',str(body.segment_id)); db.commit()
     return observation_dict(row)
 
-@app.post('/api/routes/search')
+@app.post('/api/routes/search',dependencies=[Depends(traffic_viewer)])
 async def routes(body:S.RouteRequest,db=Depends(get_db)):
     # Provider route results are intentionally not persisted or used for training.
     return await search_routes(db,body)
@@ -403,11 +410,11 @@ def publish_video(ident:str,options:S.PublishOptions|None=None,user=Depends(oper
     return publish_job(db,own(item(db,VideoJob,ident),user),user,options or S.PublishOptions())
 
 @app.get('/api/favorites')
-def favorites(user=Depends(require_user),db=Depends(get_db)):
+def favorites(user=Depends(traffic_member),db=Depends(get_db)):
     return [{'id':r.id,'name':r.name,'request':r.request} for r in db.find(Favorite,{'user_id':user.id},sort=[('id',-1)])]
 
 @app.post('/api/favorites',status_code=201)
-def add_favorite(body:S.FavoriteInput,user=Depends(require_user),db=Depends(get_db)):
+def add_favorite(body:S.FavoriteInput,user=Depends(traffic_member),db=Depends(get_db)):
     if db.count(Favorite,{'user_id':user.id}) >= 50: raise HTTPException(422,'Mỗi tài khoản lưu tối đa 50 hành trình.')
     request=body.request.model_dump(mode='json'); request['departure_at']=None
     # Save user's inputs only; no Google geometry or provider results.
@@ -415,28 +422,28 @@ def add_favorite(body:S.FavoriteInput,user=Depends(require_user),db=Depends(get_
     return {'id':row.id,'name':row.name,'request':row.request}
 
 @app.delete('/api/favorites/{ident}')
-def delete_favorite(ident:int,user=Depends(require_user),db=Depends(get_db)):
+def delete_favorite(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
     row=own(item(db,Favorite,ident),user); db.delete(row); db.commit(); return {'message':'Đã xóa hành trình.'}
 
 @app.get('/api/alerts')
-def alerts(user=Depends(require_user),db=Depends(get_db)):
+def alerts(user=Depends(traffic_member),db=Depends(get_db)):
     rules=[{k:getattr(r,k) for k in ('id','segment_id','density','active')} for r in db.find(AlertRule,{'user_id':user.id})]
     notices=[{k:getattr(n,k) for k in ('id','message','read','created_at','warning_id')} for n in db.find(Notification,{'user_id':user.id},sort=[('id',-1)],limit=100)]
     return {'rules':rules,'notifications':notices}
 
 @app.post('/api/alerts',status_code=201)
-def add_alert(body:S.RuleInput,user=Depends(require_user),db=Depends(get_db)):
+def add_alert(body:S.RuleInput,user=Depends(traffic_member),db=Depends(get_db)):
     item(db,Segment,body.segment_id)
     if db.find_one(AlertRule,{'user_id':user.id,'segment_id':body.segment_id,'density':body.density}):
         raise HTTPException(409,'Bạn đã theo dõi điều kiện này.')
     row=AlertRule(user_id=user.id,**body.model_dump()); db.add(row); db.commit(); return {'id':row.id}
 
 @app.delete('/api/alerts/{ident}')
-def remove_alert(ident:int,user=Depends(require_user),db=Depends(get_db)):
+def remove_alert(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
     row=own(item(db,AlertRule,ident),user); db.delete(row); db.commit(); return {'message':'Đã bỏ theo dõi.'}
 
 @app.post('/api/notifications/{ident}/read')
-def read_notification(ident:int,user=Depends(require_user),db=Depends(get_db)):
+def read_notification(ident:int,user=Depends(traffic_member),db=Depends(get_db)):
     row=own(item(db,Notification,ident),user); row.read=True; db.commit(); return {'message':'Đã đánh dấu đã đọc.'}
 
 def report_rows(db,segment_id=None,start=None,end=None):
@@ -453,12 +460,12 @@ def report_rows(db,segment_id=None,start=None,end=None):
     return db.find(Observation,filters,sort=[('observed_at',-1)],limit=5000)
 
 @app.get('/api/reports')
-def reports(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(operator),db=Depends(get_db)):
+def reports(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(admin),db=Depends(get_db)):
     rows=report_rows(db,segment_id,start,end)
     return {'total':len(rows),'limit':5000,'distribution':{k:sum(r.density==k for r in rows) for k in ('LOW','NORMAL','HIGH')},'average_count':round(sum(r.count for r in rows)/len(rows),1) if rows else 0,'observations':[observation_dict(r) for r in rows]}
 
 @app.get('/api/reports/export')
-def export(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(operator),db=Depends(get_db)):
+def export(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(admin),db=Depends(get_db)):
     rows=report_rows(db,segment_id,start,end); out=io.StringIO(); out.write('\ufeff'); writer=csv.writer(out)
     writer.writerow(['id','segment_id','density','score','vehicle_count','source','observed_at','note'])
     for r in rows:

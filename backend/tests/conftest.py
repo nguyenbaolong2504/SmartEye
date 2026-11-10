@@ -58,6 +58,14 @@ def admin_client(client):
     assert client.post('/api/auth/login',json={'email':'admin@test.vn','password':'test-password-only'}).status_code==200
     return client
 
+@pytest.fixture
+def analyst_client(client):
+    with SessionLocal() as db:
+        db.add(User(email='analyst@test.vn',name='Test Analyst',role='analyst',password=hash_password('test-password-only')))
+        db.commit()
+    assert client.post('/api/auth/login',json={'email':'analyst@test.vn','password':'test-password-only'}).status_code==200
+    return client
+
 
 @pytest.fixture
 def route_request():
