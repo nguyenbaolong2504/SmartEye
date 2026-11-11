@@ -5,6 +5,8 @@ public address/Overpass services for each browser run.
 """
 import json
 import base64
+import subprocess
+import threading
 from pathlib import Path
 from fastapi import FastAPI, Body
 from fastapi.responses import Response
@@ -81,3 +83,20 @@ def tile(z:int,x:int,y:int):
 @app.api_route('/camera.png',methods=['GET','HEAD'])
 def camera_image():
     return Response(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7WQAAAAASUVORK5CYII='),media_type='image/png')
+
+
+_video_lock=threading.Lock()
+
+
+@app.get('/camera-demo.mp4')
+def camera_video():
+    import imageio_ffmpeg
+    from fastapi.responses import FileResponse
+    path=Path(__file__).resolve().parents[1]/'backend'/'data'/'e2e-camera-sample.mp4'
+    with _video_lock:
+        if not path.is_file():
+            path.parent.mkdir(parents=True,exist_ok=True)
+            subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-hide_banner','-loglevel','error','-y',
+                '-f','lavfi','-i','color=c=gray:s=640x360:d=6:r=15','-an','-c:v','libx264',
+                '-pix_fmt','yuv420p','-movflags','+faststart',str(path)],check=True,timeout=30)
+    return FileResponse(path,media_type='video/mp4')

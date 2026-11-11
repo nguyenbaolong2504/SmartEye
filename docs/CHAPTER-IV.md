@@ -64,6 +64,7 @@ Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sác
 5. Ảnh nguồn được cập nhật theo chu kỳ đã cấu hình, có thể tạm dừng, tải lại và phóng to. Video MP4/WebM được phát bằng nút điều khiển. Hình ảnh lưu từ trước được ghi rõ loại và thời điểm ghi hình.
 6. Hệ thống hiển thị nguồn, thời điểm ghi hình khi có, thời điểm nhận ảnh và lần kiểm tra kết nối. Nguồn không cung cấp thời điểm ghi hình được ghi nhận rõ. Ghim theo đoạn đường có ghi chú về vị trí.
 7. Người xem chọn **Xem dự báo tuyến đường** nếu được cấp quyền dự báo. Hệ thống mở đúng tuyến và chiều của camera.
+8. Với camera có video mẫu đã phân tích, người xem phát/tua video hoặc nhấn cột thời gian để xem số xe, mức mật độ và thống kê khung hình. Nguồn và ghi chú video minh họa xuất hiện cùng kết quả. Nếu có quyền dự báo và lịch sử minh họa phù hợp, hệ thống hiển thị thêm mật độ chạy thử sau 15/30/60 phút.
 
 **Luồng ngoại lệ**
 
@@ -73,7 +74,10 @@ Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sác
 - Nguồn bị tắt hoặc thu hồi chia sẻ chặn ngay yêu cầu ảnh tiếp theo, kể cả khi ảnh đã nằm trong bộ nhớ đệm máy chủ.
 - Tài khoản bị bỏ quyền xem camera không được mở trang hoặc gọi API xem ảnh. Quyền dự báo được kiểm tra riêng.
 - Tuyến chưa đủ lịch sử mở trang dự báo với thông báo thiếu dữ liệu theo luồng dự báo hiện có.
+- Video mẫu đang xử lý hiển thị tiến độ, chưa có mô hình/lịch sử phù hợp vẫn hiển thị kết quả đếm xe nhưng báo chưa có dự báo. Đổi hiệu chỉnh làm kết quả cũ hết phù hợp. Admin/Quản lý có quyền quản lý camera đúng phạm vi có thể phân tích lại. Không cho gửi trùng tác vụ, giữ video cũ trong khi phân tích và có thể thử lại nếu thất bại.
 
 **Cấu hình để chạy thử**
 
 Admin mở **Quản trị hệ thống → Nguồn dữ liệu → Thêm nguồn**, chọn Camera, đoạn đường, chiều, định dạng Ảnh hoặc Video và URL nguồn được phép sử dụng. Nhập tên giao lộ và tọa độ nếu có. Tích **Cho phép người dùng xem camera trên trang Camera giao thông**, xác nhận quyền sử dụng, lưu, kiểm tra nguồn rồi bật nguồn. Ảnh hỗ trợ JPG/PNG/WebP. Video chia sẻ cần URL MP4/WebM công khai, không chứa mã truy cập. Nguồn ảnh có mã truy cập được lấy qua máy chủ và giữ kín mã. Camera nguồn không tự tạo nhãn ùn tắc hoặc dữ liệu huấn luyện chỉ bằng thao tác xem.
+
+Để có clip mẫu kèm nhận diện thực bằng YOLO11 và dự báo mật độ minh họa bằng XGBoost, dùng `scripts/setup_camera_videos.py` theo [DEMO.md](DEMO.md#video-camera-và-dự-báo-mật-độ). Dữ liệu tổng hợp và video không xác minh đúng tuyến không được công bố thành quan trắc hay cảnh báo thực tế.

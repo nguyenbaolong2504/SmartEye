@@ -133,7 +133,7 @@ def item(db, model, ident):
     return row
 
 def camera_dict(c):
-    return {k:getattr(c,k) for k in ('id','name','segment_id','active','capacity','low_threshold','high_threshold','roi')}
+    return {k:getattr(c,k) for k in ('id','name','segment_id','active','capacity','low_threshold','high_threshold','roi','analysis_job_id')}
 
 def own(row, user):
     if row.user_id != user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
@@ -521,6 +521,8 @@ from .monitoring import router as monitoring_router
 app.include_router(monitoring_router)
 from .public_cameras import router as public_camera_router
 app.include_router(public_camera_router)
+from .camera_video import router as camera_video_router
+app.include_router(camera_video_router)
 from .forecast_api import router as forecast_router
 app.include_router(forecast_router)
 from .incidents import router as incidents_router

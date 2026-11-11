@@ -71,6 +71,7 @@ def directory(db=Depends(get_db)):
             'position':location(segment),'position_exact':False,'is_demo':segment.is_demo,'direction':'forward',
             'state':'inactive' if not active else 'archive' if shared else 'empty','active':active,'segment_active':segment.active,
             'source_name':'Hình ảnh được chia sẻ','source_host':None,'captured_at':camera.preview_at if shared else None,
+            'analysis_url':f'/api/traffic/cameras/recordings/{camera.id}/analysis?v={camera.analysis_job_id}' if active and camera.preview_public and camera.analysis_job_id else None,
             'checked_at':None,'refresh_seconds':0,'source_url':None,'media_kind':'recording',
             'image_url':f'/api/traffic/cameras/recordings/{camera.id}/frame?v={token}' if shared else None,
             'video_url':f'/api/traffic/cameras/recordings/{camera.id}/video?v={token}' if shared and camera.preview_mime else None})

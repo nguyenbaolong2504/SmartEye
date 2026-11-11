@@ -66,7 +66,7 @@ Không ghi mẫu vào `observations`, `traffic_samples`, `traffic_labels`, `fore
 
 - `DEMO_DATA_ENABLED`: mặc định bật ở development, tắt ở production; chỉ bật ở production nếu chủ ý triển khai một bản demo có nhãn.
 - `DEMO_AUTO_PREPARE=true`, `DEMO_HISTORY_DAYS=365`, `DEMO_ESTIMATORS=96`.
-- `VIDEO_FEATURE_ENABLED=false`: không tải video mới. Chỉ bật lại nếu cần kiểm tra tương thích API cũ; giao diện nhận diện đã gỡ.
+- `VIDEO_FEATURE_ENABLED=false`: tắt API tải video cá nhân và giao diện nhận diện cũ. Trang Camera vẫn phát và phân tích lại các video mẫu đã được chuẩn bị theo hướng dẫn bên dưới.
 - `OSRM_URL=https://router.project-osrm.org`: nguồn ô tô nhanh; cache ứng viên 10 phút, trọng số và dữ liệu giao thông được tính lại theo từng yêu cầu. Xe máy dùng mạng OSM đầy đủ; không thay bằng tuyến xe đạp hay tuyến ô tô không kiểm tra quyền.
 - `GET /api/demo/status`, `GET /api/demo/predict?segment_id=14`.
 - `GET /api/demo/predict?segment_id=14&issue_at=<ISO có múi giờ trong 30 ngày đã qua (API ngắn hạn cũ)>`.
@@ -87,3 +87,39 @@ Các ảnh dưới đây dùng bộ dữ liệu mô phỏng riêng trong Docker,
 ![Dự báo giờ cao điểm mẫu](previews/forecast-demo-desktop.png)
 
 [Dự báo trên điện thoại](previews/forecast-demo-mobile.png) · [Thống kê tháng trên máy tính](previews/traffic-demo-desktop.png) · [Thống kê tháng trên điện thoại](previews/traffic-demo-mobile.png).
+
+## Video camera và dự báo mật độ
+
+Trang **Camera giao thông** có video minh họa từ Pexels, đếm xe bằng YOLO11 và dự báo mật độ chạy thử sau 15, 30, 60 phút. Hai clip được gắn luân phiên vào bốn camera để thử nhiều tuyến, không phải hình ảnh trực tiếp hoặc bằng chứng rằng video quay ở đúng tuyến đang chọn.
+
+| Video | Tác giả | Nguồn và quyền sử dụng |
+|---|---|---|
+| Bustling Hanoi Street Captured from Above | Nimit N | [Video gốc](https://www.pexels.com/video/bustling-hanoi-street-captured-from-above-31873135/), [Pexels License](https://www.pexels.com/license/) |
+| Busy Urban Traffic Scene in Hanoi | Sandeep Kumar | [Video gốc](https://www.pexels.com/video/busy-urban-traffic-scene-in-hanoi-35369134/), [Pexels License](https://www.pexels.com/license/) |
+
+Tên địa điểm theo mô tả của người đăng, chưa xác minh đường và thời điểm ghi hình. Nguồn, tác giả, ngày công bố, giấy phép và ghi chú vị trí được giữ trong `database/camera-video-sources.json`, metadata của tác vụ và trang xem. Video được bỏ âm thanh, nén H.264 tối đa 960px, 15fps để phát nhanh. Tệp gốc khoảng 165 MB cho hai clip, tệp dùng để phát khoảng 1,5 MB và 2 MB. Dữ liệu lớn nằm trong `backend/data`, không đưa lên GitHub.
+
+**Cài hoặc cập nhật bằng PowerShell**
+
+```powershell
+cd C:\Users\Admin\Documents\GitHub\SmartEye
+docker compose up -d --build --wait --wait-timeout 240
+docker compose exec backend python scripts/download_model.py
+docker compose exec backend python scripts/setup_camera_videos.py
+```
+
+Nếu báo chưa có lịch sử minh họa, chạy `docker compose exec backend python scripts/prepare_demo.py --days 365` rồi chạy lại bước chuẩn bị video. Bước này dành cho môi trường demo có `DEMO_DATA_ENABLED=true`. Không cần bật `VIDEO_FEATURE_ENABLED`.
+
+Script chuẩn bị mô hình mật độ riêng, tải/nén video nếu chưa có, gắn vào camera 1–4 đang có tuyến hoạt động và chạy YOLO. Camera được chọn sẽ được bật và chia sẻ video. Vùng quan sát/sức chứa mẫu chỉ được áp dụng cho camera chưa từng phân tích có cấu hình mặc định; không ghi đè hiệu chỉnh riêng. Khi đã hoàn tất, chạy lại sẽ dùng kết quả cũ nếu video, cấu hình và bộ lịch sử không đổi. Có thể chỉ định `--camera-id 1 --camera-id 3` hoặc thêm `--refresh` để phân tích lại. Tuyến ngoài bộ lịch sử minh họa vẫn xem được mật độ video nhưng sẽ báo chưa đủ dữ liệu dự báo.
+
+**Lần sau chạy** chỉ cần `docker compose up -d`, mở [Camera giao thông](http://localhost:8081/#cameras), chọn camera và nhấn phát. Các cột thời gian cho phép tua đến từng giây; số xe và thẻ dự báo đổi theo khung hình tương ứng. Trong phần Camera & hiệu chỉnh, Admin hoặc Quản lý có quyền `network.manage` đúng phạm vi có thể nhấn **Phân tích lại video**. Video cũ vẫn xem được trong khi xử lý. Đổi ngưỡng/vùng quan sát yêu cầu phân tích lại; kết quả cũ được đánh dấu không còn phù hợp.
+
+**Cách phân tích**
+
+- YOLO11n nhận diện ô tô, xe máy, xe buýt và xe tải trên một khung hình mỗi giây. Chỉ nhận xe có tâm nằm trong vùng mặt đường đã chọn.
+- Chỉ số mật độ là giá trị lớn hơn giữa tỷ lệ vùng quan sát bị xe che phủ và số xe/sức chứa camera, giới hạn trong 0–1. Diện tích hộp chồng nhau chỉ tính một lần. Hai ngưỡng camera phân thành Thấp, Vừa, Cao. Khi chỉ số vượt `high + 0.65 × (1-high)`, giao diện ghi Rất cao. Đây là quy ước chạy thử cần hiệu chỉnh, không phải xác suất ùn tắc.
+- Các xe có thể xuất hiện ở nhiều khung hình. Số xe/khung hình không phải lưu lượng xe/giờ; không suy ra tốc độ hay ùn tắc chắc chắn từ riêng số xe.
+- XGBoost phân loại mật độ cho ba mốc 15/30/60 phút. Mô hình camera học từ 8 ngày hoàn chỉnh gần nhất của bộ lịch sử minh họa, chia train/validation/test theo thời gian, loại giao thoa giữa nhãn và phần tiếp theo. Chuẩn hóa chỉ tính trên train. Metadata có so sánh với cách giữ trạng thái hiện tại trên tập test.
+- Mỗi khung hình thay mốc mới nhất trong cửa sổ 60 phút bằng số xe/mật độ thực sự đo từ video; **11 mốc trước đó vẫn là dữ liệu tổng hợp**. Tất cả mốc trong một clip dùng cùng thời điểm tham chiếu chạy thử, không có thời điểm ghi hình thực đã xác minh. Phần dự báo vì vậy luôn ghi **chạy thử**. Không gọi kết quả đánh giá trên mẫu tổng hợp là độ chính xác ngoài đường.
+
+Pipeline này không ghi vào `observations`, `traffic_samples`, `traffic_labels`, registry/mô hình dự báo thực hoặc cảnh báo thật. Nó lưu metadata, kết quả và video trong `video_jobs`, `cameras`, `backend/data/uploads`, `backend/data/camera_previews` và mô hình riêng tại `backend/data/camera-density/<UUID>`. Bộ dự báo thực XGBoost/GRU giữ nguyên theo [FORECASTING.md](FORECASTING.md). Muốn đánh giá dự báo thật cần video/quan trắc liên tục, đúng tuyến và thời gian, nhãn đã kiểm chứng, rồi kiểm thử trên giai đoạn chưa dùng huấn luyện. Clip vài chục giây không cung cấp đủ lịch sử để chứng minh độ chính xác 80–90%.

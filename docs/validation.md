@@ -135,3 +135,15 @@ Frontend không thay đổi trong lần bổ sung DB; kết quả 10 E2E ở m�
 ## Giới hạn xác minh
 
 Google thật cần key/billing; chưa xác minh coverage/ETA Hà Nội. Density threshold và pretrained detector cần nhãn thực/ROI/capacity; chưa có precision/recall/Macro-F1 cho giao thông Hà Nội. Docker/PostgreSQL run cần ghi riêng, không suy từ SQLite tests. Chưa có forecast/training/GPS/RTSP; không dùng số minh họa làm đánh giá khoa học.
+
+## Camera video ngày 12/11/2026
+
+Các mục tháng 10 ở trên ghi lại trạng thái tại thời điểm kiểm thử đó. Lượt bổ sung camera video này đã chạy trên Docker với MongoDB; không dùng kết quả cũ thay cho lượt xác minh mới.
+
+- Backend **45 passed** cho camera video, camera công khai, media/quan trắc và đoạn đường. Chạy trong Linux Docker với MongoDB thử riêng, gồm huấn luyện XGBoost thật, kiểm tra tách tập theo thời gian và không ghi kết quả demo vào quan trắc/registry thực.
+- Playwright **10 passed** cho camera video, danh sách/bộ lọc camera và luồng Chương IV trên desktop/mobile. Sau khi siết đối chiếu đường dẫn API trong fixture, hai bài camera video được chạy lại và đều qua. Kiểm tra tua video, đồng bộ số xe và ba mốc dự báo, quyền giao diện và không tràn ngang. Video kiểm thử H.264 sáu giây được sinh cục bộ; không phụ thuộc Pexels trong E2E.
+- Bản Docker thực tế đã tải, nén và chạy YOLO11n cho hai video Pexels gắn vào bốn camera mẫu. Clip khoảng 33 giây cho trung bình 10,2 xe/khung hình, đỉnh 18; clip khoảng 10 giây cho trung bình 8,6, đỉnh 13. Các con số là kết quả detector với ROI/sức chứa ước lượng, chưa có nhãn thủ công để tính độ chính xác.
+- Kiểm tra trực tiếp trình duyệt trên Docker ở 1440×1000 và 390×844: video phát được, tua đến giây 5 cập nhật số xe, có ba thẻ 15/30/60 phút, không lỗi JavaScript và không tràn ngang. HTTP Range và tệp H.264 hoạt động. TypeScript/Vite và Docker build thành công; ba dịch vụ chạy, backend và MongoDB healthy, `/api/health` trả `ok`.
+- Kiểm tra quyền xem camera riêng với quyền dự báo, thu hồi chia sẻ, thay đổi hiệu chỉnh, tác vụ không đúng camera, giới hạn phạm vi Quản lý, chặn hai phiên tạo tác vụ cạnh tranh và khôi phục lượt phân tích thất bại từ video đã chia sẻ trước đó.
+
+Dự báo camera dùng XGBoost trên lịch sử tổng hợp với 11/12 mốc đầu vào minh họa; mốc cuối lấy số xe/mật độ từ clip. Không xác minh đúng tuyến quay, không có quan trắc trực tiếp, tốc độ, tracking hay đánh giá độ chính xác dự báo thực địa. Kết quả không được phát thành cảnh báo thật. Windows App Control chặn DLL XGBoost của môi trường Python cục bộ; lượt huấn luyện/kiểm thử ML này được thực hiện trong Linux Docker, không tuyên bố đã chạy ML native Windows.

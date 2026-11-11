@@ -95,6 +95,7 @@ class Camera(Document):
     preview_source: str | None = None
     preview_job_id: str | None = None
     preview_mime: str | None = None
+    analysis_job_id: str | None = None
 
 
 @dataclass(kw_only=True)
@@ -145,6 +146,7 @@ class VideoJob(Document):
     created_at: str = field(default_factory=timestamp)
     retain_video: bool = False
     history_published: bool = False
+    source_metadata: dict = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)

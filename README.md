@@ -74,7 +74,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 | A* | Mặc định tìm chi phí kết hợp trên đồ thị SmartEye hoặc mạng OSM tải đầy đủ |
 | Dijkstra | Thuật toán tham chiếu và chuẩn hóa chi phí; có API đối chiếu, không cần lựa chọn trên giao diện |
 | OSRM | Dịch vụ cung cấp nhanh các tuyến ô tô trên OSM. SmartEye xếp hạng các tuyến được trả về; không tuyên bố chạy A* trên đồ thị nội bộ của dịch vụ |
-| YOLO | Chức năng nhận diện đã tắt và gỡ khỏi giao diện; mã đọc dữ liệu cũ giữ để tương thích |
+| YOLO11 | Đếm xe và đo mức chiếm vùng quan sát trong video tại trang Camera giao thông. Video mẫu có nguồn và giấy phép riêng; màn hình tải video cá nhân vẫn được gỡ |
 
 Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle, yêu cầu loại cao tốc và kiểm tra kết quả trả về; không dùng tuyến ô tô/xe đạp thay thế. Cache chỉ giữ ứng viên hình học/ETA tham chiếu; ưu tiên và tình trạng giao thông được tính lại mỗi lần. Thời gian/khoảng cách là ước tính, chưa phải dẫn đường thời gian thực. Phần đường không có dữ liệu không được coi là thông thoáng. Các dịch vụ công cộng có thể gián đoạn; dùng máy chủ riêng khi cần tải lớn. [Chi tiết định tuyến và giới hạn](docs/MAPS.md).
 
@@ -83,5 +83,7 @@ Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle,
 ## Tài liệu kỹ thuật
 
 [Dữ liệu demo](docs/DEMO.md) · [Bản đồ](docs/MAPS.md) · [Pipeline XGBoost/GRU trên dữ liệu thực](docs/FORECASTING.md) · [API](docs/api.md) · [Kiểm thử](docs/validation.md).
+
+**Video camera mẫu:** chạy `docker compose exec backend python scripts/download_model.py` rồi `docker compose exec backend python scripts/setup_camera_videos.py`. Mở **Camera giao thông** để phát video, tua xem số xe từng giây và dự báo mật độ chạy thử sau 15/30/60 phút. [Nguồn video, cách cài và giới hạn dự báo](docs/DEMO.md#video-camera-và-dự-báo-mật-độ).
 
 `src/`: frontend · `backend/app/`: API/PyMongo/mô hình · `backend/tests/`: Pytest · `tests/e2e/`: Playwright · `scripts/`: khởi tạo và dữ liệu mẫu · `deploy/`: Nginx/Mongo init.

@@ -5,6 +5,7 @@ httpx>=0.28,<1
 python-multipart>=0.0.20,<1
 numpy>=1.26,<3
 opencv-python>=4.10,<5
+imageio-ffmpeg>=0.6,<0.7
 ultralytics>=8.3,<9
 xgboost-cpu>=3.0,<4
 scikit-learn>=1.5,<2
