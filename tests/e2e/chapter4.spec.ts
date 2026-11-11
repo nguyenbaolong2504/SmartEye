@@ -1,4 +1,5 @@
 import {test, expect, type Page} from '@playwright/test';
+import {createManager} from './actors';
 
 async function navigate(page:Page, label:string) {
   const menu=page.getByRole('button',{name:'Mở menu',exact:true});
@@ -26,7 +27,6 @@ test('admin can hide a single report action and an entire page for one account',
   expect((await request.post('/api/auth/register',{data:{name:'Người thử quyền',email,username,password,password_confirmation:password}})).status()).toBe(201);
   await page.goto('/');
   await signIn(page,'e2e-admin@example.invalid','test-only-password-123');
-  await page.getByRole('button',{name:'Người dùng',exact:true}).click();
   await page.getByLabel('Tìm người dùng',{exact:true}).fill(email);
   await page.getByRole('button',{name:'Tìm kiếm',exact:true}).click();
   await page.locator('.workflow-row').filter({hasText:email}).getByRole('button',{name:'Phân quyền',exact:true}).click();
@@ -133,12 +133,14 @@ test('chapter IV report verification and warning publication in the UI',async({p
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
 
-test('admin checks a source before enabling it and receives a CSV',async({page})=>{
+test('manager checks a source before enabling it and receives a CSV',async({page,request})=>{
   test.setTimeout(55000);
   page.on('dialog',dialog=>dialog.accept());
+  const manager=await createManager(request,[1]);
   await page.goto('/');
-  await signIn(page,'e2e-admin@example.invalid','test-only-password-123');
-  await navigate(page,'Quản trị hệ thống');
+  await signIn(page,manager.username,manager.password);
+  await navigate(page,'Giám sát & xử lý');
+  await page.getByRole('button',{name:'Dữ liệu & thiết lập',exact:true}).click();
   await page.getByRole('button',{name:'Thêm nguồn',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await dialog.getByLabel('Tên nguồn',{exact:true}).fill(`Nguồn tệp kiểm thử ${Date.now()}`);

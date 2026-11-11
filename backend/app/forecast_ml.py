@@ -167,7 +167,7 @@ def train_run(run_id,database=None):
 def forecast(database,segment_id,target='density'):
     empty=lambda state,message:{'state':state,'message':message,'segment_id':segment_id,'target':target,'predictions':[]}
     registry=database.forecast_registry.find_one({'_id':target})
-    if not registry: return empty('no_model','Chưa có mô hình được Admin kích hoạt.')
+    if not registry: return empty('no_model','Quản lý chưa đưa mô hình vào sử dụng.')
     run=database.forecast_runs.find_one({'_id':registry['run_id'],'status':'completed'})
     if not run or segment_id not in run['segment_ids']: return empty('unsupported','Mô hình chưa được huấn luyện cho tuyến này.')
     if not any(info.get('deployable') and segment_id in info.get('supported_segment_ids',[]) for info in run.get('report',{}).get('horizons',{}).values()):
@@ -175,7 +175,7 @@ def forecast(database,segment_id,target='density'):
     if now()-datetime.fromisoformat(run['end_at'])>timedelta(days=45):
         return empty('model_stale','Mô hình đã quá 45 ngày. Cần đánh giá và huấn luyện lại.')
     folder=artifact_folder(run['_id'])
-    if not (folder/'metadata.json').is_file(): return empty('unavailable','Không tìm thấy tệp mô hình. Liên hệ Admin.')
+    if not (folder/'metadata.json').is_file(): return empty('unavailable','Không tìm thấy tệp mô hình. Hãy liên hệ Quản lý phụ trách mô hình.')
     series,_,_,_=load_series(database,[segment_id],now()-timedelta(hours=3),now())
     samples=series.get(segment_id,{})
     if not samples: return empty('no_data','Chưa có các ô quan sát hoàn chỉnh cho tuyến này.')

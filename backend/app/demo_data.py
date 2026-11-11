@@ -21,7 +21,8 @@ from .db import get_db, get_database, now, stamp, MongoSession
 from .models import Segment
 from .history import LOCAL, window, summary
 from .forecast_data import features, examples, split_indices, CLASSES, STEP
-from .security import admin, permit
+from .security import permit
+from .business_common import require_global_scope
 
 router=APIRouter(prefix='/api/demo',tags=['Synthetic traffic'])
 FOLDER=DATA/'demo-forecasts'
@@ -241,7 +242,8 @@ def demo_status(db=Depends(get_db)): return status(db.database)
 
 
 @router.post('/prepare',status_code=202)
-def demo_prepare(user=Depends(admin),db=Depends(get_db)):
+def demo_prepare(user=Depends(permit('models.manage')),db=Depends(get_db)):
+    require_global_scope(user)
     if not enabled(): raise HTTPException(503,'Dữ liệu mẫu đang tắt.')
     start_demo(db.database,force=True)
     return {'message':'Đang tạo lại dữ liệu mô phỏng ở vùng riêng; dữ liệu thực được giữ nguyên.','is_demo':True}

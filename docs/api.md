@@ -4,29 +4,31 @@ Swagger `/docs` trên backend. Cookie cùng origin, không lưu token trong loca
 
 | Nhóm | Endpoint | Quyền |
 |---|---|---|
-| Public | `GET /api/health`, `/config`, `/places`, `/segments`, `/cameras` | Public |
+| Public | `GET /api/health`, `/config`, `/places`, `/segments` | Công khai theo quyền của trang giao thông |
 | Auth | `POST /api/auth/register`, `/login`, `/logout` | Public/cookie |
 | Profile | `GET /api/auth/me`, `PATCH /api/auth/profile`, `POST /api/auth/password` | Own |
 | Reset | `POST /api/auth/forgot-password`, `/reset-password` | Public/token |
 | Route | `POST /api/routes/search` | Public, 20/min/IP |
 | Upload | `POST /api/videos` multipart file/camera_id/observed_at? | User |
-| Jobs/frames | `GET /api/videos`, `/{id}`, `/{id}/frames/{second}` | Own/Admin |
-| Cancel/delete | `POST /api/videos/{id}/cancel`, `DELETE /api/videos/{id}` | Own/Admin |
-| Publish | `POST /api/videos/{id}/publish` | Own Analyst/Admin |
-| Observation | `POST /api/observations` | Analyst/Admin |
+| Jobs/frames | `GET /api/videos`, `/{id}`, `/{id}/frames/{second}` | Chủ sở hữu, tài khoản Người dùng hoặc Quản lý |
+| Cancel/delete | `POST /api/videos/{id}/cancel`, `DELETE /api/videos/{id}` | Chủ sở hữu, tài khoản Người dùng hoặc Quản lý |
+| Publish | `POST /api/videos/{id}/publish` | Quản lý có quyền `sources.manage`, sở hữu tác vụ và phụ trách tuyến |
+| Observation | `POST /api/observations` | Quản lý theo quyền thao tác và phạm vi tuyến |
 | Favorites | `GET/POST /api/favorites`, `DELETE /api/favorites/{id}` | Own |
 | Alerts | `GET/POST /api/alerts`, `DELETE /api/alerts/{id}` | Own |
 | Notices | `POST /api/notifications/{id}/read` | Own |
-| Reports | `GET /api/reports`, `/api/reports/export` | Analyst/Admin |
-| Cameras | `POST /api/cameras`, `PUT/DELETE /api/cameras/{id}` | Admin |
-| Segments | `POST /api/segments`, `PUT/DELETE /api/segments/{id}` | Admin |
+| Reports | `GET /api/reports`, `/api/reports/export`, `/api/management/traffic-report`, `/api/management/traffic-report/export` | Quản lý có `analytics.view` hoặc `analytics.export`, theo tuyến được giao |
+| Cameras | `GET/POST /api/cameras`, `PUT/DELETE /api/cameras/{id}` | Quản lý có `network.manage`, theo tuyến được giao |
+| Segments | `POST /api/segments`, `PUT/DELETE /api/segments/{id}` | Quản lý có `network.manage`, tạo mới yêu cầu phụ trách toàn bộ tuyến |
 | Users | `GET /api/admin/users?q=`, `PATCH /api/admin/users/{id}`, `POST /api/admin/users/{id}/revoke` | Admin |
-| System/audit | `GET /api/admin/system` | Admin |
+| Operations | `GET /api/management/operations`, `/api/management/events`, `/api/management/events/{id}` | Quản lý toàn bộ tuyến có `diagnostics.view`, chỉ nhật ký vận hành giao thông |
+| Sources | `GET/POST /api/management/sources`, `/{id}`, `/{id}/mapping`, `/{id}/test`, `/{id}/toggle`, `/{id}/receive` | Quản lý có `sources.manage`, theo tuyến được giao |
+| Forecast evaluation | `GET /api/management/hourly-backtest` | Quản lý có `analytics.view`, theo tuyến được giao |
 | Camera board | `GET /api/monitor/cameras` | Public, không trả user ID hay thông tin tệp riêng tư |
 | Shared camera media | `GET /api/monitor/cameras/{id}/frame`, `/{id}/video` | Public chỉ khi đã cho phép chia sẻ, camera/đường còn hoạt động |
-| Retained original | `GET /api/videos/{id}/source` | Own/Admin, HTTP Range |
-| Historical archive | `POST /api/videos/{id}/archive` body `{share_preview:false}` | Own Analyst/Admin, video hoàn tất có thời điểm quay |
-| Change sharing | `POST /api/videos/{id}/share-preview` body `{share_preview:true/false}` | Own Analyst/Admin, đã công bố/lưu lịch sử |
+| Retained original | `GET /api/videos/{id}/source` | Chủ sở hữu, tài khoản Người dùng hoặc Quản lý, HTTP Range |
+| Historical archive | `POST /api/videos/{id}/archive` body `{share_preview:false}` | Quản lý có `sources.manage`, sở hữu tác vụ và phụ trách tuyến, video hoàn tất có thời điểm quay |
+| Change sharing | `POST /api/videos/{id}/share-preview` body `{share_preview:true/false}` | Quản lý có `sources.manage`, sở hữu tác vụ và phụ trách tuyến, đã công bố/lưu lịch sử |
 | Day/month analytics | `GET /api/traffic/history?segment_id=1&period=day&value=2026-10-01` hoặc `period=month&value=2026-10` | Public, thống kê UTC+7 |
 
 Upload nhận thêm form `retain_video=false` mặc định. Publish hiện tại nhận body tùy chọn `{share_preview:false}`; mặc định giữ ảnh/video riêng tư. Archive cho phép video cũ, không biến thời điểm tải lên thành thời điểm quay. Xem [CAMERAS.md](CAMERAS.md) về nguồn dữ liệu, quyền chia sẻ, độ phủ và điều kiện khung giờ lặp lại.
@@ -41,7 +43,7 @@ Client xử lý 401/403/404/409/413/415/422/429/502/503/504. `detail` có thể 
 
 ## Dự báo XGBoost / GRU
 
-API dữ liệu, nhãn thực tế, tác vụ huấn luyện, xuất báo cáo, kích hoạt và dự báo 15/30 phút: xem [FORECASTING.md](FORECASTING.md#api). Truy vấn dự báo công khai; chuẩn bị dữ liệu/huấn luyện yêu cầu Quản lý/Admin; kích hoạt chỉ Admin.
+API dữ liệu, nhãn thực tế, tác vụ huấn luyện, xuất báo cáo, kích hoạt và dự báo 15/30 phút: xem [FORECASTING.md](FORECASTING.md#api). Truy vấn dự báo công khai; chuẩn bị dữ liệu/huấn luyện yêu cầu Quản lý có `models.manage` trong phạm vi được giao. Kích hoạt/ngừng mô hình yêu cầu Quản lý phụ trách toàn bộ tuyến có cùng quyền.
 
 ## Tối ưu tuyến Dijkstra/A*
 

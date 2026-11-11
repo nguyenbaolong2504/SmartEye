@@ -116,23 +116,23 @@ def test_user_priority_changes_optimum_and_dominated_edge_does_not_rescale(clien
     assert first['routes'][0]['score']==second['routes'][0]['score']
 
 
-def test_one_way_roads_new_places_and_favorite_algorithm(admin_client):
+def test_one_way_roads_new_places_and_favorite_algorithm(analyst_client):
     payload={'name':'Surveyed one way','start_node':'new_west','end_node':'new_east','distance_km':2,
         'geometry':[[21.04,105.79],[21.04,105.81]],'is_demo':False,'active':True,'one_way':True}
-    assert admin_client.post('/api/segments',json=payload).status_code==201
+    assert analyst_client.post('/api/segments',json=payload).status_code==201
     auth={'name':'Test Rider','username':'test-rider','email':'test-rider@example.invalid','password':'rider-test-password','password_confirmation':'rider-test-password'}
-    assert admin_client.post('/api/auth/register',json=auth).status_code==201
-    assert admin_client.post('/api/auth/login',json={'email':auth['email'],'password':auth['password']}).status_code==200
-    places=admin_client.get('/api/places').json()
+    assert analyst_client.post('/api/auth/register',json=auth).status_code==201
+    assert analyst_client.post('/api/auth/login',json={'email':auth['email'],'password':auth['password']}).status_code==200
+    places=analyst_client.get('/api/places').json()
     a=next(p for p in places if p['node']=='new_west');b=next(p for p in places if p['node']=='new_east')
     request={'origin':a,'destination':b,'weights':{'time':.6,'distance':.4},'algorithm':'dijkstra'}
-    result=admin_client.post('/api/routes/search',json=request)
+    result=analyst_client.post('/api/routes/search',json=request)
     assert result.status_code==200 and len(result.json()['routes'])==1
     assert not result.json()['optimization']['contains_demo_roads']
-    saved=admin_client.post('/api/favorites',json={'name':'Surveyed route','request':request})
+    saved=analyst_client.post('/api/favorites',json={'name':'Surveyed route','request':request})
     assert saved.status_code==201 and saved.json()['request']['algorithm']=='dijkstra'
     request.update(origin=b,destination=a)
-    assert admin_client.post('/api/routes/search',json=request).status_code==404
+    assert analyst_client.post('/api/routes/search',json=request).status_code==404
 
 
 @pytest.mark.parametrize('weights',[{'time':float('inf'),'distance':.5},{'time':float('nan'),'distance':.5},{'time':-.5,'distance':.5},{'time':0,'distance':0}])

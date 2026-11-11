@@ -4,7 +4,7 @@ Hệ thống chạy thử **dự báo ùn tắc và lựa chọn tuyến đườ
 
 ## Chọn ngày, giờ và tránh giờ cao điểm
 
-Giao diện đã bỏ thanh chọn nguồn dữ liệu phía trên và tên mô hình khỏi các màn hình người dùng. **Dự báo giao thông** mặc định xem ngày mai lúc 17:00: chọn tuyến/ngày/giờ, xem khung giờ nên tránh, số ngày cùng thứ từng ùn tắc và các giờ có thể cân nhắc thay thế. **Tình trạng & thống kê** có một năm lịch sử, so sánh tháng và giờ cao điểm theo từng thứ. Khi tìm tuyến có thể bấm **So sánh giờ đi** để xem giờ đã chọn và một giờ trước/sau.
+Giao diện đã bỏ thanh chọn nguồn dữ liệu phía trên và tên mô hình khỏi các màn hình người dùng. **Dự báo giao thông** mặc định xem ngày mai lúc 17:00: chọn tuyến/ngày/giờ, xem khung giờ nên tránh, số ngày phù hợp từng ùn tắc và các giờ có thể cân nhắc thay thế. **Tình trạng & thống kê** có một năm lịch sử, so sánh tháng và giờ cao điểm theo từng thứ. Khi tìm tuyến có thể bấm **So sánh giờ đi** để xem giờ đã chọn và một giờ trước/sau.
 
 Dữ liệu minh họa mặc định tạo **365 ngày đã qua cùng ngày hiện tại** cho 14 tuyến, lưu riêng với dữ liệu thật. Phần dự báo ngày mai học từ các tuần trước; không lấy nhãn được sinh sẵn của ngày tương lai để trả kết quả. [Hướng dẫn và giới hạn](docs/PLANNING.md).
 
@@ -19,7 +19,7 @@ Google Maps đã được chuẩn bị: khi có cả hai khóa, trang tìm tuy�
 - Đã gỡ trang nhận diện video, lựa chọn kỹ thuật và liên kết mã nguồn khỏi giao diện. Không còn các thẻ camera trống. Upload video mặc định trả HTTP 410; bản ghi cũ vẫn được bảo toàn.
 - Tải từng trang khi cần, một API khởi tạo, ngừng polling khi tab bị ẩn. Gói JS ban đầu giảm khoảng 373 → 252 KB (chưa nén).
 
-**DỮ LIỆU MÔ PHỎNG không phải giao thông thực tế.** Mặc định phát sinh 365 ngày trước và ngày hiện tại, có giờ cao điểm, cuối tuần và nhiễu. Nhãn/mô hình mẫu nằm riêng, không ghi đè quan sát hay mô hình thực. Chuyển sang “Quan sát thực tế” ở đầu trang để xem đúng dữ liệu đã thu thập. [Cách tạo, chạy thử và giới hạn](docs/DEMO.md).
+**DỮ LIỆU MÔ PHỎNG không phải giao thông thực tế.** Mặc định phát sinh 365 ngày trước và ngày hiện tại, có giờ cao điểm, cuối tuần và nhiễu. Nhãn/mô hình mẫu nằm riêng, không ghi đè quan sát hay mô hình thực. Kết quả liên quan có ghi chú nguồn lịch sử minh họa hoặc quan trắc. [Cách tạo, chạy thử và giới hạn](docs/DEMO.md).
 
 ## Chạy bằng Docker
 
@@ -61,6 +61,8 @@ Nếu chưa tạo: `docker compose exec backend python scripts/init_db.py --demo
 | Quản lý | analyst@smarteye.test | SmartEyeAnalyst@2026 |
 | Người dùng | user@smarteye.test | SmartEyeUser@2026 |
 
+Admin quản lý tài khoản, phân quyền và phân công tuyến. Quản lý xử lý toàn bộ nghiệp vụ giao thông, gồm báo cáo theo giờ trong **Giám sát & xử lý**, cùng nguồn dữ liệu, camera và mô hình trong **Dữ liệu & thiết lập**. Các màn hình và thao tác phụ thuộc quyền được cấp.
+
 Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của tài khoản đã tồn tại. Tài khoản database khác tài khoản website; MongoDB lưu password website dưới dạng hash.
 
 ## Mô hình và thuật toán
@@ -68,7 +70,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 | Thành phần | Cách dùng hiện tại |
 |---|---|
 | XGBoost | Dự báo theo ngày/giờ từ lịch sử 7/14/21/28 ngày trước và đặc điểm thời gian; vẫn giữ pipeline ngắn hạn; chia train/validation/test theo thời gian |
-| GRU | Pipeline nghiên cứu trên dữ liệu/nhãn thực, trong phần Dữ liệu & mô hình của Quản lý/Admin; chưa tự tuyên bố tốt hơn XGBoost |
+| GRU | Pipeline nghiên cứu trên dữ liệu/nhãn thực, trong phần Dữ liệu & mô hình của Quản lý được cấp quyền; chưa tự tuyên bố tốt hơn XGBoost |
 | A* | Mặc định tìm chi phí kết hợp trên đồ thị SmartEye hoặc mạng OSM tải đầy đủ |
 | Dijkstra | Thuật toán tham chiếu và chuẩn hóa chi phí; có API đối chiếu, không cần lựa chọn trên giao diện |
 | OSRM | Dịch vụ cung cấp nhanh các tuyến ô tô trên OSM. SmartEye xếp hạng các tuyến được trả về; không tuyên bố chạy A* trên đồ thị nội bộ của dịch vụ |
@@ -76,7 +78,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 
 Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle, yêu cầu loại cao tốc và kiểm tra kết quả trả về; không dùng tuyến ô tô/xe đạp thay thế. Cache chỉ giữ ứng viên hình học/ETA tham chiếu; ưu tiên và tình trạng giao thông được tính lại mỗi lần. Thời gian/khoảng cách là ước tính, chưa phải dẫn đường thời gian thực. Phần đường không có dữ liệu không được coi là thông thoáng. Các dịch vụ công cộng có thể gián đoạn; dùng máy chủ riêng khi cần tải lớn. [Chi tiết định tuyến và giới hạn](docs/MAPS.md).
 
-Đăng ký/đăng nhập, hồ sơ, hành trình yêu thích, cảnh báo theo quan sát thực, nhập CSV, phân quyền và nhật ký quản trị vẫn có sẵn. Dữ liệu mô phỏng không phát cảnh báo thật cho người dùng.
+Đăng ký/đăng nhập, hồ sơ, hành trình yêu thích, cảnh báo theo quan sát thực, nhập CSV, phân quyền và nhật ký vận hành giao thông vẫn có sẵn. Dữ liệu mô phỏng không phát cảnh báo thật cho người dùng.
 
 ## Tài liệu kỹ thuật
 

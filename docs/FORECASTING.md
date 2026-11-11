@@ -1,6 +1,6 @@
 # Pipeline XGBoost / GRU trên dữ liệu quan sát thực
 
-Phần **Dữ liệu & mô hình** nằm trong **Quản trị hệ thống**. Bản chạy thử có mô hình XGBoost học từ dữ liệu minh họa được lưu riêng. [Dữ liệu minh họa](DEMO.md)
+Quản lý mở **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình**. Các tuyến và thao tác hiển thị theo phạm vi, quyền được cấp. Bản chạy thử có mô hình XGBoost học từ dữ liệu minh họa được lưu riêng. [Dữ liệu minh họa](DEMO.md)
 
 ![Trang Tổng quan](previews/overview-redesign.png)
 
@@ -15,10 +15,10 @@ Trang **Tổng quan** là điểm bắt đầu: Tình trạng & thống kê, D�
 1. Cập nhật và chạy Docker theo `docs/RUNNING.md`. Sau thay đổi này cần build **backend** để có `xgboost-cpu` và `scikit-learn`; PyTorch CPU đã có trong Dockerfile. Không cần cài TensorFlow.
 2. Mở `http://localhost:8081/#forecast` nếu `.env` đang dùng `FRONTEND_PORT=8081`.
 3. Người dùng gõ tên đường, chọn ngày và khung giờ trên trang **Dự báo giao thông**. Mốc 15/30 phút của XGBoost và GRU thuộc luồng mô hình kỹ thuật bên dưới.
-4. Admin mở **Quản trị hệ thống → Dữ liệu & mô hình**, chọn tuyến và khoảng thời gian, rồi bấm **Kiểm tra dữ liệu**.
+4. Quản lý có quyền chuẩn bị dữ liệu mở **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình**, chọn tuyến và khoảng thời gian, rồi bấm **Kiểm tra dữ liệu**.
 5. Khi đủ dữ liệu, bấm **Huấn luyện XGBoost + GRU**. Một worker huấn luyện nền; có tiến độ và thao tác hủy. Chỉ một tác vụ chạy tại một thời điểm. Khởi động lại máy chủ sẽ đánh dấu tác vụ gián đoạn là thất bại, không tự phục hồi kết quả dở dang.
 6. Xem bảng so sánh XGBoost / GRU / Giữ nguyên trạng thái, điểm validation, ma trận nhầm lẫn và tải CSV báo cáo.
-7. **Admin** kích hoạt bản đủ điều kiện; mỗi mục tiêu có một bản đang phục vụ. Chỉ các mốc và tuyến đạt đánh giá được phép trả dự báo. Có thể kích hoạt lại một bản cũ hoặc ngừng phục vụ mà không xóa báo cáo.
+7. **Quản lý phụ trách toàn bộ tuyến** có quyền mô hình kích hoạt bản đủ điều kiện; mỗi mục tiêu có một bản đang phục vụ. Chỉ các mốc và tuyến đạt đánh giá được phép trả dự báo. Có thể kích hoạt lại một bản cũ hoặc ngừng phục vụ mà không xóa báo cáo.
 
 Code cung cấp luồng huấn luyện thật, không kèm mô hình dự báo đã huấn luyện cho Hà Nội và không thêm số liệu tổng hợp vào các collection quan sát/nhãn/mô hình thực. Bộ mẫu nằm riêng trong `demo_profiles` và `demo_registry`.
 
@@ -26,15 +26,25 @@ Code cung cấp luồng huấn luyện thật, không kèm mô hình dự báo �
 
 1. **Đoạn đường**. Khai báo tuyến, tỉnh/thành, vị trí và chiều lưu thông để chọn đúng nơi cần dự báo.
 2. **Nguồn dữ liệu**. Nhập dữ liệu quan trắc đã xác nhận tình trạng `FREE`, `SLOW`, `JAM` theo tuyến và chiều. Có thể dùng tệp nguồn đã kiểm tra hoặc nhập CSV nhãn đã xác minh cho chiều đi trong **Dữ liệu & mô hình**. Mật độ hoặc số xe riêng lẻ chưa đủ để gán nhãn ùn tắc. Mỗi giờ cần ít nhất sáu ô năm phút khác nhau, với tối thiểu ba ô ở mỗi nửa giờ.
-3. **Đánh giá dự báo theo giờ**. Chọn tuyến, chiều và ngày cuối. Bản kiểm tra chấm trên 28 ngày quan trắc và dùng tối đa 100 ngày trước mỗi ngày cần chấm. Nó so sánh với cách lấy trạng thái của ngày tương tự gần nhất. Có thể cần đến 128 ngày dữ liệu để bao phủ trọn cả lịch sử và kỳ đánh giá. Giờ thiếu căn cứ được báo riêng qua tỷ lệ số giờ đã chấm trên số giờ có nhãn.
+3. **Đánh giá dự báo theo giờ**. Quản lý mở **Giám sát & xử lý → Báo cáo theo giờ**. Chọn tuyến, chiều và ngày cuối. Bản kiểm tra chấm trên 28 ngày quan trắc và dùng tối đa 100 ngày trước mỗi ngày cần chấm. Nó so sánh với cách lấy trạng thái của ngày tương tự gần nhất. Có thể cần đến 128 ngày dữ liệu để bao phủ trọn cả lịch sử và kỳ đánh giá. Giờ thiếu căn cứ được báo riêng qua tỷ lệ số giờ đã chấm trên số giờ có nhãn.
 4. **Đọc kết quả**. Muốn ghi 80–90% trong báo cáo, lấy tỷ lệ đúng trên những giờ quan trắc thực đã chấm, ghi kèm số mẫu, Macro-F1 và tỷ lệ phát hiện đúng giờ ùn tắc. Nếu đa số giờ thông thoáng, tỷ lệ đúng chung có thể cao trong khi khả năng phát hiện ùn tắc thấp. Giữ một giai đoạn mới để đánh giá lại sau khi điều chỉnh cách dự báo. [Cách tính độ chính xác cân bằng theo lớp](https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html)
 
 Màn hình theo ngày và giờ dùng mẫu lặp từ lịch sử quan trắc khi đủ dữ liệu. Hai mô hình XGBoost và GRU cho mốc 15/30 phút sử dụng quy trình huấn luyện riêng ở phần dưới. Chỉ tiêu 80–90% cần được xác nhận riêng cho từng bài toán, tuyến và chiều.
 
+## Căn cứ dự báo đang dùng
+
+Màn hình chọn ngày và giờ ưu tiên lịch sử quan trắc của đúng đoạn đường, chiều đi và khung giờ. Hệ thống xét 100 ngày trước, nhóm ngày làm việc hoặc cuối tuần giống ngày cần dự báo, rồi chọn trạng thái xuất hiện nhiều nhất. Cần ít nhất 5 ngày phù hợp có dữ liệu đạt yêu cầu. Nhánh này đang dùng mẫu lặp trong lịch sử, chưa kết hợp lượng xe hiện tại vào một mô hình AI.
+
+Bộ mẫu một năm phục vụ chạy thử có XGBoost cho ngày tương lai. Đầu vào gồm giờ, thứ, chu kỳ trong năm, mã tuyến và các chỉ số của cùng giờ cách 7, 14, 21, 28 ngày. Các chỉ số lịch sử gồm mật độ, tỷ lệ ô ùn tắc, tốc độ và số xe. Kết quả từ bộ mẫu được gắn nhãn minh họa.
+
+Pipeline XGBoost và GRU trên dữ liệu thực ở tài liệu này giải quyết mốc 15 và 30 phút. Nó lấy 60 phút quan sát vừa qua cùng giờ, thứ và mã tuyến. Số xe, mật độ và tỷ lệ quan sát cao/thấp hiện có trong đặc trưng. Vận tốc và lưu lượng theo phút chưa phải đầu vào của pipeline này. Nhãn ùn tắc cần căn cứ thực tế độc lập.
+
+Tỷ lệ 18 ngày ùn tắc trên 20 ngày phù hợp tương đương tần suất lịch sử 90%. API trả tỷ lệ này qua `jam_frequency`. Tỷ lệ đó mô tả tập lịch sử đã quan sát. Để công bố xác suất ùn tắc 90% cho một dự báo mới, cần kiểm tra khả năng hiệu chỉnh xác suất trên dữ liệu thực tách riêng theo thời gian. Độ chính xác của mô hình được đo bằng việc đối chiếu các dự báo với tình trạng xảy ra sau đó, kèm số mẫu, Macro-F1 và khả năng phát hiện đúng giờ ùn tắc.
+
 ## Chuẩn bị dữ liệu
 
 - Nhập CSV có thời gian và nguồn quan sát đã được phép sử dụng. Dữ liệu video đã công bố từ bản cũ vẫn được đọc; màn hình tải video mới đã gỡ.
-- Hoặc Quản lý/Admin nhập CSV số liệu đã quan sát. Tải mẫu tiêu đề ở `database/templates/traffic-observations.csv`. Các cột bắt buộc: `segment_id,observed_at,score,count,density`.
+- Hoặc Quản lý có quyền `models.manage` trong phạm vi được phân công nhập CSV số liệu đã quan sát. Tải mẫu tiêu đề ở `database/templates/traffic-observations.csv`. Các cột bắt buộc: `segment_id,observed_at,score,count,density`.
 - Thời gian là ISO có múi giờ; score 0–1, count 0–10000, density LOW/NORMAL/HIGH. Mỗi dòng là một quan sát thật, không phải một hàng đại diện do hệ thống tự nhân lên.
 - CSV tối đa 2 MB/5.000 dòng. **Kiểm tra CSV** không ghi DB; **Xác nhận nhập** mới ghi. Tất cả hàng được kiểm tra trước khi ghi. Nhập lại cùng tuyến/thời điểm bỏ qua bản đã có, không ghi đè. MongoDB không có transaction nhiều document: lỗi giữa lúc ghi có thể để lại một phần; nhập lại an toàn nhờ sample_key unique.
 - CSV chỉ nhập mẫu mật độ; không tự tạo nhãn ùn tắc.
@@ -46,7 +56,7 @@ segment_id,observed_at,score,count,density
 1,2026-01-15T07:01:00+07:00,0.40,12,NORMAL
 ```
 
-Đối với mục tiêu **ùn tắc**, Quản lý/Admin phải xác nhận nhãn FREE/SLOW/JAM sau khi xem căn cứ thực tế. Mốc nhãn là **kết thúc ô 5 phút**: nhãn 07:05 mô tả ô 07:00–07:05. Có tên người xác nhận, căn cứ và nhật ký. API không chấp nhận nhãn tương lai hoặc mốc không chia hết 5 phút. Có thể nhập hàng loạt bằng CSV nhãn riêng (`segment_id,observed_at,state,note`), kiểm tra trước rồi xác nhận nhập. Mốc đã có được cập nhật và gắn người nhập hiện tại; không sinh mẫu mật độ. Có thể sửa nhãn; bộ dữ liệu của các lần huấn luyện đã lưu giữ nguyên để truy vết.
+Đối với mục tiêu **ùn tắc**, Quản lý có quyền `models.manage` trong phạm vi được phân công phải xác nhận nhãn FREE/SLOW/JAM sau khi xem căn cứ thực tế. Mốc nhãn là **kết thúc ô 5 phút**: nhãn 07:05 mô tả ô 07:00–07:05. Có tên người xác nhận, căn cứ và nhật ký. API không chấp nhận nhãn tương lai hoặc mốc không chia hết 5 phút. Có thể nhập hàng loạt bằng CSV nhãn riêng (`segment_id,observed_at,state,note`), kiểm tra trước rồi xác nhận nhập. Mốc đã có được cập nhật và gắn người nhập hiện tại; không sinh mẫu mật độ. Có thể sửa nhãn; bộ dữ liệu của các lần huấn luyện đã lưu giữ nguyên để truy vết.
 
 ## Cửa sổ và đặc trưng
 
@@ -78,7 +88,7 @@ Mô hình thắng được chọn bằng Macro-F1 trên **validation**. Báo cá
 
 ## Phục vụ dự báo và tìm đường
 
-Chỉ đọc mô hình Admin đã kích hoạt, có tệp đầy đủ, đúng tuyến và đúng mục tiêu. Cần 60 phút dữ liệu liên tiếp đủ chất lượng; ô mới nhất kết thúc không quá 10 phút trước. Mô hình có khoảng dữ liệu huấn luyện kết thúc quá 45 ngày cần huấn luyện lại. Không hiển thị tỷ lệ “chắc chắn tắc” chưa được hiệu chỉnh xác suất.
+Chỉ đọc mô hình Quản lý đã kích hoạt, có tệp đầy đủ, đúng tuyến và đúng mục tiêu. Cần 60 phút dữ liệu liên tiếp đủ chất lượng; ô mới nhất kết thúc không quá 10 phút trước. Mô hình có khoảng dữ liệu huấn luyện kết thúc quá 45 ngày cần huấn luyện lại. Không hiển thị tỷ lệ “chắc chắn tắc” chưa được hiệu chỉnh xác suất.
 
 Với tìm tuyến khởi hành trong tương lai, dự báo chỉ được ghép khi thời điểm dự báo lệch giờ khởi hành tối đa 2,5 phút, trong phạm vi 35 phút tới. Ưu tiên mô hình ùn tắc nếu có, sau đó mật độ; thiếu dự báo thì dùng lịch sử đủ bằng chứng. Quan sát hiện tại vẫn phục vụ tìm tuyến ngay bây giờ. Camera/dự báo chỉ bổ sung rủi ro, giữ ETA của Google. Đây chưa phải mô hình dự báo theo thời điểm đến từng cạnh của tuyến.
 
@@ -92,13 +102,13 @@ Ba collection mới: `forecast_runs` (tác vụ/báo cáo), `traffic_labels` (nh
 
 | API | Quyền |
 |---|---|
-| GET `/api/forecast/status`, GET `/api/forecast/predict?segment_id=1&target=density` | Công khai, metadata và dự báo đã kích hoạt |
-| POST `/api/forecast/readiness`, GET/POST `/api/forecast/runs` | Quản lý/Admin |
-| POST `/api/forecast/runs/{uuid}/cancel` | Người tạo tác vụ hoặc Admin |
-| POST `/api/forecast/runs/{uuid}/activate`, DELETE `/api/forecast/active/{target}` | Admin |
-| GET `/api/forecast/runs/{uuid}/report.csv` | Quản lý/Admin |
-| GET/POST `/api/forecast/labels`, POST `/api/forecast/labels/import?dry_run=true/false` | Quản lý/Admin |
-| POST `/api/forecast/import?dry_run=true/false` | Quản lý/Admin |
+| GET `/api/forecast/status`, GET `/api/forecast/predict?segment_id=1&target=density` | Dự báo đã kích hoạt theo quyền xem dự báo, metadata còn hỗ trợ quyền quản lý mô hình |
+| POST `/api/forecast/readiness`, GET/POST `/api/forecast/runs` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| POST `/api/forecast/runs/{uuid}/cancel` | Quản lý có quyền `models.manage`, phụ trách toàn bộ các tuyến của tác vụ |
+| POST `/api/forecast/runs/{uuid}/activate`, DELETE `/api/forecast/active/{target}` | Quản lý toàn bộ tuyến có quyền `models.manage` |
+| GET `/api/forecast/runs/{uuid}/report.csv` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| GET/POST `/api/forecast/labels`, POST `/api/forecast/labels/import?dry_run=true/false` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| POST `/api/forecast/import?dry_run=true/false` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
 
 ## Chạy sau cập nhật
 

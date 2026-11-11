@@ -43,17 +43,21 @@ def warning(client,incident_id=None):
 
 
 def source(client,speed=True,state=True,direction='forward'):
-    login(client,'admin@test.vn')
-    response=client.post('/api/admin/sources',json={'name':'Nguồn quan trắc kiểm thử','kind':'file','format':'csv','segment_id':1,'direction':direction,
+    with SessionLocal() as db:
+        if not db.find_one(User,{'email':'source-manager@test.vn'}):
+            db.add(User(email='source-manager@test.vn',name='Source manager',role='analyst',password=hash_password(PASSWORD)))
+            db.commit()
+    login(client,'source-manager@test.vn')
+    response=client.post('/api/management/sources',json={'name':'Nguồn quan trắc kiểm thử','kind':'file','format':'csv','segment_id':1,'direction':direction,
             'authorized':True,'speed_verified':speed,'state_verified':state,'count_method':'crossings','interval_seconds':60})
     assert response.status_code==201,response.text
     value=response.json();assert not value['active']
     mapping={key:key for key in ('observed_at','segment_id','direction','count','interval_seconds','speed_kmh','score','density','state')}
-    value=client.put(f'/api/admin/sources/{value["id"]}/mapping',json={'revision':value['revision'],'mapping':mapping,'units':{'speed_kmh':'km/h'},'confirmed':True}).json()
+    value=client.put(f'/api/management/sources/{value["id"]}/mapping',json={'revision':value['revision'],'mapping':mapping,'units':{'speed_kmh':'km/h'},'confirmed':True}).json()
     sample={'observed_at':(now()-timedelta(seconds=30)).isoformat(),'segment_id':1,'direction':direction,'count':20,'speed_kmh':12,'score':.8,'state':'JAM'}
-    value=client.post(f'/api/admin/sources/{value["id"]}/test',json={'revision':value['revision'],'sample':sample}).json()
+    value=client.post(f'/api/management/sources/{value["id"]}/test',json={'revision':value['revision'],'sample':sample}).json()
     assert value['tested']
-    value=client.post(f'/api/admin/sources/{value["id"]}/toggle',json={'revision':value['revision'],'active':True,'confirmed':True}).json()
+    value=client.post(f'/api/management/sources/{value["id"]}/toggle',json={'revision':value['revision'],'active':True,'confirmed':True}).json()
     return value,sample
 
 
@@ -198,16 +202,16 @@ def test_admin_can_limit_report_actions_without_granting_other_roles(client):
 
 def test_source_mapping_check_enable_import_and_missing_speed_are_honest(client):
     value,sample=source(client,speed=False,state=False)
-    response=client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample,{**sample,'segment_id':999}]})
+    response=client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':[sample,{**sample,'segment_id':999}]})
     assert response.status_code==200 and response.json()['accepted']==1 and response.json()['rejected']==1
     actual=client.get('/api/traffic/road?segment_id=1',headers={'Cookie':''}).json()
     assert actual['state'] is None and actual['fresh']
     assert 'speed_kmh' not in actual['metrics'] and actual['metrics']['count']['value']==20
     assert 'flow_per_minute' not in actual['metrics']
-    duplicate=client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample]}).json()
+    duplicate=client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':[sample]}).json()
     assert duplicate['duplicates']==1
-    value=client.post(f'/api/admin/sources/{value["id"]}/toggle',json={'revision':value['revision'],'active':False,'confirmed':True}).json()
-    assert client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample]}).status_code==409
+    value=client.post(f'/api/management/sources/{value["id"]}/toggle',json={'revision':value['revision'],'active':False,'confirmed':True}).json()
+    assert client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':[sample]}).status_code==409
     assert not client.get('/api/traffic/road?segment_id=1',headers={'Cookie':''}).json()['fresh']
     with SessionLocal() as db:assert db.database.road_readings.count_documents({})==1
 
@@ -215,7 +219,7 @@ def test_source_mapping_check_enable_import_and_missing_speed_are_honest(client)
 def test_import_retry_recovers_forecast_input_without_counting_reading_twice(client,monkeypatch):
     from backend.app import sources
     value,sample=source(client)
-    url=f'/api/admin/sources/{value["id"]}/receive'
+    url=f'/api/management/sources/{value["id"]}/receive'
     rows={'rows':[{**sample,'interval_seconds':120,'density':'HIGH'}]}
     def fail_mirror(db,record):
         raise PyMongoError('test-only downstream write failure')
@@ -232,14 +236,34 @@ def test_import_retry_recovers_forecast_input_without_counting_reading_twice(cli
 
 
 @pytest.mark.parametrize('bad', ['http://example.org/data','https://user:password@example.org/data','https://example.org/data?token=secret','https://127.0.0.1/data','file:///etc/passwd'])
-def test_source_rejects_secret_urls_and_unsafe_targets(admin_client,bad):
-    response=admin_client.post('/api/admin/sources',json={'name':'Nguồn kiểm thử URL','kind':'api','format':'json','segment_id':1,'authorized':True,'url':bad})
+def test_source_rejects_secret_urls_and_unsafe_targets(analyst_client,bad):
+    response=analyst_client.post('/api/management/sources',json={'name':'Nguồn kiểm thử URL','kind':'api','format':'json','segment_id':1,'authorized':True,'url':bad})
     assert response.status_code==422
+
+
+def test_source_credentials_require_approved_host_and_preserve_existing_origin(analyst_client,monkeypatch):
+    path='/api/management/sources'
+    body={'name':'Authorized traffic service','kind':'api','format':'json','segment_id':1,'authorized':True,
+          'url':'https://unapproved.example.org/data','credential_env':'TRAFFIC_SOURCE_TEST_KEY'}
+    monkeypatch.setenv('TRAFFIC_SOURCE_TEST_KEY_HOST','approved.example.org')
+    assert analyst_client.post(path,json=body).status_code==422
+    assert analyst_client.get(path).json()==[]
+    body['url']='https://approved.example.org/data'
+    created=analyst_client.post(path,json=body)
+    assert created.status_code==201,created.text
+    source=created.json()
+    # Older configured sources keep working when their URL path changes on the same origin.
+    monkeypatch.delenv('TRAFFIC_SOURCE_TEST_KEY_HOST')
+    body['url']='https://approved.example.org/new-path'
+    updated=analyst_client.patch(f'{path}/{source["id"]}',json={**body,'revision':source['revision']})
+    assert updated.status_code==200,updated.text
+    body['url']='https://unapproved.example.org/new-path'
+    assert analyst_client.patch(f'{path}/{source["id"]}',json={**body,'revision':updated.json()['revision']}).status_code==422
 
 
 def test_current_conditions_are_scoped_and_stale_values_are_not_current(client):
     value,sample=source(client)
-    client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample]})
+    client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':[sample]})
     assert client.post('/api/auth/logout').status_code==200
     current=client.get('/api/traffic/road?segment_id=1').json()
     assert current['state']=='JAM' and current['metrics']['speed_kmh']['value']==12
@@ -253,15 +277,15 @@ def test_rule_proposes_only_pending_warning_and_keeps_version(client):
     people(client);value,sample=source(client)
     base=now()
     rows=[{**sample,'observed_at':(base-timedelta(minutes=i,seconds=30)).isoformat()} for i in range(5)]
-    client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':rows})
+    client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':rows})
     login(client,'manager@test.vn')
     rule=client.post('/api/management/rules',json={'name':'Theo dõi tốc độ thấp','segment_id':1,'metric':'speed_kmh','operator':'lt','threshold':20,'unit':'km/h','window_minutes':4}).json()
     assert not rule['active']
     rule=client.post(f'/api/management/rules/{rule["id"]}/test',json={'revision':rule['revision']}).json()
     assert rule['tested']
     rule=client.post(f'/api/management/rules/{rule["id"]}/toggle',json={'revision':rule['revision'],'active':True,'confirmed':True}).json()
-    login(client,'admin@test.vn')
-    result=client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[{**sample,'observed_at':(base-timedelta(seconds=10)).isoformat()}]})
+    login(client,'source-manager@test.vn')
+    result=client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':[{**sample,'observed_at':(base-timedelta(seconds=10)).isoformat()}]})
     assert result.status_code==200,result.text
     assert client.get('/api/warnings',headers={'Cookie':''}).json()==[]
     with SessionLocal() as db:
@@ -301,21 +325,88 @@ def test_registration_confirmation_login_and_profile_conflicts(client):
 def test_observed_reports_and_csv_use_identical_filters(client):
     value,sample=source(client)
     start=(now()-timedelta(hours=1)).isoformat();end=stamp()
-    client.post(f'/api/admin/sources/{value["id"]}/receive',json={'rows':[sample]})
+    client.post(f'/api/management/sources/{value["id"]}/receive',json={'rows':[sample]})
     query={'segment_id':1,'direction':'forward','start':start,'end':end}
-    result=client.get('/api/admin/traffic-report',params=query);assert result.status_code==200
+    result=client.get('/api/management/traffic-report',params=query);assert result.status_code==200
     assert result.json()['valid_samples']==1 and result.json()['unknown_samples']==0
-    exported=client.get('/api/admin/traffic-report/export',params=query)
+    exported=client.get('/api/management/traffic-report/export',params=query)
     assert exported.status_code==200 and 'observed' in exported.text and 'JAM' in exported.text
-    assert client.get('/api/admin/traffic-report',params={**query,'start':end,'end':start}).status_code==422
+    assert client.get('/api/management/traffic-report',params={**query,'start':end,'end':start}).status_code==422
 
 
-def test_journal_redacts_secrets_and_is_read_only(admin_client):
+def test_journal_redacts_secrets_and_is_read_only(analyst_client):
     from backend.app.models import Audit
     with SessionLocal() as db:db.add(Audit(action='source_failed',detail='token=hidden-password mongodb://secret:password@db/test',level='error',service='ingestion'));db.commit()
-    items=admin_client.get('/api/admin/events?level=error&service=ingestion').json();assert len(items)==1
+    items=analyst_client.get('/api/management/events?level=error&service=ingestion').json();assert len(items)==1
     assert 'hidden-password' not in items[0]['detail'] and 'secret:password' not in items[0]['detail']
-    assert admin_client.delete(f'/api/admin/events/{items[0]["id"]}').status_code==405
+    assert analyst_client.delete(f'/api/management/events/{items[0]["id"]}').status_code==405
+
+
+def test_admin_can_manage_accounts_but_cannot_open_traffic_reports(admin_client):
+    query={'segment_id':1,'direction':'forward','start':(now()-timedelta(days=1)).isoformat(),'end':stamp()}
+    assert admin_client.get('/api/admin/accounts').status_code==200
+    for path in ('/api/management/traffic-report','/api/management/traffic-report/export',
+                 '/api/admin/traffic-report','/api/admin/traffic-report/export',
+                 '/api/management/hourly-backtest','/api/admin/hourly-backtest',
+                 '/api/reports','/api/reports/export','/api/management/sources',
+                 '/api/management/operations','/api/management/events','/api/forecast/runs','/api/cameras'):
+        assert admin_client.get(path,params=query).status_code==403,path
+    assert admin_client.post('/api/observations',json={'segment_id':1,'score':.5,'observed_at':stamp()}).status_code==403
+
+
+def test_manager_reports_and_model_records_stay_inside_assigned_roads(client):
+    import uuid
+    from backend.app.business_models import DataSource
+    from backend.app.models import ForecastRun, Observation
+    with SessionLocal() as db:
+        person=User(email='scoped@test.vn',name='Scoped manager',role='analyst',password=hash_password(PASSWORD),managed_segment_ids=[1])
+        db.add(person);db.commit()
+        for sid in (1,2):
+            db.add(Observation(user_id=person.id,segment_id=sid,density='LOW',score=.1,observed_at=stamp()))
+            db.add(DataSource(name=f'Source {sid}',kind='file',format='csv',segment_id=sid,direction='forward',created_by=person.id,signature=f'scope-{sid}'))
+            db.add(ForecastRun(id=str(uuid.uuid4()),user_id=person.id,target='density',segment_ids=[sid],
+                start_at=(now()-timedelta(days=30)).isoformat(),end_at=stamp(),status='completed',running=False))
+        db.commit()
+    login(client,'scoped@test.vn')
+    query={'segment_id':1,'direction':'forward','start':(now()-timedelta(days=1)).isoformat(),'end':stamp()}
+    assert client.get('/api/management/traffic-report',params=query).status_code==200
+    assert client.get('/api/management/traffic-report/export',params=query).status_code==200
+    for path in ('/api/management/traffic-report','/api/management/traffic-report/export',
+                 '/api/reports','/api/reports/export','/api/forecast/labels'):
+        assert client.get(path,params={**query,'segment_id':2}).status_code==403,path
+    assert client.get('/api/management/hourly-backtest',params={'segment_id':2,'end':(now()-timedelta(days=1)).date().isoformat()}).status_code==403
+    assert {item['segment_id'] for item in client.get('/api/reports').json()['observations']}=={1}
+    assert {item['segment_id'] for item in client.get('/api/management/sources').json()}=={1}
+    assert [item['segment_ids'] for item in client.get('/api/forecast/runs').json()]==[[1]]
+    assert all(item['segment_id']==1 for item in client.get('/api/cameras').json())
+    for path in ('/api/management/operations','/api/management/events'):
+        assert client.get(path).status_code==403
+
+
+def test_report_view_permission_does_not_grant_export(client):
+    with SessionLocal() as db:
+        db.add(User(email='report-viewer@test.vn',name='Report viewer',role='analyst',password=hash_password(PASSWORD),
+                    managed_segment_ids=[1],permissions=['analytics.view']))
+        db.commit()
+    login(client,'report-viewer@test.vn')
+    query={'segment_id':1,'direction':'forward','start':(now()-timedelta(days=1)).isoformat(),'end':stamp()}
+    assert client.get('/api/management/traffic-report',params=query).status_code==200
+    assert client.get('/api/reports').status_code==200
+    assert client.get('/api/management/traffic-report/export',params=query).status_code==403
+    assert client.get('/api/reports/export').status_code==403
+    assert client.get('/api/management/sources').status_code==403
+
+
+def test_operational_journal_excludes_account_events(analyst_client):
+    from backend.app.models import Audit
+    with SessionLocal() as db:
+        hidden=Audit(action='account_created',detail='Account information')
+        visible=Audit(action='source_failed',detail='Source unavailable')
+        db.add(hidden);db.add(visible);db.commit()
+    items=analyst_client.get('/api/management/events').json()
+    assert [item['id'] for item in items]==[visible.id]
+    assert analyst_client.get(f'/api/management/events/{hidden.id}').status_code==404
+    assert analyst_client.get(f'/api/management/events/{visible.id}').status_code==200
 
 
 def test_failed_state_write_leaves_original_state(client,monkeypatch):

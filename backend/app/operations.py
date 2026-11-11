@@ -6,17 +6,21 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from .db import get_db, now, stamp
-from .security import admin
+from .security import permit
 from .models import Audit
 from .business_models import DataSource, RoadReading
-from .business_common import period, road, serialize, clean_csv, utc
+from .business_common import period, road, require_global_scope, serialize, clean_csv, utc
 from .history import LOCAL
 
 router=APIRouter()
+OPERATION_EVENT={'$or':[
+    {'action':{'$regex':r'^(incident_|warning_|rule_|source_|forecast_|traffic_label|camera_|segment_|video_)'}},
+    {'action':{'$in':['manual_observation','report_export','hourly_report_export']}},
+]}
 
 
-def report(db,segment_id,direction,start,end):
-    road(db,segment_id,direction)
+def report(db,segment_id,direction,start,end,user):
+    road(db,segment_id,direction,user)
     dates=period(start,end)
     if not {'$gte','$lte'}<=dates.keys():raise HTTPException(422,'Chọn đầy đủ thời gian bắt đầu và kết thúc.')
     if utc(dates['$lte'])>now():raise HTTPException(422,'Khoảng thống kê không được ở tương lai.')
@@ -34,16 +38,18 @@ def report(db,segment_id,direction,start,end):
             'valid_samples':sum(h['samples']-h['unknown'] for h in hours),'unknown_samples':sum(h['unknown'] for h in hours)}
 
 
-@router.get('/api/admin/traffic-report')
-def statistics(segment_id:int,direction:str,start:str,end:str,user=Depends(admin),db=Depends(get_db)):
+@router.get('/api/management/traffic-report')
+@router.get('/api/admin/traffic-report',include_in_schema=False)
+def statistics(segment_id:int,direction:str,start:str,end:str,user=Depends(permit('analytics.view')),db=Depends(get_db)):
     if direction not in ('forward','reverse'):raise HTTPException(422,'Chiều đường không hợp lệ.')
-    return report(db,segment_id,direction,start,end)
+    return report(db,segment_id,direction,start,end,user)
 
 
-@router.get('/api/admin/traffic-report/export')
-def export(segment_id:int,direction:str,start:str,end:str,format:str='csv',user=Depends(admin),db=Depends(get_db)):
+@router.get('/api/management/traffic-report/export')
+@router.get('/api/admin/traffic-report/export',include_in_schema=False)
+def export(segment_id:int,direction:str,start:str,end:str,format:str='csv',user=Depends(permit('analytics.export')),db=Depends(get_db)):
     if format!='csv' or direction not in ('forward','reverse'):raise HTTPException(422,'Khoảng thời gian hoặc định dạng tệp chưa hợp lệ.')
-    value=report(db,segment_id,direction,start,end);out=io.StringIO();out.write('\ufeff');writer=csv.writer(out)
+    value=report(db,segment_id,direction,start,end,user);out=io.StringIO();out.write('\ufeff');writer=csv.writer(out)
     for key in ('segment_id','direction','start','end','timezone','source','generated_at','valid_samples','unknown_samples'):
         writer.writerow([key,clean_csv(value[key])])
     writer.writerow(['Ghi chú','Chỉ gồm dữ liệu quan trắc; khoảng không có mẫu không được coi là thông thoáng.'])
@@ -61,10 +67,11 @@ def redact(value):
     return value[:2000]
 
 
-@router.get('/api/admin/events')
+@router.get('/api/management/events')
 def events(q:str=Query(default='',max_length=100),start:str|None=None,end:str|None=None,level:str|None=None,service:str|None=None,
-           user=Depends(admin),db=Depends(get_db)):
-    query={};conditions=[]
+           user=Depends(permit('diagnostics.view')),db=Depends(get_db)):
+    require_global_scope(user)
+    query={};conditions=[OPERATION_EVENT]
     if q:conditions.append({'$or':[{field:{'$regex':re.escape(q),'$options':'i'}} for field in ('event_id','request_id','action','detail')]})
     if level:
         if level not in ('info','warning','error'):raise HTTPException(422,'Mức nhật ký không hợp lệ.')
@@ -78,15 +85,17 @@ def events(q:str=Query(default='',max_length=100),start:str|None=None,end:str|No
     return [{**serialize(row),'detail':redact(row.detail)} for row in db.find(Audit,query,sort=[('id',-1)],limit=300)]
 
 
-@router.get('/api/admin/events/{ident}')
-def event_detail(ident:int,user=Depends(admin),db=Depends(get_db)):
-    item=db.get(Audit,ident)
+@router.get('/api/management/events/{ident}')
+def event_detail(ident:int,user=Depends(permit('diagnostics.view')),db=Depends(get_db)):
+    require_global_scope(user)
+    item=db.find_one(Audit,{'id':ident,**OPERATION_EVENT})
     if not item:raise HTTPException(404,'Không có quyền xem hoặc bản ghi đã không còn tồn tại.')
     return {**serialize(item),'detail':redact(item.detail)}
 
 
-@router.get('/api/admin/operations')
-def operations(user=Depends(admin),db=Depends(get_db)):
+@router.get('/api/management/operations')
+def operations(user=Depends(permit('diagnostics.view')),db=Depends(get_db)):
+    require_global_scope(user)
     from .sources import source_state
     checked=stamp()
     try:db.database.command('ping');database_state='healthy'

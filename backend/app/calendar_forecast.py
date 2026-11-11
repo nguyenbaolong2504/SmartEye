@@ -11,7 +11,7 @@ from fastapi import APIRouter,Depends,HTTPException
 from .db import get_db,now,stamp
 from .history import LOCAL
 from .forecast_data import CLASSES,split_indices
-from .security import admin, permit
+from .security import permit
 from .hourly_history import LOOKBACK_DAYS, TEXT, backtest, evidence_by_hour, observed_profiles
 
 router=APIRouter()
@@ -219,10 +219,11 @@ def road_outlook(segment_id:int,date:date,hour:int=17,direction:Literal['forward
     return outlook(db.database,segment_id,date,hour,direction,data_mode)
 
 
-@router.get('/api/admin/hourly-backtest',dependencies=[Depends(admin)])
-def hourly_backtest(segment_id:int,end:date,direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
+@router.get('/api/management/hourly-backtest')
+@router.get('/api/admin/hourly-backtest',include_in_schema=False)
+def hourly_backtest(segment_id:int,end:date,direction:Literal['forward','reverse']='forward',user=Depends(permit('analytics.view')),db=Depends(get_db)):
     from .business_common import road
-    road(db,segment_id,direction)
+    road(db,segment_id,direction,user)
     if end>=now().astimezone(LOCAL).date():
         raise HTTPException(422,'Chọn ngày đánh giá muộn nhất là hôm qua.')
     return backtest(db.database,segment_id,direction,end+timedelta(days=1))

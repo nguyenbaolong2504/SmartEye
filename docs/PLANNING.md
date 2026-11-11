@@ -6,7 +6,7 @@ Bản này tập trung vào câu hỏi: **Ngày mai, đi qua tuyến đường n
 
 1. Mở **Dự báo giao thông**.
 2. Chọn tuyến đường, ngày và giờ định đi. Mặc định là ngày mai lúc 17:00; hỗ trợ các ngày trong một tuần tới.
-3. Bấm **Xem dự báo**. Trang hiển thị tình trạng dự kiến, số ngày cùng thứ từng ùn tắc và những khung giờ nên cân nhắc tránh.
+3. Bấm **Xem dự báo**. Trang hiển thị tình trạng dự kiến, số ngày phù hợp từng ùn tắc và những khung giờ nên cân nhắc tránh.
 4. Có thể chọn một giờ khác trong dải 24 giờ hoặc các giờ được gợi ý. Đây là các giờ để cân nhắc, không bảo đảm rằng đường chắc chắn thông thoáng.
 5. Bấm **Xem lịch sử tuyến đường** để xem một năm đã qua, so sánh từng tháng và giờ cao điểm theo từng thứ. Bấm cột tháng hoặc ô ngày/giờ để đi sâu vào lịch sử.
 6. Bấm **Tìm tuyến đường** để giữ lại giờ dự định đi. Nhập điểm xuất phát và điểm đến, tính tuyến, rồi bấm **So sánh giờ đi** để xem giờ đã chọn và một giờ trước/sau.
@@ -32,7 +32,9 @@ Chỉ chạy lại khi cần thay bộ dữ liệu. Khởi động bình thườ
 
 ## Dự báo dùng lịch sử như thế nào?
 
-Phần dự báo ngày sắp tới dùng XGBoost riêng cho từng khung giờ: học đặc điểm giờ/thứ/mùa và tình trạng cùng giờ cách 7, 14, 21, 28 ngày. Kết quả được trình bày dưới dạng thông thoáng, đông xe hoặc dễ ùn tắc. Số ngày cùng thứ từng ùn tắc là thống kê thực tế của bộ lịch sử đang dùng, không phải một phần trăm độ tin cậy do tự đặt ra.
+Khi có quan trắc đủ chất lượng, dự báo ngày/giờ đối chiếu 100 ngày trước ở cùng tuyến, chiều và giờ, chọn nhóm ngày làm việc hoặc cuối tuần giống ngày định đi. Trạng thái xuất hiện nhiều nhất được dùng để ước tính, với ít nhất 5 ngày phù hợp. Tỷ lệ ngày ùn tắc là tần suất đã quan sát trong lịch sử.
+
+Với bộ mẫu, dự báo tương lai dùng XGBoost học đặc điểm giờ/thứ/mùa và tình trạng cùng giờ cách 7, 14, 21, 28 ngày. Kết quả được trình bày dưới dạng thông thoáng, đông xe hoặc dễ ùn tắc. Thống kê đi kèm dùng cùng nhóm ngày làm việc/cuối tuần trong 100 ngày, còn mô hình dùng đặc trưng các tuần trước. Bộ mẫu và điểm kiểm thử trên bộ mẫu được ghi rõ là minh họa.
 
 Huấn luyện và đánh giá chia theo thứ tự thời gian; có khoảng cách một ngày giữa nhãn và phần tiếp theo. Khi phục vụ, chỉ đọc ngày đã qua, bỏ toàn bộ tổng hợp ngày hiện tại để tránh lấy cả những giờ chưa xảy ra. Không sinh ngày mai rồi lấy nhãn của ngày đó trả thay kết quả mô hình. Kiểm thử còn chèn một ngày tương lai để xác nhận nó không làm đổi dự báo.
 

@@ -54,11 +54,11 @@ def test_congestion_requires_independent_current_and_future_labels():
     assert output['y'].tolist()==[2] and output['baseline'].tolist()==[0]
 
 
-def test_readiness_and_public_no_model_are_honest(admin_client):
-    output=admin_client.post('/api/forecast/readiness',json=body())
+def test_readiness_and_public_no_model_are_honest(analyst_client):
+    output=analyst_client.post('/api/forecast/readiness',json=body())
     assert output.status_code==200 and not output.json()['ready']
     assert output.json()['horizons']['15']['windows']==0
-    result=admin_client.get('/api/forecast/predict?segment_id=1',headers={'Cookie':''}).json()
+    result=analyst_client.get('/api/forecast/predict?segment_id=1',headers={'Cookie':''}).json()
     assert result['state']=='no_model' and result['predictions']==[]
 
 
@@ -92,90 +92,90 @@ def test_private_training_and_labels_require_operator(client):
     assert client.get('/api/forecast/labels?segment_id=1').status_code==403
 
 
-def test_csv_preview_is_read_only_commit_is_idempotent(admin_client):
+def test_csv_preview_is_read_only_commit_is_idempotent(analyst_client):
     at=(now()-timedelta(days=1)).isoformat()
     content=f'segment_id,observed_at,score,count,density\n1,{at},0.8,25,HIGH\n'
     path='/api/forecast/import'
-    assert admin_client.post(path,files={'file':('samples.csv',content,'text/csv')}).json()['rows']==1
+    assert analyst_client.post(path,files={'file':('samples.csv',content,'text/csv')}).json()['rows']==1
     assert get_database().traffic_samples.count_documents({})==0
-    first=admin_client.post(path+'?dry_run=false',files={'file':('samples.csv',content,'text/csv')})
+    first=analyst_client.post(path+'?dry_run=false',files={'file':('samples.csv',content,'text/csv')})
     assert first.status_code==200 and first.json()['inserted']==1
-    again=admin_client.post(path+'?dry_run=false',files={'file':('samples.csv',content,'text/csv')})
+    again=analyst_client.post(path+'?dry_run=false',files={'file':('samples.csv',content,'text/csv')})
     assert again.json()['inserted']==0 and again.json()['duplicates']==1
     assert get_database().traffic_labels.count_documents({})==0
 
 
-def test_csv_invalid_or_unknown_road_writes_nothing(admin_client):
+def test_csv_invalid_or_unknown_road_writes_nothing(analyst_client):
     at=(now()-timedelta(days=1)).isoformat()
     content=f'segment_id,observed_at,score,count,density\n1,{at},0.1,2,LOW\n1,{at},nan,4,HIGH'
-    response=admin_client.post('/api/forecast/import?dry_run=false',files={'file':('samples.csv',content)})
+    response=analyst_client.post('/api/forecast/import?dry_run=false',files={'file':('samples.csv',content)})
     assert response.status_code==422 and not get_database().traffic_samples.count_documents({})
     content=f'segment_id,observed_at,score,count,density\n999,{at},0.1,2,LOW'
-    assert admin_client.post('/api/forecast/import?dry_run=false',files={'file':('samples.csv',content)}).status_code==404
+    assert analyst_client.post('/api/forecast/import?dry_run=false',files={'file':('samples.csv',content)}).status_code==404
 
 
-def test_reviewed_labels_update_with_audit_and_no_auto_density_labels(admin_client):
+def test_reviewed_labels_update_with_audit_and_no_auto_density_labels(analyst_client):
     at=(now()-timedelta(hours=1)).replace(minute=0,second=0,microsecond=0)
     payload={'segment_id':1,'observed_at':at.isoformat(),'state':'JAM','note':'Video thực tế cho thấy dòng xe dừng kéo dài'}
-    assert admin_client.post('/api/forecast/labels',json=payload).status_code==200
+    assert analyst_client.post('/api/forecast/labels',json=payload).status_code==200
     payload['state']='SLOW'
-    assert admin_client.post('/api/forecast/labels',json=payload).status_code==200
-    rows=admin_client.get('/api/forecast/labels?segment_id=1').json()
-    assert len(rows)==1 and rows[0]['state']=='SLOW' and rows[0]['reviewer_id']==1
+    assert analyst_client.post('/api/forecast/labels',json=payload).status_code==200
+    rows=analyst_client.get('/api/forecast/labels?segment_id=1').json()
+    assert len(rows)==1 and rows[0]['state']=='SLOW' and rows[0]['reviewer_id']==analyst_client.get('/api/auth/me').json()['id']
     payload['observed_at']=(at+timedelta(minutes=1)).isoformat()
-    assert admin_client.post('/api/forecast/labels',json=payload).status_code==422
+    assert analyst_client.post('/api/forecast/labels',json=payload).status_code==422
 
 
-def test_batch_labels_preview_and_updates_require_reviewed_evidence(admin_client):
+def test_batch_labels_preview_and_updates_require_reviewed_evidence(analyst_client):
     at=(now()-timedelta(days=1)).replace(minute=0,second=0,microsecond=0).isoformat()
     content=f'segment_id,observed_at,state,note\n1,{at},JAM,Observed stopped traffic in reviewed video\n'
     path='/api/forecast/labels/import'
-    assert admin_client.post(path,files={'file':('labels.csv',content)}).status_code==200
+    assert analyst_client.post(path,files={'file':('labels.csv',content)}).status_code==200
     assert get_database().traffic_labels.count_documents({})==0
-    assert admin_client.post(path+'?dry_run=false',files={'file':('labels.csv',content)}).status_code==200
-    response=admin_client.post(path+'?dry_run=false',files={'file':('labels.csv',content.replace('JAM','SLOW'))})
+    assert analyst_client.post(path+'?dry_run=false',files={'file':('labels.csv',content)}).status_code==200
+    response=analyst_client.post(path+'?dry_run=false',files={'file':('labels.csv',content.replace('JAM','SLOW'))})
     assert response.json()['updates']==1
     assert get_database().traffic_labels.count_documents({})==1
     assert get_database().traffic_labels.find_one()['state']=='SLOW'
     assert not get_database().traffic_samples.count_documents({})
 
 
-def test_batch_labels_validate_all_before_writing(admin_client):
+def test_batch_labels_validate_all_before_writing(analyst_client):
     at=(now()-timedelta(days=1)).replace(minute=0,second=0,microsecond=0).isoformat()
     content=f'segment_id,observed_at,state,note\n1,{at},JAM,Reviewed traffic evidence\n2,{at},FAKE,wrong state\n'
-    assert admin_client.post('/api/forecast/labels/import?dry_run=false',files={'file':('labels.csv',content)}).status_code==422
+    assert analyst_client.post('/api/forecast/labels/import?dry_run=false',files={'file':('labels.csv',content)}).status_code==422
     assert not get_database().traffic_labels.count_documents({})
 
 
-def test_training_cancel_and_duplicate_lock(admin_client,monkeypatch):
+def test_training_cancel_and_duplicate_lock(analyst_client,monkeypatch):
     monkeypatch.setattr(forecast_api.importlib.util,'find_spec',lambda name:True)
     submissions=[]
     monkeypatch.setattr(ml.executor,'submit',lambda *args:submissions.append(args))
-    first=admin_client.post('/api/forecast/runs',json=body())
+    first=analyst_client.post('/api/forecast/runs',json=body())
     assert first.status_code==202 and len(submissions)==1
     ident=first.json()['id']
-    assert admin_client.post('/api/forecast/runs',json=body()).status_code==409
-    assert admin_client.post(f'/api/forecast/runs/{ident}/cancel').status_code==200
+    assert analyst_client.post('/api/forecast/runs',json=body()).status_code==409
+    assert analyst_client.post(f'/api/forecast/runs/{ident}/cancel').status_code==200
     ml.train_run(ident,get_database())
     assert get_database().forecast_runs.find_one({'_id':ident})['status']=='cancelled'
 
 
-def test_worker_releases_lock_on_insufficient_data(admin_client):
+def test_worker_releases_lock_on_insufficient_data(analyst_client):
     ident=str(uuid.uuid4());values=body()
     with SessionLocal() as db:
         db.add(ForecastRun(id=ident,user_id=1,**values));db.commit()
     ml.train_run(ident,get_database())
     result=get_database().forecast_runs.find_one({'_id':ident})
     assert result['status']=='failed' and not result['running'] and 'Chưa đủ dữ liệu' in result['message']
-    assert admin_client.post(f'/api/forecast/runs/{ident}/activate').status_code==409
+    assert analyst_client.post(f'/api/forecast/runs/{ident}/activate').status_code==409
 
 
-def test_missing_artifacts_cannot_be_activated(admin_client,tmp_path,monkeypatch):
+def test_missing_artifacts_cannot_be_activated(analyst_client,tmp_path,monkeypatch):
     ident=str(uuid.uuid4());monkeypatch.setattr(ml,'ARTIFACTS',tmp_path)
     folder=ml.artifact_folder(ident);folder.mkdir();(folder/'metadata.json').write_text('{}')
     get_database().forecast_runs.insert_one({'_id':ident,'user_id':1,'target':'density','status':'completed',
         'running':False,'segment_ids':[1],'report':{'horizons':{'15':{'deployable':True,'supported_segment_ids':[1]}}}})
-    assert admin_client.post(f'/api/forecast/runs/{ident}/activate').status_code==409
+    assert analyst_client.post(f'/api/forecast/runs/{ident}/activate').status_code==409
 
 
 def test_public_forecast_does_not_serve_unqualified_road(client):
@@ -202,12 +202,13 @@ def test_future_route_uses_only_time_matched_forecast(client,route_request,monke
 
 
 @pytest.mark.parametrize('field,value',[('target','invented'),('epochs',500),('segment_ids',[]),('end_at','2999-01-01T00:00:00Z')])
-def test_training_validation(admin_client,field,value):
+def test_training_validation(analyst_client,field,value):
     payload=body();payload[field]=value
-    assert admin_client.post('/api/forecast/runs',json=payload).status_code==422
+    assert analyst_client.post('/api/forecast/runs',json=payload).status_code==422
 
 
-def test_real_xgboost_and_gru_training_persistence_and_inference(client,tmp_path,monkeypatch):
+def test_real_xgboost_and_gru_training_persistence_and_inference(analyst_client,tmp_path,monkeypatch):
+    client=analyst_client
     try:
         import torch
         import xgboost
@@ -236,7 +237,6 @@ def test_real_xgboost_and_gru_training_persistence_and_inference(client,tmp_path
     latest={issue-data.STEP*i:dict(list(recent.values())[-i-1],at=issue-data.STEP*(i+1)) for i in range(12)}
     monkeypatch.setattr(ml,'load_series',lambda *args:({1:latest},{},36,12))
     database=get_database()
-    assert client.post('/api/auth/login',json={'email':'admin@test.vn','password':'test-password-only'}).status_code==200
     for selected in ('XGBoost','GRU'):
         info={**result,'selected':selected,'deployable':True,'supported_segment_ids':[1]}
         report={'horizons':{'15':info,'30':{'deployable':False}}}

@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {createManager} from './actors';
 async function address(page:Page,label:string,text:string){await page.getByRole('combobox',{name:label,exact:true}).fill(text);await page.getByRole('listbox',{name:`Kết quả ${label.toLowerCase()}`}).getByRole('button').first().click();}
 test('simple route form, automatic source and weighted time/distance ranking',async({page},info)=>{
   await page.goto('/#routes');
@@ -17,7 +18,8 @@ test('simple route form, automatic source and weighted time/distance ranking',as
   await page.screenshot({path:info.outputPath('simplified-routing.png'),fullPage:true});
 });
 test('configured network still defaults to A* and obeys one-way roads',async({request})=>{
-  await request.post('/api/auth/login',{data:{email:'e2e-admin@example.invalid',password:'test-only-password-123'}});
+  const manager=await createManager(request);
+  expect((await request.post('/api/auth/login',{data:{email:manager.email,password:manager.password}})).status()).toBe(200);
   const suffix=Date.now();const start=`west_${suffix}`,end=`east_${suffix}`;
   const created=await request.post('/api/segments',{data:{name:`Đường kiểm thử ${suffix}`,start_node:start,end_node:end,distance_km:2,geometry:[[21.04,105.79],[21.04,105.81]],one_way:true}});expect(created.status()).toBe(201);
   expect((await request.post('/api/auth/logout')).status()).toBe(200);

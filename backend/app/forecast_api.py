@@ -14,7 +14,8 @@ from pymongo import ReturnDocument
 from pymongo.errors import BulkWriteError
 from .db import get_db, now, stamp
 from .models import Segment, ForecastRun, TrafficLabel, ForecastRegistry
-from .security import admin, audit, permit
+from .security import audit, can, optional_user, permit
+from .business_common import check_segment_scope, require_global_scope
 from .history import parse_timestamp
 from .forecast_data import prepare, CLASSES, DataNotReady, STEP
 from . import forecast_ml
@@ -53,7 +54,8 @@ class LabelInput(BaseModel):
         return self
 
 
-def valid_segments(db,ids):
+def valid_segments(db,ids,user=None):
+    check_segment_scope(user,*ids)
     for ident in ids:
         road=db.get(Segment,ident)
         if not road or not road.active: raise HTTPException(404,'Đoạn đường không tồn tại hoặc đã ngừng.')
@@ -64,7 +66,9 @@ def public_run(run):
 
 
 @router.get('/api/forecast/status')
-def status(db=Depends(get_db)):
+def status(db=Depends(get_db),user=Depends(optional_user)):
+    if not (can(user,'forecast.view') or can(user,'models.manage')):
+        raise HTTPException(403,'Tài khoản chưa được cấp quyền xem mô hình dự báo.')
     active=[]
     for registry in db.database.forecast_registry.find():
         run=db.database.forecast_runs.find_one({'_id':registry['run_id'],'status':'completed'})
@@ -81,12 +85,12 @@ def predict(segment_id:int,target:Target='density',db=Depends(get_db)):
     except Exception:
         logging.getLogger('smarteye.forecast').exception('Forecast inference unavailable')
         return {'state':'unavailable','segment_id':segment_id,'target':target,'predictions':[],
-            'message':'Mô hình chưa phục vụ được. Liên hệ Admin kiểm tra tệp mô hình và thư viện backend.'}
+            'message':'Mô hình chưa phục vụ được. Hãy liên hệ Quản lý phụ trách mô hình để kiểm tra.'}
 
 
 @router.post('/api/forecast/readiness')
-def readiness(body:TrainInput,user=Depends(admin),db=Depends(get_db)):
-    valid_segments(db,body.segment_ids)
+def readiness(body:TrainInput,user=Depends(permit('models.manage')),db=Depends(get_db)):
+    valid_segments(db,body.segment_ids,user)
     try: result,_=prepare(db.database,body.segment_ids,body.start_at,body.end_at,body.target)
     except DataNotReady as exc: raise HTTPException(422,str(exc))
     result['dependencies']={name:importlib.util.find_spec(name) is not None for name in ('xgboost','sklearn','torch')}
@@ -94,13 +98,16 @@ def readiness(body:TrainInput,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.get('/api/forecast/runs')
-def runs(user=Depends(admin),db=Depends(get_db)):
-    return [public_run(row) for row in db.database.forecast_runs.find().sort('created_at',-1).limit(20)]
+def runs(user=Depends(permit('models.manage')),db=Depends(get_db)):
+    query={}
+    if user.managed_segment_ids is not None:
+        query={'segment_ids':{'$exists':True,'$not':{'$elemMatch':{'$nin':user.managed_segment_ids}}}}
+    return [public_run(row) for row in db.database.forecast_runs.find(query).sort('created_at',-1).limit(20)]
 
 
 @router.post('/api/forecast/runs',status_code=202)
-def start_training(body:TrainInput,user=Depends(admin),db=Depends(get_db)):
-    valid_segments(db,body.segment_ids)
+def start_training(body:TrainInput,user=Depends(permit('models.manage')),db=Depends(get_db)):
+    valid_segments(db,body.segment_ids,user)
     if any(importlib.util.find_spec(name) is None for name in ('xgboost','sklearn','torch')):
         raise HTTPException(503,'Thiếu thư viện dự báo. Cài backend/requirements.txt và PyTorch CPU hoặc build lại backend Docker.')
     row=ForecastRun(id=str(uuid.uuid4()),user_id=user.id,target=body.target,segment_ids=body.segment_ids,
@@ -112,10 +119,10 @@ def start_training(body:TrainInput,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.post('/api/forecast/runs/{run_id}/cancel')
-def cancel(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
+def cancel(run_id:uuid.UUID,user=Depends(permit('models.manage')),db=Depends(get_db)):
     row=db.database.forecast_runs.find_one({'_id':str(run_id)})
     if not row: raise HTTPException(404,'Không tìm thấy lần huấn luyện.')
-    if row['user_id']!=user.id and user.role!='admin': raise HTTPException(403,'Chỉ người tạo hoặc Admin được hủy.')
+    check_segment_scope(user,*row['segment_ids'])
     changed=db.database.forecast_runs.update_one({'_id':str(run_id),'running':True},{'$set':{
         'running':False,'status':'cancelled','message':'Đã hủy huấn luyện.','finished_at':stamp()}})
     if not changed.modified_count: raise HTTPException(409,'Tác vụ đã kết thúc.')
@@ -124,7 +131,8 @@ def cancel(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.post('/api/forecast/runs/{run_id}/activate')
-def activate(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
+def activate(run_id:uuid.UUID,user=Depends(permit('models.manage')),db=Depends(get_db)):
+    require_global_scope(user)
     run=db.database.forecast_runs.find_one({'_id':str(run_id),'status':'completed'})
     if not run or not any(h.get('deployable') for h in run.get('report',{}).get('horizons',{}).values()):
         raise HTTPException(409,'Mô hình chưa đạt điều kiện đánh giá để kích hoạt.')
@@ -140,15 +148,17 @@ def activate(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.delete('/api/forecast/active/{target}')
-def deactivate(target:Target,user=Depends(admin),db=Depends(get_db)):
+def deactivate(target:Target,user=Depends(permit('models.manage')),db=Depends(get_db)):
+    require_global_scope(user)
     db.database.forecast_registry.delete_one({'_id':target});audit(db,user.id,'forecast_model_deactivated',target);db.commit()
     return {'message':'Đã ngừng phục vụ mô hình. Dữ liệu và báo cáo được giữ lại.'}
 
 
 @router.get('/api/forecast/runs/{run_id}/report.csv')
-def export_report(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
+def export_report(run_id:uuid.UUID,user=Depends(permit('models.manage')),db=Depends(get_db)):
     run=db.database.forecast_runs.find_one({'_id':str(run_id),'status':'completed'})
     if not run: raise HTTPException(404,'Chưa có báo cáo hoàn tất.')
+    check_segment_scope(user,*run['segment_ids'])
     output=io.StringIO();writer=csv.writer(output)
     writer.writerow(['target','horizon_minutes','split','model','samples','macro_f1','accuracy','high_recall','selected','deployable'])
     for horizon,info in run['report']['horizons'].items():
@@ -159,13 +169,14 @@ def export_report(run_id:uuid.UUID,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.get('/api/forecast/labels')
-def labels(segment_id:int,user=Depends(admin),db=Depends(get_db)):
+def labels(segment_id:int,user=Depends(permit('models.manage')),db=Depends(get_db)):
+    valid_segments(db,[segment_id],user)
     return [dict(row,id=row['_id']) for row in db.database.traffic_labels.find({'segment_id':segment_id}).sort('observed_at',-1).limit(50)]
 
 
 @router.post('/api/forecast/labels')
-def label(body:LabelInput,user=Depends(admin),db=Depends(get_db)):
-    valid_segments(db,[body.segment_id])
+def label(body:LabelInput,user=Depends(permit('models.manage')),db=Depends(get_db)):
+    valid_segments(db,[body.segment_id],user)
     existing=db.find_one(TrafficLabel,{'segment_id':body.segment_id,'observed_at':body.observed_at.isoformat()})
     if existing: db.update(TrafficLabel,existing.id,{'state':body.state,'note':body.note,'reviewer_id':user.id,'updated_at':stamp()})
     else: db.add(TrafficLabel(segment_id=body.segment_id,observed_at=body.observed_at.isoformat(),state=body.state,note=body.note,reviewer_id=user.id))
@@ -174,7 +185,7 @@ def label(body:LabelInput,user=Depends(admin),db=Depends(get_db)):
 
 
 @router.post('/api/forecast/import')
-async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(admin),db=Depends(get_db)):
+async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(permit('models.manage')),db=Depends(get_db)):
     content=await file.read(2_000_001)
     if len(content)>2_000_000: raise HTTPException(413,'CSV tối đa 2 MB.')
     try:
@@ -192,7 +203,7 @@ async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(a
             documents.append({'sample_key':key,'segment_id':sid,'observed_at':at.isoformat(),
                 'score':score,'count':count,'density':density,'source':'import','camera_id':None,
                 'imported_by':user.id,'created_at':stamp()})
-        valid_segments(db,sorted({row['segment_id'] for row in documents}))
+        valid_segments(db,sorted({row['segment_id'] for row in documents}),user)
     except (ValueError,KeyError,TypeError,UnicodeError) as exc:
         raise HTTPException(422,'CSV cần cột segment_id,observed_at,score,count,density; thời gian ISO có múi giờ. '+str(exc)) from None
     duplicates=db.database.traffic_samples.count_documents({'sample_key':{'$in':[r['sample_key'] for r in documents]}})
@@ -208,14 +219,14 @@ async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(a
     return {'rows':len(documents),'inserted':inserted,'duplicates':len(documents)-inserted,'message':'Đã nhập mẫu lịch sử. CSV không tự tạo nhãn ùn tắc.'}
 
 
-@router.get('/api/forecast/templates/{kind}.csv',dependencies=[Depends(admin)])
+@router.get('/api/forecast/templates/{kind}.csv',dependencies=[Depends(permit('models.manage'))])
 def template(kind:Literal['observations','labels']):
     header='segment_id,observed_at,score,count,density' if kind=='observations' else 'segment_id,observed_at,state,note'
     return Response(header+'\r\n',media_type='text/csv',headers={'Content-Disposition':f'attachment; filename=traffic-{kind}.csv'})
 
 
 @router.post('/api/forecast/labels/import')
-async def import_labels(file:UploadFile=File(...),dry_run:bool=True,user=Depends(admin),db=Depends(get_db)):
+async def import_labels(file:UploadFile=File(...),dry_run:bool=True,user=Depends(permit('models.manage')),db=Depends(get_db)):
     content=await file.read(2_000_001)
     if len(content)>2_000_000: raise HTTPException(413,'CSV tối đa 2 MB.')
     try:
@@ -227,7 +238,7 @@ async def import_labels(file:UploadFile=File(...),dry_run:bool=True,user=Depends
             key=(label.segment_id,label.observed_at.isoformat())
             if key in seen: raise ValueError('Trùng tuyến và thời điểm trong CSV nhãn.')
             seen.add(key);checked.append({'segment_id':label.segment_id,'observed_at':key[1],'state':label.state,'note':label.note})
-        valid_segments(db,sorted({row['segment_id'] for row in checked}))
+        valid_segments(db,sorted({row['segment_id'] for row in checked}),user)
     except (ValueError,KeyError,TypeError,UnicodeError):
         raise HTTPException(422,'CSV nhãn cần segment_id,observed_at,state,note. Mốc kết thúc ô 5 phút có múi giờ, không ở tương lai; state FREE/SLOW/JAM; căn cứ 5–300 ký tự. Không trùng tuyến/thời điểm.') from None
     existing=db.database.traffic_labels.count_documents({'$or':[{'segment_id':r['segment_id'],'observed_at':r['observed_at']} for r in checked]})

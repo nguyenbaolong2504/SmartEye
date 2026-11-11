@@ -1,10 +1,12 @@
-import {can} from './permissions';
-import {useState} from 'react';
-import {Activity, Bell, Camera, MessageSquare, Plus, SlidersHorizontal} from 'lucide-react';
+import {can,hasTrafficConfiguration} from './permissions';
+import {lazy,Suspense,useState} from 'react';
+import {Activity, BarChart3, Bell, Camera, MessageSquare, Plus, Settings2, SlidersHorizontal} from 'lucide-react';
 import {api, json} from './api';
 import {Empty, Modal, Notice, Spinner} from './components';
 import {IncidentDetails} from './IncidentsPage';
-import {type User, type Segment, dateTime} from './types';
+import {ReportPanel} from './AdminOperations';
+import TrafficConfiguration from './TrafficConfiguration';
+import {type User, type Segment, type Camera as CameraConfig, type DemoStatus, dateTime} from './types';
 import {
   type CurrentRoad, type Direction, type Incident, type Rule, type Warning,
   CurrentConditions, trafficLabel, Feedback, History, Loading, RoadFields, State, iso, kinds, localInput,
@@ -12,6 +14,7 @@ import {
 } from './business';
 
 const incidentStates = ['pending', 'verifying', 'processing', 'resolved', 'rejected'];
+const HourlyEvaluation=lazy(()=>import('./ForecastManagement').then(module=>({default:module.HourlyEvaluation})));
 const warningStates = ['pending_verification', 'pending_publication', 'published', 'ended', 'cancelled'];
 const metrics = {score: ['Chỉ số mật độ', 'ratio', 1], speed_kmh: ['Vận tốc', 'km/h', 200], flow_per_minute: ['Lưu lượng', 'vehicles/min', 10000]} as const;
 type MetricName = keyof typeof metrics;
@@ -352,17 +355,29 @@ function RuleForm({item, segments, onClose, onSaved}: {item: Rule | null; segmen
   </form>;
 }
 
-export default function ManagementPage({user, segments}: {user: User; segments: Segment[]}) {
+export default function ManagementPage({user,segments,cameras,demo,onUpdated}: {
+  user:User;segments:Segment[];cameras:CameraConfig[];demo:DemoStatus|null;onUpdated:()=>void;
+}) {
   const [chosen, setTab] = useState('monitor');
-  const scoped = segments.filter(s => s.active && (!user.managed_segment_ids || user.managed_segment_ids.includes(s.id)));
-  const tabs = [{id:'monitor', permission:'monitor.view', label:'Giám sát', Icon:Activity}, {id:'incidents', permission:'incidents.view', label:'Quản lý phản ánh', Icon:MessageSquare}, {id:'warnings', permission:'publication.view', label:'Quản lý cảnh báo', Icon:Bell}, {id:'rules', permission:'rules.view', label:'Quy tắc cảnh báo', Icon:SlidersHorizontal}].filter(item=>can(user,item.permission));
+  const scoped = segments.filter(s => !user.managed_segment_ids || user.managed_segment_ids.includes(s.id));
+  const active = scoped.filter(s=>s.active);
+  const tabs = [
+    {id:'monitor', allowed:can(user,'monitor.view'), label:'Giám sát', Icon:Activity},
+    {id:'reports', allowed:can(user,'analytics.view'), label:'Báo cáo theo giờ', Icon:BarChart3},
+    {id:'incidents', allowed:can(user,'incidents.view'), label:'Quản lý phản ánh', Icon:MessageSquare},
+    {id:'warnings', allowed:can(user,'publication.view'), label:'Quản lý cảnh báo', Icon:Bell},
+    {id:'rules', allowed:can(user,'rules.view'), label:'Quy tắc cảnh báo', Icon:SlidersHorizontal},
+    {id:'configuration', allowed:hasTrafficConfiguration(user), label:'Dữ liệu & thiết lập', Icon:Settings2},
+  ].filter(item=>item.allowed);
   const tab=tabs.some(item=>item.id===chosen)?chosen:tabs[0]?.id;
   return <>
-    <div className="page-heading"><div><div className="eyebrow">DÀNH CHO QUẢN LÝ</div><h1>Giám sát & xử lý<span>.</span></h1><p>Theo dõi số liệu, tiếp nhận sự cố và xác minh cảnh báo trước khi công bố.</p></div></div>
+    <div className="page-heading"><div><div className="eyebrow">DÀNH CHO QUẢN LÝ</div><h1>Giám sát & xử lý<span>.</span></h1><p>Theo dõi tình trạng đường, xem báo cáo và xử lý sự cố giao thông.</p></div></div>
     <div className="tabs workflow-tabs">{tabs.map(({id,label,Icon}) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><Icon size={17}/>{label}</button>)}</div>
-    {tab === 'monitor' && <Monitor segments={scoped}/>}
-    {tab === 'incidents' && <IncidentQueue user={user} segments={scoped}/>}
-    {tab === 'warnings' && <WarningQueue segments={scoped} user={user}/>}
-    {tab === 'rules' && <RuleList segments={scoped} user={user}/>}
+    {tab === 'monitor' && <Monitor segments={active}/>}
+    {tab === 'reports' && <><ReportPanel segments={active} allowExport={can(user,'analytics.export')}/><Suspense fallback={<Spinner/>}><HourlyEvaluation segments={active}/></Suspense></>}
+    {tab === 'incidents' && <IncidentQueue user={user} segments={active}/>}
+    {tab === 'warnings' && <WarningQueue segments={active} user={user}/>}
+    {tab === 'rules' && <RuleList segments={active} user={user}/>}
+    {tab === 'configuration' && <TrafficConfiguration user={user} segments={scoped} cameras={cameras} demo={demo} onUpdated={onUpdated}/>}
   </>;
 }

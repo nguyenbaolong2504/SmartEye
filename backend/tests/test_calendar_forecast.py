@@ -60,8 +60,8 @@ def test_calendar_requires_history_and_preserves_missing_values(client):
     assert response.status_code==409
 
 
-def test_hourly_forecast_uses_only_earlier_labeled_hours_and_preserves_direction(admin_client):
-    response=admin_client.post('/api/segments',json={'name':'Nguyễn Huệ','area':'Hồ Chí Minh','start_node':'nh_dau',
+def test_hourly_forecast_uses_only_earlier_labeled_hours_and_preserves_direction(analyst_client):
+    response=analyst_client.post('/api/segments',json={'name':'Nguyễn Huệ','area':'Hồ Chí Minh','start_node':'nh_dau',
         'end_node':'nh_cuoi','distance_km':.8,'geometry':[[10.775,106.701],[10.772,106.705]]})
     assert response.status_code==201,response.text
     sid=response.json()['id'];today=now().astimezone(LOCAL).date();target=today-timedelta(days=10)
@@ -81,12 +81,12 @@ def test_hourly_forecast_uses_only_earlier_labeled_hours_and_preserves_direction
         for i in (0,5,10,30,35,40))
     database.road_readings.insert_many(rows)
     params={'segment_id':sid,'date':target.isoformat(),'hour':1}
-    response=admin_client.get('/api/traffic/outlook',params=params,headers={'Cookie':''})
+    response=analyst_client.get('/api/traffic/outlook',params=params,headers={'Cookie':''})
     assert response.status_code==200,response.text
     data=response.json()
     assert not data['is_demo'] and data['historical'] and data['history_days']==100
     assert data['selected']['label']=='FREE' and data['selected']['free_days']==data['selected']['similar_days']
     assert data['hourly'][7]['label']=='JAM' and data['hourly'][8]['label'] is None
-    assert admin_client.get('/api/traffic/outlook',params={**params,'direction':'reverse'},headers={'Cookie':''}).status_code==409
-    evaluation=admin_client.get('/api/admin/hourly-backtest',params={'segment_id':sid,'end':(target-timedelta(days=1)).isoformat()}).json()
+    assert analyst_client.get('/api/traffic/outlook',params={**params,'direction':'reverse'},headers={'Cookie':''}).status_code==409
+    evaluation=analyst_client.get('/api/management/hourly-backtest',params={'segment_id':sid,'end':(target-timedelta(days=1)).isoformat()}).json()
     assert evaluation['scored_hours']==56 and evaluation['model']['accuracy']==1 and evaluation['model']['high_recall']==1

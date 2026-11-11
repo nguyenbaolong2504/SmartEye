@@ -15,12 +15,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pydantic import Field
 from pymongo.errors import DuplicateKeyError
 from .business_common import (Input, Revision, road, get_record, changed, event, log_event, serialize,
-                              fingerprint, period)
+                              fingerprint, period, allowed_query, check_segment_scope)
 from .business_models import DataSource, RoadReading, SourceReceipt
 from .business_schemas import SourceInput, SourceEdit, MappingInput, Toggle
 from .db import get_db, stamp, now
 from .models import TrafficSample
-from .security import admin, permit
+from .security import permit
 
 router=APIRouter()
 MAX_BYTES=2*1024*1024
@@ -97,24 +97,44 @@ def signature(body):
                         'url':body.url,'name':body.name.casefold() if body.kind=='file' else ''})
 
 
-@router.get('/api/admin/sources')
-def list_sources(q:str=Query(default='',max_length=100),user=Depends(admin),db=Depends(get_db)):
+def managed_source(db,ident,user):
+    source=get_record(db,DataSource,ident)
+    check_segment_scope(user,source.segment_id)
+    return source
+
+
+def validate_credentials(body, current=None):
+    if not body.credential_env:
+        return
+    target=urlsplit(body.url)
+    if current and current.credential_env==body.credential_env:
+        old=urlsplit(current.url)
+        if (target.scheme,target.hostname,target.port)==(old.scheme,old.hostname,old.port):
+            return
+    expected=os.getenv(f'{body.credential_env}_HOST','').strip().lower()
+    if target.scheme!='https' or target.port not in (None,443) or target.hostname!=expected:
+        raise HTTPException(422,'Nguồn dùng mã truy cập cần máy chủ HTTPS đã được cấu hình trước.')
+
+
+@router.get('/api/management/sources')
+def list_sources(q:str=Query(default='',max_length=100),user=Depends(permit('sources.manage')),db=Depends(get_db)):
     import re
-    query={'name':{'$regex':re.escape(q),'$options':'i'}} if q else {}
+    query=allowed_query(user)
+    if q:query['name']={'$regex':re.escape(q),'$options':'i'}
     return [source_data(s) for s in db.find(DataSource,query,sort=[('id',1)],limit=200)]
 
 
-@router.post('/api/admin/sources',status_code=201)
-def create_source(body:SourceInput,user=Depends(admin),db=Depends(get_db)):
-    road(db,body.segment_id,body.direction);url_valid(body.url)
+@router.post('/api/management/sources',status_code=201)
+def create_source(body:SourceInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    road(db,body.segment_id,body.direction,user);url_valid(body.url);validate_credentials(body)
     row=DataSource(**body.model_dump(),created_by=user.id,signature=signature(body),history=[event(user,'source_created')],
                    versions=[{'version':1,**body.model_dump()}])
     db.add(row);db.commit();return source_data(row)
 
 
-@router.patch('/api/admin/sources/{ident}')
-def edit_source(ident:int,body:SourceEdit,user=Depends(admin),db=Depends(get_db)):
-    source=get_record(db,DataSource,ident);road(db,body.segment_id,body.direction);url_valid(body.url)
+@router.patch('/api/management/sources/{ident}')
+def edit_source(ident:int,body:SourceEdit,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    source=managed_source(db,ident,user);road(db,body.segment_id,body.direction,user);url_valid(body.url);validate_credentials(body,source)
     fields=body.model_dump(exclude={'revision'})
     version=source.version+1
     updates={**fields,'signature':signature(body),'active':False,'tested':False,'connection_state':'unknown',
@@ -158,9 +178,9 @@ def mapped_reading(source,raw):
     return {'observed_at':at.isoformat(),'segment_id':source.segment_id,'direction':source.direction,'metrics':metrics}
 
 
-@router.put('/api/admin/sources/{ident}/mapping')
-def mapping(ident:int,body:MappingInput,user=Depends(admin),db=Depends(get_db)):
-    source=get_record(db,DataSource,ident)
+@router.put('/api/management/sources/{ident}/mapping')
+def mapping(ident:int,body:MappingInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    source=managed_source(db,ident,user)
     if source.kind=='camera':raise HTTPException(422,'Nguồn hình ảnh không có bảng ánh xạ số liệu.')
     units=body.units
     if units.get('speed_kmh','km/h') not in ('km/h','m/s'):raise HTTPException(422,'Đơn vị vận tốc không được hỗ trợ.')
@@ -181,9 +201,9 @@ class SourceTest(Revision):
     sample: dict | None = None
 
 
-@router.post('/api/admin/sources/{ident}/test')
-async def test_source(ident:int,body:SourceTest,user=Depends(admin),db=Depends(get_db)):
-    source=get_record(db,DataSource,ident);road(db,source.segment_id,source.direction)
+@router.post('/api/management/sources/{ident}/test')
+async def test_source(ident:int,body:SourceTest,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    source=managed_source(db,ident,user);road(db,source.segment_id,source.direction)
     if not source.authorized:raise HTTPException(409,'Nguồn dữ liệu chưa đủ điều kiện hoạt động.')
     preview=None
     if source.kind=='file':
@@ -203,9 +223,9 @@ async def test_source(ident:int,body:SourceTest,user=Depends(admin),db=Depends(g
     return {**source_data(value),'preview':preview}
 
 
-@router.post('/api/admin/sources/{ident}/toggle')
-def toggle_source(ident:int,body:Toggle,user=Depends(admin),db=Depends(get_db)):
-    source=get_record(db,DataSource,ident)
+@router.post('/api/management/sources/{ident}/toggle')
+def toggle_source(ident:int,body:Toggle,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    source=managed_source(db,ident,user)
     if body.active:
         road(db,source.segment_id,source.direction)
         if not source.authorized or not source.tested or source.kind!='camera' and not source.mapping:
@@ -285,30 +305,30 @@ class RowsInput(Input):
     rows: list[dict] = Field(max_length=5000)
 
 
-@router.post('/api/admin/sources/{ident}/receive')
-def receive_json(ident:int,body:RowsInput,user=Depends(admin),db=Depends(get_db)):
-    return receive(db,get_record(db,DataSource,ident),body.rows)
+@router.post('/api/management/sources/{ident}/receive')
+def receive_json(ident:int,body:RowsInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    return receive(db,managed_source(db,ident,user),body.rows)
 
 
-@router.post('/api/admin/sources/{ident}/upload')
-async def receive_file(ident:int,file:UploadFile=File(...),user=Depends(admin),db=Depends(get_db)):
-    source=get_record(db,DataSource,ident)
+@router.post('/api/management/sources/{ident}/upload')
+async def receive_file(ident:int,file:UploadFile=File(...),user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    source=managed_source(db,ident,user)
     if source.kind!='file':raise HTTPException(422,'Chỉ nhập tệp cho nguồn có loại Tệp lịch sử.')
     raw=await file.read(MAX_BYTES+1)
     if len(raw)>MAX_BYTES:raise HTTPException(413,'Tệp vượt giới hạn 2 MB.')
     return receive(db,source,decode_rows(raw,source.format))
 
 
-@router.get('/api/admin/sources/{ident}/receipts')
-def receipts(ident:int,start:str|None=None,end:str|None=None,user=Depends(admin),db=Depends(get_db)):
-    get_record(db,DataSource,ident);query={'source_id':ident};dates=period(start,end)
+@router.get('/api/management/sources/{ident}/receipts')
+def receipts(ident:int,start:str|None=None,end:str|None=None,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    managed_source(db,ident,user);query={'source_id':ident};dates=period(start,end)
     if dates:query['received_at']=dates
     return [serialize(r) for r in db.find(SourceReceipt,query,sort=[('id',-1)],limit=200)]
 
 
-@router.post('/api/admin/sources/{ident}/poll')
-async def poll(ident:int,user=Depends(admin),db=Depends(get_db)):
-    source=get_record(db,DataSource,ident)
+@router.post('/api/management/sources/{ident}/poll')
+async def poll(ident:int,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    source=managed_source(db,ident,user)
     if source.kind!='api' or not source.active:raise HTTPException(409,'Chỉ nhận trực tiếp từ nguồn dịch vụ đang bật.')
     try:
         raw,_=await source_request(source)
@@ -321,7 +341,7 @@ async def poll(ident:int,user=Depends(admin),db=Depends(get_db)):
 @router.get('/api/management/cameras/{ident}/preview')
 async def camera_preview(ident:int,user=Depends(permit('monitor.camera')),db=Depends(get_db)):
     from fastapi.responses import Response
-    source=get_record(db,DataSource,ident)
+    source=managed_source(db,ident,user)
     road(db,source.segment_id,source.direction,user)
     if source.kind!='camera' or not source.active or not source.tested:
         raise HTTPException(404,'Chưa có nguồn camera phù hợp.')

@@ -38,7 +38,7 @@ Local, sau khi MongoDB và `.env` đã đúng:
 .venv\Scripts\python.exe scripts/prepare_demo.py --days 365
 ```
 
-Hoặc Admin vào Dự báo, nếu chưa có mẫu thì bấm **Tạo dữ liệu mẫu**. Huấn luyện chạy nền; dữ liệu cũ tiếp tục dùng đến khi bộ mới hoàn tất. Khi đã sẵn sàng, script có thể tạo lại bộ mẫu mà không xóa dữ liệu thực.
+Hoặc Quản lý phụ trách toàn bộ tuyến, có quyền quản lý mô hình, vào **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình** và bấm **Cập nhật lịch sử** khi bộ mẫu cần chuẩn bị. Huấn luyện chạy nền; dữ liệu cũ tiếp tục dùng đến khi bộ mới hoàn tất. Khi đã sẵn sàng, script có thể tạo lại bộ mẫu mà không xóa dữ liệu thực.
 
 Backend và frontend chạy local theo [RUNNING.md](RUNNING.md). Không cần `download_model.py` để dùng dự báo mới.
 
@@ -72,13 +72,13 @@ Không ghi mẫu vào `observations`, `traffic_samples`, `traffic_labels`, `fore
 - `GET /api/demo/predict?segment_id=14&issue_at=<ISO có múi giờ trong 30 ngày đã qua (API ngắn hạn cũ)>`.
 - `GET /api/demo/history?segment_id=14&period=month&value=2026-10` (thay ID/tháng bằng dữ liệu của bạn).
 - `GET /api/demo/export.csv?segment_id=14`.
-- `POST /api/demo/prepare` chỉ Admin; không cần gửi body.
+- `POST /api/demo/prepare` yêu cầu Quản lý phụ trách toàn bộ tuyến có quyền `models.manage`, không cần gửi body.
 - `GET /api/bootstrap?data_mode=demo` khởi tạo trang bằng một request.
 - `POST /api/routes/search` có `provider=auto`, `algorithm=astar`, `traffic_mode=demo|observed`. Ô tô mặc định xếp hạng các ứng viên OSRM; `provider=demo|osm` dùng đồ thị đầy đủ và A*, còn `algorithm=compare` chỉ phục vụ kiểm chứng qua API.
 
 ## Khi cần dữ liệu thật
 
-Giữ dữ liệu mẫu để thử giao diện. Với nghiên cứu chính thức, dùng CSV quan trắc được phép sử dụng hoặc dữ liệu mở có thời gian/địa điểm rõ ràng; Quản lý/Admin nhập lịch sử và nhãn đã kiểm chứng trong **Dữ liệu & mô hình**, huấn luyện rồi đánh giá trước khi kích hoạt. Không nhập CSV tổng hợp vào chế độ thực và gọi nó là dữ liệu thu thập tại Hà Nội. Pipeline GRU và XGBoost cho dữ liệu thực vẫn có tại [FORECASTING.md](FORECASTING.md).
+Giữ dữ liệu mẫu để thử giao diện. Với nghiên cứu chính thức, dùng CSV quan trắc được phép sử dụng hoặc dữ liệu mở có thời gian/địa điểm rõ ràng; Quản lý có quyền mô hình nhập lịch sử và nhãn đã kiểm chứng trong **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình**, huấn luyện rồi đánh giá trước khi kích hoạt. Không nhập CSV tổng hợp vào chế độ thực và gọi nó là dữ liệu thu thập tại Hà Nội. Pipeline GRU và XGBoost cho dữ liệu thực vẫn có tại [FORECASTING.md](FORECASTING.md).
 
 ## Ảnh từ Docker sau cập nhật
 

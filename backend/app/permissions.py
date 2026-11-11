@@ -36,10 +36,16 @@ MANAGEMENT = {
     'rules.test': 'Kiểm tra quy tắc',
     'rules.toggle': 'Bật hoặc tắt quy tắc',
     'rules.delete': 'Xóa quy tắc',
+    'analytics.view': 'Xem thống kê và đánh giá dự báo theo giờ',
+    'analytics.export': 'Xuất báo cáo giao thông',
+    'sources.manage': 'Cấu hình nguồn và tiếp nhận dữ liệu giao thông',
+    'network.manage': 'Cấu hình đoạn đường và camera',
+    'models.manage': 'Chuẩn bị dữ liệu và huấn luyện mô hình',
+    'diagnostics.view': 'Xem trạng thái dịch vụ và nhật ký vận hành',
 }
 PUBLIC = {'traffic.view', 'forecast.view', 'routes.search', 'warnings.view'}
 PARENTS = {
-    **{key: key.split('.')[0]+'.view' for key in MANAGEMENT if not key.endswith('.view')},
+    **{key: key.split('.')[0]+'.view' for key in MANAGEMENT if key.split('.')[0]+'.view' in MANAGEMENT},
     'favorites.delete': 'favorites.view', 'favorites.add': 'routes.search',
     'alerts.follow': 'alerts.view', 'alerts.read': 'alerts.view',
 }

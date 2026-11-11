@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {createManager} from './actors';
 async function navigate(page:Page,label:string){const menu=page.getByRole('button',{name:'Mở menu',exact:true});if(await menu.isVisible())await menu.click();await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:label,exact:true}).click();}
 async function choose(page:Page,label:string,text:string){await page.getByRole('combobox',{name:label,exact:true}).fill(text);await page.getByRole('listbox',{name:`Kết quả ${label.toLowerCase()}`}).getByRole('button').first().click();}
 test('registration, save route, follow road, edit profile and logout',async({page})=>{
@@ -31,16 +32,52 @@ test('admin starts in IT workspace and traffic URLs cannot open consumer pages',
   await page.goto('/#forecast');
   await expect(page).toHaveURL(/#admin$/);
   await expect(page.getByRole('heading',{name:'Không gian quản trị.'})).toBeVisible();
-  await navigate(page,'Quản trị hệ thống');await page.getByRole('button',{name:'Đoạn đường',exact:true}).click();await expect(page.getByRole('button',{name:'Thêm đoạn đường',exact:true})).toBeVisible();
-  const response=await page.request.post('/api/observations',{data:{segment_id:1,score:.7,count:12,note:'Quan sát E2E trong database thử riêng',observed_at:new Date().toISOString()}});expect(response.status()).toBe(201);
-  await page.getByRole('button',{name:'Báo cáo theo giờ',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Thống kê ùn tắc theo giờ'})).toBeVisible();
-  await page.getByRole('button',{name:'Thống kê',exact:true}).click();
-  await expect(page.getByRole('button',{name:'Xuất báo cáo CSV'})).toBeVisible();
-  await navigate(page,'Quản trị hệ thống');await page.getByRole('button',{name:'Hệ thống & nhật ký',exact:true}).click();await expect(page.getByText('manual_observation',{exact:true}).first()).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Quản lý tài khoản',exact:true})).toBeVisible();
+  for(const label of ['Nguồn dữ liệu','Đoạn đường','Báo cáo theo giờ','Dữ liệu & mô hình','Dịch vụ & nhật ký']){
+    await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
+  }
+  const query=new URLSearchParams({segment_id:'1',direction:'forward',start:new Date(Date.now()-86400000).toISOString(),end:new Date().toISOString()}).toString();
+  expect((await page.request.get('/api/management/traffic-report?'+query)).status()).toBe(403);
+  expect((await page.request.get('/api/reports')).status()).toBe(403);
+  expect((await page.request.get('/api/forecast/runs')).status()).toBe(403);
+  expect((await page.request.get('/api/management/sources')).status()).toBe(403);
   await page.getByRole('button',{name:/^Hồ sơ /}).click();
   await expect(page.getByRole('heading',{name:'Hồ sơ của bạn.'})).toBeVisible();
   await expect(page.getByLabel('Nhận thông báo khi có cảnh báo được phát hành')).toHaveCount(0);
+});
+test('manager views and exports hourly reports only for assigned roads',async({page,request})=>{
+  const manager=await createManager(request,[1]);
+  await page.goto('/');
+  await page.getByRole('button',{name:'Đăng nhập',exact:true}).first().click();
+  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill(manager.username);
+  await page.getByLabel('Mật khẩu',{exact:true}).fill(manager.password);
+  await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await navigate(page,'Giám sát & xử lý');
+  await expect(page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:'Quản trị hệ thống'})).toHaveCount(0);
+  const observedAt=new Date(Date.now()-60000).toISOString();
+  expect((await page.request.post('/api/observations',{data:{segment_id:1,score:.7,count:12,note:'Quan sát E2E trong database thử riêng',observed_at:observedAt}})).status()).toBe(201);
+  await page.getByRole('button',{name:'Báo cáo theo giờ',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Thống kê ùn tắc theo giờ',exact:true})).toBeVisible();
+  const road=page.getByRole('combobox',{name:'Tuyến đường',exact:true});
+  await expect(road.locator('option')).toHaveCount(1);
+  await expect(road).toHaveValue('1');
+  await page.getByRole('button',{name:'Thống kê',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Xuất báo cáo CSV',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Kiểm tra dự báo theo giờ',exact:true})).toBeVisible();
+  const query={direction:'forward',start:new Date(Date.now()-86400000).toISOString(),end:new Date().toISOString()};
+  const scoped=new URLSearchParams({...query,segment_id:'1'}).toString();
+  const outside=new URLSearchParams({...query,segment_id:'2'}).toString();
+  const exported=await page.request.get('/api/management/traffic-report/export?'+scoped);
+  expect(exported.status()).toBe(200);
+  expect(exported.headers()['content-type']).toContain('text/csv');
+  expect((await page.request.get('/api/management/traffic-report?'+outside)).status()).toBe(403);
+  expect((await page.request.get('/api/management/traffic-report/export?'+outside)).status()).toBe(403);
+  await page.getByRole('button',{name:'Dữ liệu & thiết lập',exact:true}).click();
+  await page.getByRole('button',{name:'Đoạn đường',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Thêm đoạn đường',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Dịch vụ & nhật ký',exact:true})).toHaveCount(0);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });
 test('policy dialog and retired URL recover to overview without overflow',async({page})=>{
   await page.goto('/#video');await expect(page.getByRole('heading',{name:/Hiểu đường đi/})).toBeVisible();await page.getByRole('button',{name:'Điều khoản & quyền riêng tư'}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1)).toBe(false);

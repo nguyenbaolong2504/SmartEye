@@ -11,7 +11,7 @@ from pymongo.errors import BulkWriteError
 from .config import DATA, UPLOADS, TTL_MINUTES
 from .db import get_db, now, stamp
 from .models import Camera, Segment, VideoJob, Observation, TrafficSample
-from .security import operator, require_user, permit, audit
+from .security import traffic_member, permit, audit
 from .schemas import PublishOptions
 from .history import history_report, parse_timestamp
 from .traffic import emit_alerts, observation_dict
@@ -77,6 +77,7 @@ def share_media(db, camera, job, share):
 
 
 def publish_job(db, job, user, options, historical=False):
+    from .business_common import check_segment_scope
     if job.user_id!=user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
     if job.status!='completed' or not job.result: raise HTTPException(409,'Video chưa phân tích xong.')
     if not job.observed_at: raise HTTPException(422,'Cần thời điểm ghi hình để đưa video vào thống kê giao thông.')
@@ -90,6 +91,7 @@ def publish_job(db, job, user, options, historical=False):
     camera = db.get(Camera,job.camera_id)
     if not camera: raise HTTPException(404,'Không tìm thấy camera.')
     segment_id = job.camera_config['segment_id']
+    check_segment_scope(user,segment_id)
     segment = db.get(Segment,segment_id)
     if not segment: raise HTTPException(404,'Không tìm thấy đoạn đường.')
     if not historical and (not camera.active or not segment.active or camera.segment_id!=segment_id):
@@ -136,7 +138,7 @@ def shared_video(camera_id:int,db=Depends(get_db)):
 
 
 @router.get('/api/videos/{ident}/source')
-def private_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
+def private_video(ident:str,user=Depends(traffic_member),db=Depends(get_db)):
     job = db.get(VideoJob,ident)
     if not job: raise HTTPException(404,'Không tìm thấy video.')
     if job.user_id!=user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
@@ -146,17 +148,19 @@ def private_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
 
 
 @router.post('/api/videos/{ident}/archive')
-def archive_video(ident:str,options:PublishOptions,user=Depends(operator),db=Depends(get_db)):
+def archive_video(ident:str,options:PublishOptions,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     job = db.get(VideoJob,ident)
     if not job: raise HTTPException(404,'Không tìm thấy video.')
     return publish_job(db,job,user,options,historical=True)
 
 
 @router.post('/api/videos/{ident}/share-preview')
-def change_preview(ident:str,options:PublishOptions,user=Depends(operator),db=Depends(get_db)):
+def change_preview(ident:str,options:PublishOptions,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     job = db.get(VideoJob,ident)
     if not job: raise HTTPException(404,'Không tìm thấy video.')
     if job.user_id!=user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')
+    from .business_common import check_segment_scope
+    check_segment_scope(user,job.camera_config.get('segment_id'))
     if not db.find_one(Observation,{'job_id':ident}): raise HTTPException(409,'Hãy công bố hoặc lưu lịch sử trước khi chia sẻ ảnh/video.')
     camera = db.get(Camera,job.camera_id)
     if not camera or camera.segment_id!=job.camera_config['segment_id']: raise HTTPException(409,'Camera đã đổi vị trí.')

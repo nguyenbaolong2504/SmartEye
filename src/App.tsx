@@ -3,7 +3,7 @@ import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, Ma
 import { api } from './api';
 import { AuthModal,ProfilePage } from './Auth';
 import { Modal,Notice,Spinner } from './components';
-import {can,managementSections} from './permissions';
+import {can,hasManagement} from './permissions';
 import { type Place,type Segment,type Camera,type Config,type User,type Favorite,type DemoStatus,type DataMode } from './types';
 const OverviewPage=lazy(()=>import('./OverviewPage'));
 const RoutesPage=lazy(()=>import('./RoutesPage'));
@@ -25,7 +25,7 @@ function canOpen(tab:Tab, user:User|null) {
   if(tab==='profile')return Boolean(role);
   if(role==='admin')return tab==='admin';
   if(tab==='admin')return false;
-  if(tab==='management')return managementSections.some(key=>can(user,key));
+  if(tab==='management')return hasManagement(user);
   if(tab==='monitor')return can(user,'traffic.view');
   if(tab==='forecast')return can(user,'forecast.view');
   if(tab==='routes')return can(user,'routes.search');
@@ -88,8 +88,8 @@ export default function App(){
         {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
         {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
         {tab==='incidents'&&<IncidentsPage user={user} segments={segments} config={config} onLogin={()=>setAuthOpen(true)}/>}
-        {tab==='management'&&user?.role==='analyst'&&<ManagementPage user={user} segments={segments}/>}
-        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} cameras={cameras} segments={segments} demo={demo} onUpdated={refresh}/>}
+        {tab==='management'&&user?.role==='analyst'&&<ManagementPage user={user} segments={segments} cameras={cameras} demo={demo} onUpdated={refresh}/>}
+        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} segments={segments}/>}
         {tab==='profile'&&user&&<ProfilePage user={user} onUser={onUser}/>}
         {!user&&blocked&&<section className="card"><Notice>Vui lòng đăng nhập để tiếp tục.</Notice><button className="button" onClick={()=>setAuthOpen(true)}>Đăng nhập</button></section>}
       </Suspense>}

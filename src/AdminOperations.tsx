@@ -7,7 +7,7 @@ import {type Direction, type Source, Feedback, History, Loading, RoadFields, Sta
 
 const sourceKinds: Record<string, string> = {file:'Tệp lịch sử', api:'Dịch vụ dữ liệu', camera:'Camera'};
 const roles: Record<User['role'],string> = {user:'Người dùng', analyst:'Quản lý', admin:'Quản trị viên'};
-const permissionGroups:Record<string,string>={traffic:'Tình trạng và bản đồ',forecast:'Dự báo',routes:'Tìm đường',favorites:'Hành trình đã lưu',warnings:'Cảnh báo công khai',alerts:'Thông báo cá nhân',reports:'Phản ánh của mình',monitor:'Giám sát',incidents:'Xử lý phản ánh',publication:'Phát hành cảnh báo',rules:'Quy tắc cảnh báo'};
+const permissionGroups:Record<string,string>={traffic:'Tình trạng và bản đồ',forecast:'Dự báo',routes:'Tìm đường',favorites:'Hành trình đã lưu',warnings:'Cảnh báo công khai',alerts:'Thông báo cá nhân',reports:'Phản ánh của mình',monitor:'Giám sát',incidents:'Xử lý phản ánh',publication:'Phát hành cảnh báo',rules:'Quy tắc cảnh báo',analytics:'Báo cáo giao thông',sources:'Nguồn dữ liệu',network:'Đoạn đường và camera',models:'Dữ liệu và mô hình',diagnostics:'Dịch vụ và nhật ký'};
 const fieldNames: Record<string,string> = {observed_at:'Thời điểm quan sát', segment_id:'Mã tuyến', direction:'Chiều đường', count:'Số phương tiện', interval_seconds:'Khoảng đo (giây)', speed_kmh:'Vận tốc', score:'Chỉ số mật độ', density:'Mức mật độ', state:'Tình trạng ùn tắc'};
 const mandatory = new Set(['observed_at','segment_id','direction']);
 const receiptEmpty: Receipt[] = [];
@@ -18,7 +18,7 @@ export function SourcesPanel({segments, focus}: {segments: Segment[]; focus?: nu
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState<Source | null>(null);
   const [editing, setEditing] = useState<Source | null | undefined>(undefined);
-  const list = useRemote<Source[]>(`/admin/sources?q=${encodeURIComponent(filter)}`, []);
+  const list = useRemote<Source[]>(`/management/sources?q=${encodeURIComponent(filter)}`, []);
   useEffect(() => {
     if (focus && !list.loading) setSelected(list.data.find(s => s.id === focus) || null);
   }, [focus, list.loading]);
@@ -55,7 +55,7 @@ function SourceForm({source, segments, onSave, onClose}: {source: Source | null;
   function submit(event: React.FormEvent) {
     event.preventDefault();
     void action.run(async () => {
-      const data = await api<Source>(source ? `/admin/sources/${source.id}` : '/admin/sources',
+      const data = await api<Source>(source ? `/management/sources/${source.id}` : '/management/sources',
         json(source ? {...fields, revision: source.revision} : fields, source ? 'PATCH' : 'POST'));
       onSave(data);
     });
@@ -95,7 +95,7 @@ function SourceDetails({source, onUpdate, onEdit}: {source: Source; onUpdate: (v
   const [showMapping, setShowMapping] = useState(!source.tested && source.kind !== 'camera');
   const [showReceipts, setShowReceipts] = useState(false);
   const action = useAction();
-  const path = `/admin/sources/${source.id}`;
+  const path = `/management/sources/${source.id}`;
   function parseSample() {
     if (!sample.trim()) return undefined;
     try {
@@ -169,7 +169,7 @@ function Receipts({sourceId}: {sourceId:number}) {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [filter, setFilter] = useState('');
-  const result = useRemote<Receipt[]>(`/admin/sources/${sourceId}/receipts?${filter}`, receiptEmpty);
+  const result = useRemote<Receipt[]>(`/management/sources/${sourceId}/receipts?${filter}`, receiptEmpty);
   return <div className="workflow-actions">
     <form onSubmit={e => {e.preventDefault(); const q = new URLSearchParams(); if(start)q.set('start',iso(start)); if(end)q.set('end',iso(end)); setFilter(q.toString()); result.reload();}}>
       <div className="two-columns"><label className="field">Từ thời điểm<input type="datetime-local" value={start} onChange={e => setStart(e.target.value)}/></label><label className="field">Đến thời điểm<input type="datetime-local" value={end} min={start} onChange={e => setEnd(e.target.value)}/></label></div>
@@ -289,7 +289,7 @@ function AccountForm({mode,user,segments,onClose,onSaved}: {mode:'create'|'edit'
 }
 
 type Report = {hours:{hour:string; FREE:number; SLOW:number; JAM:number; unknown:number; samples:number}[]; valid_samples:number; unknown_samples:number};
-export function ReportPanel({segments}:{segments:Segment[]}) {
+export function ReportPanel({segments,allowExport}:{segments:Segment[];allowExport:boolean}) {
   const [road,setRoad] = useState(segments.find(s => s.active)?.id || 0);
   const [direction,setDirection] = useState<Direction>('forward');
   const [start,setStart] = useState(localInput(new Date(Date.now()-86400000).toISOString()));
@@ -301,12 +301,12 @@ export function ReportPanel({segments}:{segments:Segment[]}) {
     e.preventDefault();
     void action.run(async () => {
       const next = new URLSearchParams({segment_id:String(road),direction,start:iso(start),end:iso(end)}).toString();
-      setReport(await api<Report>(`/admin/traffic-report?${next}`));
+      setReport(await api<Report>(`/management/traffic-report?${next}`));
       setQuery(next);
     },'Đã cập nhật thống kê.');
   }
   async function download() {
-    const response = await fetch(`/api/admin/traffic-report/export?${query}&format=csv`,{credentials:'same-origin'});
+    const response = await fetch(`/api/management/traffic-report/export?${query}&format=csv`,{credentials:'same-origin'});
     if(!response.ok){const error = await response.json();throw new Error(error.detail || 'Không tạo được tệp báo cáo.');}
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement('a');
@@ -320,15 +320,15 @@ export function ReportPanel({segments}:{segments:Segment[]}) {
     <form onSubmit={submit}>
       <RoadFields segments={segments} road={road} direction={direction} onRoad={id => {setRoad(id);setDirection('forward');}} onDirection={setDirection}/>
       <div className="two-columns"><label className="field">Từ thời điểm<input type="datetime-local" required value={start} onChange={e => setStart(e.target.value)}/></label><label className="field">Đến thời điểm<input type="datetime-local" required min={start} max={localInput()} value={end} onChange={e => setEnd(e.target.value)}/></label></div>
-      <div className="workflow-buttons"><button className="button primary" disabled={action.busy || !road}>Thống kê</button>{report && <button type="button" className="button" disabled={action.busy} onClick={() => action.run(download,'Đã tạo tệp báo cáo.')}><Download size={16}/>Xuất báo cáo CSV</button>}</div>
+      <div className="workflow-buttons"><button className="button primary" disabled={action.busy || !road}>Thống kê</button>{report && allowExport && <button type="button" className="button" disabled={action.busy} onClick={() => action.run(download,'Đã tạo tệp báo cáo.')}><Download size={16}/>Xuất báo cáo CSV</button>}</div>
     </form>
-    {report && <><p>{report.valid_samples} bản ghi hợp lệ · {report.unknown_samples} chưa phân loại</p>{report.hours.length ? <div className="table-wrap"><table><thead><tr><th>Khung giờ</th><th>Thông thoáng</th><th>Bình thường</th><th>Ùn tắc</th><th>Chưa xác định</th><th>Tổng mẫu</th></tr></thead><tbody>{report.hours.map(h => <tr key={h.hour}><td>{h.hour}</td><td>{h.FREE}</td><td>{h.SLOW}</td><td>{h.JAM}</td><td>{h.unknown}</td><td>{h.samples}</td></tr>)}</tbody></table></div> : <Empty><p>Không có bản ghi phù hợp. Bạn vẫn có thể xuất tệp thống kê trống.</p></Empty>}</>}
+    {report && <><p>{report.valid_samples} bản ghi hợp lệ · {report.unknown_samples} chưa phân loại</p>{report.hours.length ? <div className="table-wrap"><table><thead><tr><th>Khung giờ</th><th>Thông thoáng</th><th>Bình thường</th><th>Ùn tắc</th><th>Chưa xác định</th><th>Tổng mẫu</th></tr></thead><tbody>{report.hours.map(h => <tr key={h.hour}><td>{h.hour}</td><td>{h.FREE}</td><td>{h.SLOW}</td><td>{h.JAM}</td><td>{h.unknown}</td><td>{h.samples}</td></tr>)}</tbody></table></div> : <Empty><p>Không có bản ghi phù hợp với khoảng thời gian đã chọn.</p></Empty>}</>}
   </section>;
 }
 
 type AuditEvent = {id:number; user_id:number|null; action:string; detail:string; created_at:string; event_id:string; request_id:string; service:string; level:string};
 type Operation = {checked_at:string;services:{name:string;state:string;checked_at:string}[];ingestion:{total:number;fresh:number;stale:number;error:number;unknown:number;disabled:number;last_received_at:string|null};sources:{id:number;name:string;state:string;last_received_at:string|null;last_error:string|null}[]};
-export function SystemPanel({onSource}:{onSource:(id:number)=>void}) {
+export function SystemPanel({onSource}:{onSource?:(id:number)=>void}) {
   const [q,setQ] = useState('');
   const [level,setLevel] = useState('');
   const [service,setService] = useState('');
@@ -336,8 +336,8 @@ export function SystemPanel({onSource}:{onSource:(id:number)=>void}) {
   const [end,setEnd] = useState('');
   const [query,setQuery] = useState('');
   const [detail,setDetail] = useState<AuditEvent|null>(null);
-  const status = useRemote<Operation|null>('/admin/operations',null);
-  const logs = useRemote<AuditEvent[]>(`/admin/events?${query}`,[]);
+  const status = useRemote<Operation|null>('/management/operations',null);
+  const logs = useRemote<AuditEvent[]>(`/management/events?${query}`,[]);
   const action = useAction();
   return <>
     <section className="card">
@@ -347,7 +347,7 @@ export function SystemPanel({onSource}:{onSource:(id:number)=>void}) {
         <h3 className="workflow-section">Trạng thái tiếp nhận dữ liệu</h3>
         <p>{status.data.ingestion.total} nguồn · {status.data.ingestion.fresh} mới · {status.data.ingestion.stale} cũ · {status.data.ingestion.error} lỗi · {status.data.ingestion.disabled} đã tắt</p>
         <p className="micro">{status.data.ingestion.last_received_at ? `Nhận gần nhất ${dateTime(status.data.ingestion.last_received_at)}` : 'Chưa có lượt tiếp nhận.'}</p>
-        {status.data.sources.map(s => <div className="segment-row" key={s.id}><span>{s.name}<small>{s.last_error || (s.last_received_at ? dateTime(s.last_received_at) : 'Chưa có dữ liệu')}</small></span><State value={s.state}/><button className="button small" onClick={() => onSource(s.id)}>Xem nguồn</button></div>)}
+        {status.data.sources.map(s => <div className="segment-row" key={s.id}><span>{s.name}<small>{s.last_error || (s.last_received_at ? dateTime(s.last_received_at) : 'Chưa có dữ liệu')}</small></span><State value={s.state}/>{onSource&&<button className="button small" onClick={() => onSource(s.id)}>Xem nguồn</button>}</div>)}
       </>}</Loading>
     </section>
     <section className="card workflow-section">
@@ -360,7 +360,7 @@ export function SystemPanel({onSource}:{onSource:(id:number)=>void}) {
         <label className="field">Mức độ<select value={level} onChange={e => setLevel(e.target.value)}><option value="">Tất cả</option><option value="info">Thông tin</option><option value="warning">Cảnh báo</option><option value="error">Lỗi</option></select></label>
         <button className="button primary">Áp dụng</button><button type="button" className="button" onClick={() => {setQ('');setStart('');setEnd('');setService('');setLevel('');setQuery('');logs.reload();}}>Xóa bộ lọc</button>
       </form>
-      <Loading loading={logs.loading} error={logs.error} onRetry={logs.reload}>{logs.data.length ? <div className="table-wrap"><table><thead><tr><th>Thời điểm</th><th>Hành động</th><th>Mức độ</th><th></th></tr></thead><tbody>{logs.data.map(row => <tr key={row.id}><td>{dateTime(row.created_at)}</td><td>{row.action}</td><td>{row.level}</td><td><button className="button small" onClick={() => action.run(async () => setDetail(await api<AuditEvent>(`/admin/events/${row.id}`)))}>Chi tiết</button></td></tr>)}</tbody></table></div> : <Empty><p>Không có nhật ký phù hợp.</p></Empty>}</Loading>
+      <Loading loading={logs.loading} error={logs.error} onRetry={logs.reload}>{logs.data.length ? <div className="table-wrap"><table><thead><tr><th>Thời điểm</th><th>Hành động</th><th>Mức độ</th><th></th></tr></thead><tbody>{logs.data.map(row => <tr key={row.id}><td>{dateTime(row.created_at)}</td><td>{row.action}</td><td>{row.level}</td><td><button className="button small" onClick={() => action.run(async () => setDetail(await api<AuditEvent>(`/management/events/${row.id}`)))}>Chi tiết</button></td></tr>)}</tbody></table></div> : <Empty><p>Không có nhật ký phù hợp.</p></Empty>}</Loading>
       {detail && <Modal title="Chi tiết sự kiện" onClose={() => setDetail(null)}><dl className="workflow-details"><dt>Thời điểm</dt><dd>{dateTime(detail.created_at)}</dd><dt>Sự kiện</dt><dd>{detail.action}</dd><dt>Dịch vụ</dt><dd>{detail.service}</dd><dt>Tác nhân</dt><dd>{detail.user_id ?? 'Hệ thống'}</dd><dt>Mã sự kiện</dt><dd>{detail.event_id || detail.id}</dd><dt>Mã yêu cầu</dt><dd>{detail.request_id || 'Chưa có'}</dd><dt>Chi tiết</dt><dd>{detail.detail || 'Chưa có mô tả bổ sung.'}</dd></dl></Modal>}
     </section>
   </>;

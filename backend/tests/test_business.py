@@ -47,13 +47,13 @@ def test_unknown_data_never_claims_free_flow(client,route_request):
     assert all(r['unknown_share']==1 for r in data['routes'])
     assert 'chưa thể khẳng định không tắc' in data['recommendation']['reason']
 
-def test_fresh_density_changes_recommendation(admin_client,route_request):
+def test_fresh_density_changes_recommendation(analyst_client,route_request):
     # Make all roads on initial shortest route crowded, alternate corridor clear.
     for segment_id in range(1,7):
-        response=admin_client.post('/api/observations',json={'segment_id':segment_id,'score':.95 if segment_id<=3 else .05,'count':25,'note':'Quan sát kiểm thử đường','observed_at':now().isoformat()})
+        response=analyst_client.post('/api/observations',json={'segment_id':segment_id,'score':.95 if segment_id<=3 else .05,'count':25,'note':'Quan sát kiểm thử đường','observed_at':now().isoformat()})
         assert response.status_code==201
-    assert admin_client.post('/api/auth/logout').status_code==200
-    result=admin_client.post('/api/routes/search',json=route_request).json()
+    assert analyst_client.post('/api/auth/logout').status_code==200
+    result=analyst_client.post('/api/routes/search',json=route_request).json()
     assert result['routes'][0]['high_share']==0
     assert result['routes'][0]['unknown_share']==0
 
@@ -74,19 +74,19 @@ def test_alert_cooldown_and_read(analyst_client):
     assert analyst_client.post(f'/api/notifications/{notices[0]["id"]}/read').status_code==200
     assert analyst_client.get('/api/alerts').json()['notifications'][0]['read']
 
-def test_historical_video_cannot_publish(admin_client):
+def test_historical_video_cannot_publish(analyst_client):
     with SessionLocal() as db:
-        db.add(VideoJob(id='historical',user_id=1,camera_id=1,filename='old.mp4',status='completed',observed_at=(now()-timedelta(hours=2)).isoformat(),camera_config={'segment_id':1},result={'density':'HIGH','score':.9,'average_count':30,'model':'test'}));db.commit()
-    assert admin_client.post('/api/videos/historical/publish').status_code==422
+        db.add(VideoJob(id='historical',user_id=analyst_client.get('/api/auth/me').json()['id'],camera_id=1,filename='old.mp4',status='completed',observed_at=(now()-timedelta(hours=2)).isoformat(),camera_config={'segment_id':1},result={'density':'HIGH','score':.9,'average_count':30,'model':'test'}));db.commit()
+    assert analyst_client.post('/api/videos/historical/publish').status_code==422
     with SessionLocal() as db: assert db.count(Observation)==0
 
-def test_video_publishes_once(admin_client):
+def test_video_publishes_once(analyst_client):
     with SessionLocal() as db:
-        db.add(VideoJob(id='fresh',user_id=1,camera_id=1,filename='new.mp4',status='completed',observed_at=now().isoformat(),camera_config={'segment_id':1},result={'density':'HIGH','score':.9,'average_count':30,'model':'test'}));db.commit()
-    assert admin_client.post('/api/videos/fresh/publish').status_code==200
-    assert admin_client.post('/api/videos/fresh/publish').status_code==409
+        db.add(VideoJob(id='fresh',user_id=analyst_client.get('/api/auth/me').json()['id'],camera_id=1,filename='new.mp4',status='completed',observed_at=now().isoformat(),camera_config={'segment_id':1},result={'density':'HIGH','score':.9,'average_count':30,'model':'test'}));db.commit()
+    assert analyst_client.post('/api/videos/fresh/publish').status_code==200
+    assert analyst_client.post('/api/videos/fresh/publish').status_code==409
 
-def test_csv_formula_injection(admin_client):
-    admin_client.post('/api/observations',json={'segment_id':1,'score':.8,'note':'=HYPERLINK("bad")','observed_at':now().isoformat()})
-    export=admin_client.get('/api/reports/export')
+def test_csv_formula_injection(analyst_client):
+    analyst_client.post('/api/observations',json={'segment_id':1,'score':.8,'note':'=HYPERLINK("bad")','observed_at':now().isoformat()})
+    export=analyst_client.get('/api/reports/export')
     assert export.status_code==200 and "'=HYPERLINK" in export.text

@@ -1,4 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
+import {createManager} from './actors';
 async function navigate(page:Page,label:string){const menu=page.getByRole('button',{name:'Mở menu',exact:true});if(await menu.isVisible())await menu.click();await page.getByRole('navigation',{name:'Điều hướng chính'}).getByRole('button',{name:label,exact:true}).click();}
 test('day-ahead forecasts explain recurring congestion without technical banners',async({page,request},info)=>{
   test.setTimeout(240000);
@@ -30,14 +31,16 @@ test('an address found outside Hanoi clearly distinguishes missing traffic data'
   await expect(page.getByText(/chưa có đoạn đường và lịch sử quan trắc/)).toBeVisible();
   await expect(page.locator('.outlook-state')).toHaveCount(0);
 });
-test('admin dataset checks, CSV preview/commit and independent congestion labels',async({page},testInfo)=>{
+test('manager dataset checks, CSV preview/commit and independent congestion labels',async({page,request},testInfo)=>{
+  const manager=await createManager(request,[1]);
   await page.goto('/#forecast',{waitUntil:'domcontentloaded'});
   await page.getByRole('button',{name:'Đăng nhập',exact:true}).first().click();
-  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill('e2e-admin@example.invalid');
-  await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');
+  await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill(manager.username);
+  await page.getByLabel('Mật khẩu',{exact:true}).fill(manager.password);
   await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page).toHaveURL(/#admin$/);
+  await navigate(page,'Giám sát & xử lý');
+  await page.getByRole('button',{name:'Dữ liệu & thiết lập',exact:true}).click();
   await page.getByRole('button',{name:'Dữ liệu & mô hình',exact:true}).click();
   await page.getByRole('button',{name:'Kiểm tra dữ liệu',exact:true}).click();
   await expect(page.getByText('Cần dữ liệu ít nhất 7 ngày khác nhau.',{exact:true})).toHaveCount(2);

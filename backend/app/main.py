@@ -25,7 +25,8 @@ from . import schemas as S
 from .config import COOKIE_SECURE, PRODUCTION, UPLOADS, MAX_UPLOAD, MODEL_PATH, TTL_MINUTES
 from .db import initialize_database, get_database, get_db, SessionLocal, stamp, now
 from .models import User, LoginSession, ResetToken, Segment, Camera, Observation, VideoJob, Favorite, AlertRule, Notification, Audit
-from .security import optional_user, require_user, can, permit, operator, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
+from .security import optional_user, require_user, traffic_member, can, permit, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
+from .business_common import allowed_query, check_segment_scope, require_global_scope
 from .seed import seed, PLACES
 from .traffic import classify, latest_observations, observation_dict, emit_alerts
 from .routing import search_routes
@@ -267,16 +268,19 @@ def segments(db=Depends(get_db),data_mode:Literal['observed','demo']='observed',
 
 @app.get('/api/bootstrap')
 def bootstrap(db=Depends(get_db),user=Depends(optional_user),data_mode:Literal['observed','demo']='observed'):
-    return {'places':places(db),'segments':segments(db,data_mode,user),'cameras':[camera_dict(c) for c in db.find(Camera)],
+    camera_config=[camera_dict(c) for c in db.find(Camera,allowed_query(user))] if can(user,'network.manage') else []
+    return {'places':places(db),'segments':segments(db,data_mode,user),'cameras':camera_config,
             'config':config(),'user':public_user(user) if user else None,'demo':demo_status(db.database)}
 
 @app.post('/api/segments',status_code=201)
-def add_segment(body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):
+def add_segment(body:S.SegmentInput,user=Depends(permit('network.manage')),db=Depends(get_db)):
+    require_global_scope(user)
     row=Segment(**body.model_dump()); db.add(row); audit(db,user.id,'segment_created',body.name); db.commit()
     return {'id':row.id}
 
 @app.put('/api/segments/{ident}')
-def edit_segment(ident:int,body:S.SegmentInput,user=Depends(admin),db=Depends(get_db)):
+def edit_segment(ident:int,body:S.SegmentInput,user=Depends(permit('network.manage')),db=Depends(get_db)):
+    check_segment_scope(user,ident)
     row=item(db,Segment,ident)
     if row.geometry != body.geometry and db.find_one(Observation,{'segment_id':ident}):
         raise HTTPException(409,'Đoạn đường đã có quan sát. Hãy ngừng đoạn cũ và tạo đoạn mới khi thay đổi vị trí để bảo toàn lịch sử.')
@@ -284,36 +288,39 @@ def edit_segment(ident:int,body:S.SegmentInput,user=Depends(admin),db=Depends(ge
     audit(db,user.id,'segment_updated',str(ident)); db.commit(); return {'id':row.id}
 
 @app.delete('/api/segments/{ident}')
-def disable_segment(ident:int,user=Depends(admin),db=Depends(get_db)):
+def disable_segment(ident:int,user=Depends(permit('network.manage')),db=Depends(get_db)):
+    check_segment_scope(user,ident)
     row=item(db,Segment,ident); row.active=False
     for camera in db.find(Camera,{'segment_id':ident}): camera.active=False
     audit(db,user.id,'segment_disabled',str(ident));db.commit();return {'message':'Đã ngừng đoạn đường và các camera liên quan.'}
 
 @app.get('/api/cameras')
-def cameras(db=Depends(get_db)):
-    return [camera_dict(c) for c in db.find(Camera,sort=[('id',1)])]
+def cameras(user=Depends(permit('network.manage')),db=Depends(get_db)):
+    return [camera_dict(c) for c in db.find(Camera,allowed_query(user),sort=[('id',1)])]
 
 @app.post('/api/cameras',status_code=201)
-def add_camera(body:S.CameraInput,user=Depends(admin),db=Depends(get_db)):
+def add_camera(body:S.CameraInput,user=Depends(permit('network.manage')),db=Depends(get_db)):
+    check_segment_scope(user,body.segment_id)
     item(db,Segment,body.segment_id)
     row = Camera(**body.model_dump()); db.add(row); audit(db,user.id,'camera_created',body.name); db.commit()
     return camera_dict(row)
 
 @app.put('/api/cameras/{ident}')
-def edit_camera(ident:int,body:S.CameraInput,user=Depends(admin),db=Depends(get_db)):
-    row=item(db,Camera,ident); item(db,Segment,body.segment_id)
+def edit_camera(ident:int,body:S.CameraInput,user=Depends(permit('network.manage')),db=Depends(get_db)):
+    row=item(db,Camera,ident); check_segment_scope(user,row.segment_id,body.segment_id); item(db,Segment,body.segment_id)
     if row.segment_id!=body.segment_id:
         row.preview_public=False;row.preview_job_id=None;row.preview_at=None;row.preview_mime=None
     for k,v in body.model_dump().items(): setattr(row,k,v)
     audit(db,user.id,'camera_updated',str(ident)); db.commit(); return camera_dict(row)
 
 @app.delete('/api/cameras/{ident}')
-def disable_camera(ident:int,user=Depends(admin),db=Depends(get_db)):
-    row=item(db,Camera,ident); row.active=False
+def disable_camera(ident:int,user=Depends(permit('network.manage')),db=Depends(get_db)):
+    row=item(db,Camera,ident); check_segment_scope(user,row.segment_id); row.active=False
     audit(db,user.id,'camera_disabled',str(ident)); db.commit(); return {'message':'Đã ngừng camera, lịch sử vẫn được bảo toàn.'}
 
 @app.post('/api/observations',status_code=201)
-def manual_observation(body:S.ObservationInput,user=Depends(operator),db=Depends(get_db)):
+def manual_observation(body:S.ObservationInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
+    check_segment_scope(user,body.segment_id)
     segment = item(db,Segment,body.segment_id)
     if not segment.active: raise HTTPException(400,'Đoạn đường đã ngừng theo dõi.')
     if body.observed_at > now()+timedelta(seconds=30): raise HTTPException(422,'Không thể ghi quan sát trong tương lai.')
@@ -327,8 +334,9 @@ async def routes(body:S.RouteRequest,db=Depends(get_db)):
     return await search_routes(db,body)
 
 @app.post('/api/videos',status_code=202)
-async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),retain_video:bool=Form(False),file:UploadFile=File(...),user=Depends(require_user),db=Depends(get_db)):
+async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),retain_video:bool=Form(False),file:UploadFile=File(...),user=Depends(traffic_member),db=Depends(get_db)):
     camera=item(db,Camera,camera_id)
+    check_segment_scope(user,camera.segment_id)
     if not camera.active: raise HTTPException(400,'Camera đã ngừng hoạt động.')
     if not item(db,Segment,camera.segment_id).active: raise HTTPException(400,'Đoạn đường đã ngừng theo dõi.')
     if not MODEL_PATH.is_file(): raise HTTPException(503,'Chưa có mô hình YOLO. Quản trị viên cần tải trọng số theo README.')
@@ -361,24 +369,24 @@ async def upload_video(camera_id:int=Form(...),observed_at:str|None=Form(None),r
     return job_dict(job)
 
 @app.get('/api/videos')
-def videos(user=Depends(require_user),db=Depends(get_db)):
+def videos(user=Depends(traffic_member),db=Depends(get_db)):
     return [job_dict(j,summary=True) for j in db.find(VideoJob,{'user_id':user.id},sort=[('created_at',-1)],limit=50,exclude=['result.samples'])]
 
 @app.get('/api/videos/{ident}')
-def get_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
+def get_video(ident:str,user=Depends(traffic_member),db=Depends(get_db)):
     job=own(item(db,VideoJob,ident),user)
     camera=db.get(Camera,job.camera_id)
     return {**job_dict(job),'preview_shared':bool(camera and camera.preview_public and camera.preview_job_id==job.id)}
 
 @app.get('/api/videos/{ident}/frames/{second}')
-def frame(ident:str,second:int,user=Depends(require_user),db=Depends(get_db)):
+def frame(ident:str,second:int,user=Depends(traffic_member),db=Depends(get_db)):
     own(item(db,VideoJob,ident),user)
     path=UPLOADS/f'{ident}-{second}.jpg'
     if not path.is_file(): raise HTTPException(404,'Chưa có ảnh cho mốc thời gian này.')
     return FileResponse(path,media_type='image/jpeg')
 
 @app.post('/api/videos/{ident}/cancel')
-def cancel_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
+def cancel_video(ident:str,user=Depends(traffic_member),db=Depends(get_db)):
     job=own(item(db,VideoJob,ident),user)
     if job.status not in ('queued','processing'): raise HTTPException(409,'Tác vụ đã kết thúc.')
     job=db.update(VideoJob,ident,{'status':'cancelled'},condition={'status':{'$in':['queued','processing']}})
@@ -386,7 +394,7 @@ def cancel_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
     return job_dict(job)
 
 @app.delete('/api/videos/{ident}')
-def delete_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
+def delete_video(ident:str,user=Depends(traffic_member),db=Depends(get_db)):
     job=own(item(db,VideoJob,ident),user)
     if job.status in ('queued','processing'): raise HTTPException(409,'Hãy hủy tác vụ trước khi xóa.')
     for path in UPLOADS.glob(f'{job.id}-*.jpg'): path.unlink(missing_ok=True)
@@ -407,7 +415,7 @@ def delete_video(ident:str,user=Depends(require_user),db=Depends(get_db)):
     return {'message':'Đã xóa kết quả và ảnh video. Quan sát đã công bố vẫn giữ nguồn gốc.'}
 
 @app.post('/api/videos/{ident}/publish')
-def publish_video(ident:str,options:S.PublishOptions|None=None,user=Depends(operator),db=Depends(get_db)):
+def publish_video(ident:str,options:S.PublishOptions|None=None,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     from .monitoring import publish_job
     return publish_job(db,own(item(db,VideoJob,ident),user),user,options or S.PublishOptions())
 
@@ -451,9 +459,11 @@ def remove_alert(ident:int,user=Depends(permit('alerts.follow')),db=Depends(get_
 def read_notification(ident:int,user=Depends(permit('alerts.read')),db=Depends(get_db)):
     row=own(item(db,Notification,ident),user); row.read=True; db.commit(); return {'message':'Đã đánh dấu đã đọc.'}
 
-def report_rows(db,segment_id=None,start=None,end=None):
-    filters={}
-    if segment_id: filters['segment_id']=segment_id
+def report_rows(db,user,segment_id=None,start=None,end=None):
+    filters=allowed_query(user)
+    if segment_id is not None:
+        check_segment_scope(user,segment_id)
+        filters['segment_id']=segment_id
     for value, comparator in ((start,True),(end,False)):
         if value:
             try:
@@ -465,13 +475,13 @@ def report_rows(db,segment_id=None,start=None,end=None):
     return db.find(Observation,filters,sort=[('observed_at',-1)],limit=5000)
 
 @app.get('/api/reports')
-def reports(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(admin),db=Depends(get_db)):
-    rows=report_rows(db,segment_id,start,end)
+def reports(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(permit('analytics.view')),db=Depends(get_db)):
+    rows=report_rows(db,user,segment_id,start,end)
     return {'total':len(rows),'limit':5000,'distribution':{k:sum(r.density==k for r in rows) for k in ('LOW','NORMAL','HIGH')},'average_count':round(sum(r.count for r in rows)/len(rows),1) if rows else 0,'observations':[observation_dict(r) for r in rows]}
 
 @app.get('/api/reports/export')
-def export(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(admin),db=Depends(get_db)):
-    rows=report_rows(db,segment_id,start,end); out=io.StringIO(); out.write('\ufeff'); writer=csv.writer(out)
+def export(segment_id:int|None=None,start:str|None=None,end:str|None=None,user=Depends(permit('analytics.export')),db=Depends(get_db)):
+    rows=report_rows(db,user,segment_id,start,end); out=io.StringIO(); out.write('\ufeff'); writer=csv.writer(out)
     writer.writerow(['id','segment_id','density','score','vehicle_count','source','observed_at','note'])
     for r in rows:
         note=r.note
@@ -494,11 +504,6 @@ def edit_user(ident:int,body:S.UserUpdate,user=Depends(admin),db=Depends(get_db)
 @app.post('/api/admin/users/{ident}/revoke')
 def revoke(ident:int,user=Depends(admin),db=Depends(get_db)):
     item(db,User,ident); db.update(User,ident,{},increment={'auth_version':1}); db.delete_many(LoginSession,{'user_id':ident}); audit(db,user.id,'sessions_revoked',str(ident)); db.commit(); return {'message':'Đã thu hồi tất cả phiên đăng nhập.'}
-
-@app.get('/api/admin/system')
-def system(user=Depends(admin),db=Depends(get_db)):
-    return {'model_ready':MODEL_PATH.is_file(),'model_name':MODEL_PATH.name,'google_ready':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'active_jobs':db.count(VideoJob,{'status':{'$in':['queued','processing']}}),'audit':[{k:getattr(a,k) for k in ('id','user_id','action','detail','created_at')} for a in db.find(Audit,sort=[('id',-1)],limit=100)]}
-
 
 from .monitoring import router as monitoring_router
 app.include_router(monitoring_router)

@@ -55,11 +55,6 @@ def permit(key):
         return check_permission(user, key)
     return check
 
-def operator(user=Depends(require_user)):
-    if user.role not in ('admin', 'analyst'):
-        raise HTTPException(403, 'Chức năng này dành cho nhà phân tích và quản trị viên.')
-    return user
-
 def admin(user=Depends(require_user)):
     if user.role != 'admin':
         raise HTTPException(403, 'Bạn không có quyền quản trị.')

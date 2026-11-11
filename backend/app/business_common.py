@@ -38,14 +38,23 @@ def manager(user=Depends(require_user)):
     return user
 
 
+def check_segment_scope(user, *ids):
+    if user and user.managed_segment_ids is not None and set(ids).difference(user.managed_segment_ids):
+        raise HTTPException(403, 'Tuyến đường nằm ngoài phạm vi được phân công.')
+
+
+def require_global_scope(user):
+    if user.managed_segment_ids is not None:
+        raise HTTPException(403,'Thao tác này dành cho Quản lý phụ trách toàn bộ tuyến.')
+
+
 def road(db, segment_id, direction='forward', user=None):
+    check_segment_scope(user,segment_id)
     segment = db.get(Segment, segment_id)
     if not segment or not segment.active:
         raise HTTPException(404, 'Chưa cấu hình tuyến đường giám sát hoặc tuyến đã ngừng hoạt động.')
     if direction == 'reverse' and segment.one_way:
         raise HTTPException(422, 'Tuyến đường này không hỗ trợ chiều ngược lại.')
-    if user and user.role == 'analyst' and user.managed_segment_ids is not None and segment_id not in user.managed_segment_ids:
-        raise HTTPException(403, 'Tuyến đường nằm ngoài phạm vi được phân công.')
     return segment
 
 
