@@ -348,10 +348,25 @@ def test_admin_can_manage_accounts_but_cannot_open_traffic_reports(admin_client)
     for path in ('/api/management/traffic-report','/api/management/traffic-report/export',
                  '/api/admin/traffic-report','/api/admin/traffic-report/export',
                  '/api/management/hourly-backtest','/api/admin/hourly-backtest',
-                 '/api/reports','/api/reports/export','/api/management/sources',
-                 '/api/management/operations','/api/management/events','/api/forecast/runs','/api/cameras'):
+                 '/api/reports','/api/reports/export'):
         assert admin_client.get(path,params=query).status_code==403,path
-    assert admin_client.post('/api/observations',json={'segment_id':1,'score':.5,'observed_at':stamp()}).status_code==403
+    for path in ('/api/management/sources','/api/management/operations','/api/management/events','/api/forecast/runs','/api/cameras'):
+        assert admin_client.get(path).status_code==200,path
+    assert admin_client.post('/api/observations',json={'segment_id':1,'score':.5,'note':'Quan sát kiểm thử hệ thống','observed_at':stamp()}).status_code==201
+
+
+def test_admin_system_journal_includes_account_and_operational_events(admin_client):
+    from backend.app.models import Audit
+    with SessionLocal() as db:
+        account=Audit(action='account_created',detail='Account action token=hidden-token')
+        operation=Audit(action='source_failed',detail='Source unavailable')
+        db.add(account);db.add(operation);db.commit()
+    items=admin_client.get('/api/management/events').json()
+    assert {account.id,operation.id}<={item['id'] for item in items}
+    detail=admin_client.get(f'/api/management/events/{account.id}')
+    assert detail.status_code==200
+    assert 'hidden-token' not in detail.json()['detail']
+    assert admin_client.delete(f'/api/management/events/{account.id}').status_code==405
 
 
 def test_manager_reports_and_model_records_stay_inside_assigned_roads(client):

@@ -1,6 +1,6 @@
 # Pipeline XGBoost / GRU trên dữ liệu quan sát thực
 
-Quản lý mở **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình**. Các tuyến và thao tác hiển thị theo phạm vi, quyền được cấp. Bản chạy thử có mô hình XGBoost học từ dữ liệu minh họa được lưu riêng. [Dữ liệu minh họa](DEMO.md)
+Admin mở **Quản trị hệ thống → Dữ liệu & mô hình**. Quản lý mở **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình** khi được cấp quyền. Các tuyến và thao tác của Quản lý giới hạn theo phạm vi được giao. Bản chạy thử có mô hình XGBoost học từ dữ liệu minh họa được lưu riêng. [Dữ liệu minh họa](DEMO.md)
 
 ![Trang Tổng quan](previews/overview-redesign.png)
 
@@ -15,10 +15,10 @@ Trang **Tổng quan** là điểm bắt đầu: Tình trạng & thống kê, D�
 1. Cập nhật và chạy Docker theo `docs/RUNNING.md`. Sau thay đổi này cần build **backend** để có `xgboost-cpu` và `scikit-learn`; PyTorch CPU đã có trong Dockerfile. Không cần cài TensorFlow.
 2. Mở `http://localhost:8081/#forecast` nếu `.env` đang dùng `FRONTEND_PORT=8081`.
 3. Người dùng gõ tên đường, chọn ngày và khung giờ trên trang **Dự báo giao thông**. Mốc 15/30 phút của XGBoost và GRU thuộc luồng mô hình kỹ thuật bên dưới.
-4. Quản lý có quyền chuẩn bị dữ liệu mở **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình**, chọn tuyến và khoảng thời gian, rồi bấm **Kiểm tra dữ liệu**.
+4. Admin hoặc Quản lý có quyền chuẩn bị dữ liệu mở **Dữ liệu & mô hình** trong không gian tương ứng, chọn tuyến và khoảng thời gian, rồi bấm **Kiểm tra dữ liệu**.
 5. Khi đủ dữ liệu, bấm **Huấn luyện XGBoost + GRU**. Một worker huấn luyện nền; có tiến độ và thao tác hủy. Chỉ một tác vụ chạy tại một thời điểm. Khởi động lại máy chủ sẽ đánh dấu tác vụ gián đoạn là thất bại, không tự phục hồi kết quả dở dang.
 6. Xem bảng so sánh XGBoost / GRU / Giữ nguyên trạng thái, điểm validation, ma trận nhầm lẫn và tải CSV báo cáo.
-7. **Quản lý phụ trách toàn bộ tuyến** có quyền mô hình kích hoạt bản đủ điều kiện; mỗi mục tiêu có một bản đang phục vụ. Chỉ các mốc và tuyến đạt đánh giá được phép trả dự báo. Có thể kích hoạt lại một bản cũ hoặc ngừng phục vụ mà không xóa báo cáo.
+7. **Admin hoặc Quản lý phụ trách toàn bộ tuyến** có quyền mô hình kích hoạt bản đủ điều kiện. Mỗi mục tiêu có một bản đang phục vụ. Chỉ các mốc và tuyến đạt đánh giá được phép trả dự báo. Có thể kích hoạt lại một bản cũ hoặc ngừng phục vụ mà không xóa báo cáo.
 
 Code cung cấp luồng huấn luyện thật, không kèm mô hình dự báo đã huấn luyện cho Hà Nội và không thêm số liệu tổng hợp vào các collection quan sát/nhãn/mô hình thực. Bộ mẫu nằm riêng trong `demo_profiles` và `demo_registry`.
 
@@ -44,7 +44,7 @@ Tỷ lệ 18 ngày ùn tắc trên 20 ngày phù hợp tương đương tần su
 ## Chuẩn bị dữ liệu
 
 - Nhập CSV có thời gian và nguồn quan sát đã được phép sử dụng. Dữ liệu video đã công bố từ bản cũ vẫn được đọc; màn hình tải video mới đã gỡ.
-- Hoặc Quản lý có quyền `models.manage` trong phạm vi được phân công nhập CSV số liệu đã quan sát. Tải mẫu tiêu đề ở `database/templates/traffic-observations.csv`. Các cột bắt buộc: `segment_id,observed_at,score,count,density`.
+- Hoặc Admin hay Quản lý có quyền `models.manage` nhập CSV số liệu đã quan sát. Quản lý chỉ nhập cho tuyến được phân công. Tải mẫu tiêu đề ở `database/templates/traffic-observations.csv`. Các cột bắt buộc: `segment_id,observed_at,score,count,density`.
 - Thời gian là ISO có múi giờ; score 0–1, count 0–10000, density LOW/NORMAL/HIGH. Mỗi dòng là một quan sát thật, không phải một hàng đại diện do hệ thống tự nhân lên.
 - CSV tối đa 2 MB/5.000 dòng. **Kiểm tra CSV** không ghi DB; **Xác nhận nhập** mới ghi. Tất cả hàng được kiểm tra trước khi ghi. Nhập lại cùng tuyến/thời điểm bỏ qua bản đã có, không ghi đè. MongoDB không có transaction nhiều document: lỗi giữa lúc ghi có thể để lại một phần; nhập lại an toàn nhờ sample_key unique.
 - CSV chỉ nhập mẫu mật độ; không tự tạo nhãn ùn tắc.
@@ -56,7 +56,7 @@ segment_id,observed_at,score,count,density
 1,2026-01-15T07:01:00+07:00,0.40,12,NORMAL
 ```
 
-Đối với mục tiêu **ùn tắc**, Quản lý có quyền `models.manage` trong phạm vi được phân công phải xác nhận nhãn FREE/SLOW/JAM sau khi xem căn cứ thực tế. Mốc nhãn là **kết thúc ô 5 phút**: nhãn 07:05 mô tả ô 07:00–07:05. Có tên người xác nhận, căn cứ và nhật ký. API không chấp nhận nhãn tương lai hoặc mốc không chia hết 5 phút. Có thể nhập hàng loạt bằng CSV nhãn riêng (`segment_id,observed_at,state,note`), kiểm tra trước rồi xác nhận nhập. Mốc đã có được cập nhật và gắn người nhập hiện tại; không sinh mẫu mật độ. Có thể sửa nhãn; bộ dữ liệu của các lần huấn luyện đã lưu giữ nguyên để truy vết.
+Đối với mục tiêu **ùn tắc**, Admin hoặc Quản lý có quyền `models.manage` xác nhận nhãn FREE/SLOW/JAM sau khi xem căn cứ thực tế. Quản lý chỉ xác nhận cho tuyến được phân công. Mốc nhãn là **kết thúc ô 5 phút**: nhãn 07:05 mô tả ô 07:00–07:05. Có tên người xác nhận, căn cứ và nhật ký. API không chấp nhận nhãn tương lai hoặc mốc không chia hết 5 phút. Có thể nhập hàng loạt bằng CSV nhãn riêng (`segment_id,observed_at,state,note`), kiểm tra trước rồi xác nhận nhập. Mốc đã có được cập nhật và gắn người nhập hiện tại; không sinh mẫu mật độ. Có thể sửa nhãn; bộ dữ liệu của các lần huấn luyện đã lưu giữ nguyên để truy vết.
 
 ## Cửa sổ và đặc trưng
 
@@ -88,7 +88,7 @@ Mô hình thắng được chọn bằng Macro-F1 trên **validation**. Báo cá
 
 ## Phục vụ dự báo và tìm đường
 
-Chỉ đọc mô hình Quản lý đã kích hoạt, có tệp đầy đủ, đúng tuyến và đúng mục tiêu. Cần 60 phút dữ liệu liên tiếp đủ chất lượng; ô mới nhất kết thúc không quá 10 phút trước. Mô hình có khoảng dữ liệu huấn luyện kết thúc quá 45 ngày cần huấn luyện lại. Không hiển thị tỷ lệ “chắc chắn tắc” chưa được hiệu chỉnh xác suất.
+Dự báo dùng mô hình đã được Admin hoặc Quản lý có quyền kích hoạt. Mô hình cần có tệp đầy đủ, đúng tuyến và đúng mục tiêu. Cần 60 phút dữ liệu liên tiếp đủ chất lượng; ô mới nhất kết thúc không quá 10 phút trước. Mô hình có khoảng dữ liệu huấn luyện kết thúc quá 45 ngày cần huấn luyện lại. Không hiển thị tỷ lệ “chắc chắn tắc” chưa được hiệu chỉnh xác suất.
 
 Với tìm tuyến khởi hành trong tương lai, dự báo chỉ được ghép khi thời điểm dự báo lệch giờ khởi hành tối đa 2,5 phút, trong phạm vi 35 phút tới. Ưu tiên mô hình ùn tắc nếu có, sau đó mật độ; thiếu dự báo thì dùng lịch sử đủ bằng chứng. Quan sát hiện tại vẫn phục vụ tìm tuyến ngay bây giờ. Camera/dự báo chỉ bổ sung rủi ro, giữ ETA của Google. Đây chưa phải mô hình dự báo theo thời điểm đến từng cạnh của tuyến.
 
@@ -103,12 +103,12 @@ Ba collection mới: `forecast_runs` (tác vụ/báo cáo), `traffic_labels` (nh
 | API | Quyền |
 |---|---|
 | GET `/api/forecast/status`, GET `/api/forecast/predict?segment_id=1&target=density` | Dự báo đã kích hoạt theo quyền xem dự báo, metadata còn hỗ trợ quyền quản lý mô hình |
-| POST `/api/forecast/readiness`, GET/POST `/api/forecast/runs` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
-| POST `/api/forecast/runs/{uuid}/cancel` | Quản lý có quyền `models.manage`, phụ trách toàn bộ các tuyến của tác vụ |
-| POST `/api/forecast/runs/{uuid}/activate`, DELETE `/api/forecast/active/{target}` | Quản lý toàn bộ tuyến có quyền `models.manage` |
-| GET `/api/forecast/runs/{uuid}/report.csv` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
-| GET/POST `/api/forecast/labels`, POST `/api/forecast/labels/import?dry_run=true/false` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
-| POST `/api/forecast/import?dry_run=true/false` | Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| POST `/api/forecast/readiness`, GET/POST `/api/forecast/runs` | Admin hoặc Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| POST `/api/forecast/runs/{uuid}/cancel` | Admin hoặc Quản lý có quyền `models.manage`, phụ trách toàn bộ các tuyến của tác vụ |
+| POST `/api/forecast/runs/{uuid}/activate`, DELETE `/api/forecast/active/{target}` | Admin hoặc Quản lý toàn bộ tuyến có quyền `models.manage` |
+| GET `/api/forecast/runs/{uuid}/report.csv` | Admin hoặc Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| GET/POST `/api/forecast/labels`, POST `/api/forecast/labels/import?dry_run=true/false` | Admin hoặc Quản lý có quyền `models.manage` trong phạm vi được phân công |
+| POST `/api/forecast/import?dry_run=true/false` | Admin hoặc Quản lý có quyền `models.manage` trong phạm vi được phân công |
 
 ## Chạy sau cập nhật
 

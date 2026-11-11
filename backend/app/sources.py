@@ -20,7 +20,7 @@ from .business_models import DataSource, RoadReading, SourceReceipt
 from .business_schemas import SourceInput, SourceEdit, MappingInput, Toggle
 from .db import get_db, stamp, now
 from .models import TrafficSample
-from .security import permit
+from .security import admin, permit
 
 router=APIRouter()
 MAX_BYTES=2*1024*1024
@@ -117,6 +117,7 @@ def validate_credentials(body, current=None):
 
 
 @router.get('/api/management/sources')
+@router.get('/api/admin/sources',dependencies=[Depends(admin)],include_in_schema=False)
 def list_sources(q:str=Query(default='',max_length=100),user=Depends(permit('sources.manage')),db=Depends(get_db)):
     import re
     query=allowed_query(user)
@@ -125,6 +126,7 @@ def list_sources(q:str=Query(default='',max_length=100),user=Depends(permit('sou
 
 
 @router.post('/api/management/sources',status_code=201)
+@router.post('/api/admin/sources',status_code=201,dependencies=[Depends(admin)],include_in_schema=False)
 def create_source(body:SourceInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     road(db,body.segment_id,body.direction,user);url_valid(body.url);validate_credentials(body)
     row=DataSource(**body.model_dump(),created_by=user.id,signature=signature(body),history=[event(user,'source_created')],
@@ -133,6 +135,7 @@ def create_source(body:SourceInput,user=Depends(permit('sources.manage')),db=Dep
 
 
 @router.patch('/api/management/sources/{ident}')
+@router.patch('/api/admin/sources/{ident}',dependencies=[Depends(admin)],include_in_schema=False)
 def edit_source(ident:int,body:SourceEdit,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     source=managed_source(db,ident,user);road(db,body.segment_id,body.direction,user);url_valid(body.url);validate_credentials(body,source)
     fields=body.model_dump(exclude={'revision'})
@@ -179,6 +182,7 @@ def mapped_reading(source,raw):
 
 
 @router.put('/api/management/sources/{ident}/mapping')
+@router.put('/api/admin/sources/{ident}/mapping',dependencies=[Depends(admin)],include_in_schema=False)
 def mapping(ident:int,body:MappingInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     source=managed_source(db,ident,user)
     if source.kind=='camera':raise HTTPException(422,'Nguồn hình ảnh không có bảng ánh xạ số liệu.')
@@ -202,6 +206,7 @@ class SourceTest(Revision):
 
 
 @router.post('/api/management/sources/{ident}/test')
+@router.post('/api/admin/sources/{ident}/test',dependencies=[Depends(admin)],include_in_schema=False)
 async def test_source(ident:int,body:SourceTest,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     source=managed_source(db,ident,user);road(db,source.segment_id,source.direction)
     if not source.authorized:raise HTTPException(409,'Nguồn dữ liệu chưa đủ điều kiện hoạt động.')
@@ -224,6 +229,7 @@ async def test_source(ident:int,body:SourceTest,user=Depends(permit('sources.man
 
 
 @router.post('/api/management/sources/{ident}/toggle')
+@router.post('/api/admin/sources/{ident}/toggle',dependencies=[Depends(admin)],include_in_schema=False)
 def toggle_source(ident:int,body:Toggle,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     source=managed_source(db,ident,user)
     if body.active:
@@ -306,11 +312,13 @@ class RowsInput(Input):
 
 
 @router.post('/api/management/sources/{ident}/receive')
+@router.post('/api/admin/sources/{ident}/receive',dependencies=[Depends(admin)],include_in_schema=False)
 def receive_json(ident:int,body:RowsInput,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     return receive(db,managed_source(db,ident,user),body.rows)
 
 
 @router.post('/api/management/sources/{ident}/upload')
+@router.post('/api/admin/sources/{ident}/upload',dependencies=[Depends(admin)],include_in_schema=False)
 async def receive_file(ident:int,file:UploadFile=File(...),user=Depends(permit('sources.manage')),db=Depends(get_db)):
     source=managed_source(db,ident,user)
     if source.kind!='file':raise HTTPException(422,'Chỉ nhập tệp cho nguồn có loại Tệp lịch sử.')
@@ -320,6 +328,7 @@ async def receive_file(ident:int,file:UploadFile=File(...),user=Depends(permit('
 
 
 @router.get('/api/management/sources/{ident}/receipts')
+@router.get('/api/admin/sources/{ident}/receipts',dependencies=[Depends(admin)],include_in_schema=False)
 def receipts(ident:int,start:str|None=None,end:str|None=None,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     managed_source(db,ident,user);query={'source_id':ident};dates=period(start,end)
     if dates:query['received_at']=dates
@@ -327,6 +336,7 @@ def receipts(ident:int,start:str|None=None,end:str|None=None,user=Depends(permit
 
 
 @router.post('/api/management/sources/{ident}/poll')
+@router.post('/api/admin/sources/{ident}/poll',dependencies=[Depends(admin)],include_in_schema=False)
 async def poll(ident:int,user=Depends(permit('sources.manage')),db=Depends(get_db)):
     source=managed_source(db,ident,user)
     if source.kind!='api' or not source.active:raise HTTPException(409,'Chỉ nhận trực tiếp từ nguồn dịch vụ đang bật.')

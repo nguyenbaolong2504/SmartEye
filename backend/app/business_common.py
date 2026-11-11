@@ -39,12 +39,12 @@ def manager(user=Depends(require_user)):
 
 
 def check_segment_scope(user, *ids):
-    if user and user.managed_segment_ids is not None and set(ids).difference(user.managed_segment_ids):
+    if user and user.role!='admin' and user.managed_segment_ids is not None and set(ids).difference(user.managed_segment_ids):
         raise HTTPException(403, 'Tuyến đường nằm ngoài phạm vi được phân công.')
 
 
 def require_global_scope(user):
-    if user.managed_segment_ids is not None:
+    if user.role!='admin' and user.managed_segment_ids is not None:
         raise HTTPException(403,'Thao tác này dành cho Quản lý phụ trách toàn bộ tuyến.')
 
 
@@ -59,7 +59,7 @@ def road(db, segment_id, direction='forward', user=None):
 
 
 def allowed_query(user):
-    return {'segment_id':{'$in':user.managed_segment_ids}} if user.managed_segment_ids is not None else {}
+    return {'segment_id':{'$in':user.managed_segment_ids}} if user.role!='admin' and user.managed_segment_ids is not None else {}
 
 
 def get_record(db, model, ident):

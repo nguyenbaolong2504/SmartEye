@@ -100,7 +100,7 @@ def readiness(body:TrainInput,user=Depends(permit('models.manage')),db=Depends(g
 @router.get('/api/forecast/runs')
 def runs(user=Depends(permit('models.manage')),db=Depends(get_db)):
     query={}
-    if user.managed_segment_ids is not None:
+    if user.role!='admin' and user.managed_segment_ids is not None:
         query={'segment_ids':{'$exists':True,'$not':{'$elemMatch':{'$nin':user.managed_segment_ids}}}}
     return [public_run(row) for row in db.database.forecast_runs.find(query).sort('created_at',-1).limit(20)]
 

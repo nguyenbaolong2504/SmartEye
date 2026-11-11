@@ -14,10 +14,10 @@
 | UC08 · Quản lý quy tắc đề xuất cảnh báo | — | Theo phạm vi được phân công | — |
 | UC09 · Thống kê theo giờ, đánh giá dự báo và xuất báo cáo | — | Theo phạm vi được phân công | — |
 | UC10 · Quản lý tài khoản và phân quyền | — | — | Có |
-| UC11 · Theo dõi dịch vụ, tình trạng tiếp nhận và nhật ký vận hành | — | Quản lý toàn bộ tuyến có quyền xem dịch vụ | — |
-| UC12 · Cấu hình, ánh xạ, kiểm tra và bật/tắt nguồn dữ liệu | — | Theo phạm vi được phân công | — |
+| UC11 · Theo dõi dịch vụ, tình trạng tiếp nhận và nhật ký | — | Nhật ký vận hành giao thông, Quản lý toàn bộ tuyến có quyền xem dịch vụ | Toàn bộ nhật ký hệ thống |
+| UC12 · Cấu hình, ánh xạ, kiểm tra và bật/tắt nguồn dữ liệu | — | Theo phạm vi được phân công | Có |
 
-UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang công khai. Phản ánh, hành trình đã lưu và thông báo cá nhân cần tài khoản Người dùng hoặc Quản lý. Tìm tuyến và lưu hành trình là chức năng có sẵn của SmartEye ngoài danh mục Chương IV, dùng chung cho Người dùng và Quản lý. Quản lý cấu hình đoạn đường, hiệu chỉnh camera, chuẩn bị dữ liệu và huấn luyện mô hình trong phạm vi được giao. Tạo đoạn đường mới, kích hoạt/ngừng mô hình đang phục vụ, tạo lại bộ mẫu và xem trạng thái dịch vụ toàn hệ thống yêu cầu Quản lý phụ trách toàn bộ tuyến. Admin phụ trách tài khoản, phân quyền, phân công tuyến và thu hồi phiên đăng nhập.
+UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang công khai. Phản ánh, hành trình đã lưu và thông báo cá nhân cần tài khoản Người dùng hoặc Quản lý. Tìm tuyến và lưu hành trình là chức năng có sẵn của SmartEye ngoài danh mục Chương IV, dùng chung cho Người dùng và Quản lý. Quản lý cấu hình đoạn đường, hiệu chỉnh camera, chuẩn bị dữ liệu và huấn luyện mô hình trong phạm vi được giao. Tạo đoạn đường mới, kích hoạt/ngừng mô hình đang phục vụ, tạo lại bộ mẫu và xem trạng thái dịch vụ toàn hệ thống dành cho Admin hoặc Quản lý phụ trách toàn bộ tuyến có quyền tương ứng. Admin có các mục Nguồn dữ liệu, Đoạn đường, Người dùng, Dữ liệu & mô hình, Hệ thống & nhật ký và Camera & hiệu chỉnh. Báo cáo theo giờ thuộc không gian Quản lý.
 
 ## Chạy thử theo vai trò
 
@@ -26,7 +26,7 @@ UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang
 3. **Quản lý.** Vào **Giám sát & xử lý**, mở phản ánh trong phạm vi phụ trách, tiếp nhận và ghi căn cứ xác minh. Phản ánh hợp lệ chuyển sang xử lý rồi kết thúc. Thiếu căn cứ thì tiếp tục xác minh. Khi kết luận không hợp lệ, phải xác nhận từ chối và ghi lý do.
 4. **Quản lý.** Tạo cảnh báo thủ công hoặc mở bản nháp do quy tắc đề xuất. Nếu xuất phát từ phản ánh, gắn mã phản ánh đã xác minh. Chọn giờ tự hết hiệu lực, xác minh rồi phát hành. Cảnh báo hiện ở Tổng quan, mục Cảnh báo và hộp thông báo của tài khoản đã bật nhận. Khi đến giờ, cảnh báo rời danh sách công khai và được giữ trong lịch sử xử lý.
 5. **Quản lý.** Vào **Giám sát & xử lý → Dữ liệu & thiết lập → Nguồn dữ liệu**. Chọn loại tệp, dịch vụ hoặc camera, tuyến và chiều. Với tệp/dịch vụ, ánh xạ trường thời gian, tuyến, chiều và các chỉ số có sẵn. Kiểm tra mẫu hoặc kết nối, bật nguồn rồi nhận dữ liệu. Mở **Giám sát & xử lý → Báo cáo theo giờ** để lọc số liệu, đánh giá dự báo và tải CSV nếu được cấp quyền xuất. Quản lý toàn bộ tuyến có thể mở **Dữ liệu & thiết lập → Dịch vụ & nhật ký** khi được cấp quyền xem dịch vụ.
-6. **Admin.** Vào **Quản trị hệ thống**, tìm hoặc tạo tài khoản, thay đổi vai trò, chọn tuyến phụ trách và cấp từng quyền thao tác. Có thể vô hiệu hóa tài khoản hoặc thu hồi phiên đăng nhập.
+6. **Admin.** Vào **Quản trị hệ thống → Người dùng**, tìm hoặc tạo tài khoản, thay đổi vai trò, chọn tuyến phụ trách và cấp từng quyền thao tác. Có thể vô hiệu hóa tài khoản hoặc thu hồi phiên đăng nhập. Các mục cấu hình nguồn, đoạn đường, camera và mô hình nằm cùng không gian. Mở **Hệ thống & nhật ký** để xem trạng thái dịch vụ và toàn bộ nhật ký, gồm thao tác tài khoản.
 
 ## Đối chiếu theo nhóm use case
 
@@ -37,12 +37,12 @@ UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang
 | UC04, UC06 | Người gửi theo dõi phản ánh của mình. Quản lý đúng phạm vi mới có quyền tiếp nhận và xử lý. Lưu căn cứ, người thao tác, thời điểm và lịch sử. Cập nhật từ phiên bản cũ yêu cầu tải lại. |
 | UC07–08 | Cảnh báo qua xác minh rồi phát hành. Theo yêu cầu cập nhật, sửa và hủy áp dụng cho bản nháp. Bản đã phát hành chỉ để xem và tự kết thúc theo giờ đã đặt. Quy tắc cần thử trước khi bật và chỉ đề xuất bản nháp. Gửi lại thông báo giữ một bản cho mỗi người nhận và phiên bản. |
 | UC09–10 | Báo cáo theo giờ và CSV dùng chung bộ lọc quan trắc. Giờ thiếu mẫu không được ghi nhận là thông thoáng. Admin quản lý tài khoản, phân quyền theo tuyến, vô hiệu hóa có lưu lịch sử và bảo vệ quản trị viên cuối. |
-| UC11–12 | Nhật ký vận hành dành cho Quản lý toàn bộ tuyến có quyền xem dịch vụ, chỉ đọc, có bộ lọc và che thông tin xác thực. Nhật ký này giới hạn ở nghiệp vụ giao thông. Nguồn chỉ nhận sau kiểm tra. Đổi cấu hình hoặc ánh xạ yêu cầu kiểm tra lại. Lượt nhận ghi số mẫu hợp lệ, sai và trùng. Lưu lượng chỉ được tính khi có thời lượng đếm. |
+| UC11–12 | Admin xem toàn bộ nhật ký hệ thống. Quản lý toàn bộ tuyến có quyền xem dịch vụ được xem nhật ký vận hành giao thông. Nhật ký chỉ đọc, có bộ lọc và che thông tin xác thực. Nguồn chỉ nhận sau kiểm tra. Đổi cấu hình hoặc ánh xạ yêu cầu kiểm tra lại. Lượt nhận ghi số mẫu hợp lệ, sai và trùng. Lưu lượng chỉ được tính khi có thời lượng đếm. |
 
 ## Điều kiện dữ liệu
 
 Dự báo theo giờ đối chiếu 100 ngày lịch, tách ngày làm việc và cuối tuần, rồi đếm số ngày đủ dữ liệu đúng khung giờ và chiều đường. Với ngày đã qua, chỉ lấy dữ liệu trước ngày được chọn. Khi thiếu quan trắc, tuyến đã có bộ mẫu có thể hiển thị kết quả gắn nhãn **Lịch sử minh họa**. Tìm địa chỉ bao phủ Việt Nam qua nguồn bản đồ. Mỗi địa chỉ cần được liên kết với đoạn đường và lịch sử quan trắc của SmartEye để có dự báo thực.
 
-Trong **Quản trị hệ thống → Phân quyền**, Admin có thể bỏ chọn từng quyền của một tài khoản Người dùng hoặc Quản lý. Ví dụ, giữ **Xem phản ánh của mình** và bỏ **Gửi phản ánh** để tài khoản chỉ xem được. Quyền thao tác của Quản lý còn phụ thuộc quyền xem nhóm chức năng, tuyến được phân công và trạng thái hồ sơ. Tài khoản đăng nhập lại sau khi quyền thay đổi.
+Trong **Quản trị hệ thống → Người dùng → Phân quyền**, Admin có thể bỏ chọn từng quyền của một tài khoản Người dùng hoặc Quản lý. Ví dụ, giữ **Xem phản ánh của mình** và bỏ **Gửi phản ánh** để tài khoản chỉ xem được. Quyền thao tác của Quản lý còn phụ thuộc quyền xem nhóm chức năng, tuyến được phân công và trạng thái hồ sơ. Tài khoản đăng nhập lại sau khi quyền thay đổi.
 
 Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sách mật khẩu đang dùng và cho phép cấu hình các tham số nguồn, thời hạn dữ liệu, ngưỡng quy tắc. Đăng ký tạo tài khoản dùng được ngay. Khôi phục mật khẩu cần SMTP. Camera cần địa chỉ HTTPS được phép sử dụng, trả ảnh JPG/PNG/WebP hoặc clip MP4/WebM. Dịch vụ lấy số liệu thật cần địa chỉ nguồn và thông tin xác thực nếu nguồn yêu cầu. Nguồn mới dùng mã truy cập trong biến môi trường phải trỏ đến máy chủ HTTPS đã cấu hình trước bằng biến cùng tên thêm hậu tố `_HOST`, dùng cổng 443. Ví dụ mã `TRAFFIC_SOURCE_DEMO` có máy chủ cho phép tại `TRAFFIC_SOURCE_DEMO_HOST=traffic.example.org`. Giao diện chỉ chọn tên biến, không hiển thị giá trị mã.

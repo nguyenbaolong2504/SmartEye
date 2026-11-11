@@ -505,6 +505,18 @@ def edit_user(ident:int,body:S.UserUpdate,user=Depends(admin),db=Depends(get_db)
 def revoke(ident:int,user=Depends(admin),db=Depends(get_db)):
     item(db,User,ident); db.update(User,ident,{},increment={'auth_version':1}); db.delete_many(LoginSession,{'user_id':ident}); audit(db,user.id,'sessions_revoked',str(ident)); db.commit(); return {'message':'Đã thu hồi tất cả phiên đăng nhập.'}
 
+@app.get('/api/admin/system')
+def system(user=Depends(admin),db=Depends(get_db)):
+    from .operations import redact
+    entries=[]
+    for row in db.find(Audit,sort=[('id',-1)],limit=100):
+        entry={key:getattr(row,key) for key in ('id','user_id','action','detail','created_at')}
+        entry['detail']=redact(entry['detail'])
+        entries.append(entry)
+    return {'model_ready':MODEL_PATH.is_file(),'model_name':MODEL_PATH.name,
+            'google_ready':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),
+            'active_jobs':db.count(VideoJob,{'status':{'$in':['queued','processing']}}),'audit':entries}
+
 from .monitoring import router as monitoring_router
 app.include_router(monitoring_router)
 from .forecast_api import router as forecast_router

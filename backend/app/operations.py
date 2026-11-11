@@ -6,7 +6,7 @@ from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from .db import get_db, now, stamp
-from .security import permit
+from .security import admin, permit
 from .models import Audit
 from .business_models import DataSource, RoadReading
 from .business_common import period, road, require_global_scope, serialize, clean_csv, utc
@@ -68,10 +68,11 @@ def redact(value):
 
 
 @router.get('/api/management/events')
+@router.get('/api/admin/events',dependencies=[Depends(admin)],include_in_schema=False)
 def events(q:str=Query(default='',max_length=100),start:str|None=None,end:str|None=None,level:str|None=None,service:str|None=None,
            user=Depends(permit('diagnostics.view')),db=Depends(get_db)):
     require_global_scope(user)
-    query={};conditions=[OPERATION_EVENT]
+    query={};conditions=[] if user.role=='admin' else [OPERATION_EVENT]
     if q:conditions.append({'$or':[{field:{'$regex':re.escape(q),'$options':'i'}} for field in ('event_id','request_id','action','detail')]})
     if level:
         if level not in ('info','warning','error'):raise HTTPException(422,'Mức nhật ký không hợp lệ.')
@@ -86,14 +87,18 @@ def events(q:str=Query(default='',max_length=100),start:str|None=None,end:str|No
 
 
 @router.get('/api/management/events/{ident}')
+@router.get('/api/admin/events/{ident}',dependencies=[Depends(admin)],include_in_schema=False)
 def event_detail(ident:int,user=Depends(permit('diagnostics.view')),db=Depends(get_db)):
     require_global_scope(user)
-    item=db.find_one(Audit,{'id':ident,**OPERATION_EVENT})
+    query={'id':ident}
+    if user.role!='admin':query.update(OPERATION_EVENT)
+    item=db.find_one(Audit,query)
     if not item:raise HTTPException(404,'Không có quyền xem hoặc bản ghi đã không còn tồn tại.')
     return {**serialize(item),'detail':redact(item.detail)}
 
 
 @router.get('/api/management/operations')
+@router.get('/api/admin/operations',dependencies=[Depends(admin)],include_in_schema=False)
 def operations(user=Depends(permit('diagnostics.view')),db=Depends(get_db)):
     require_global_scope(user)
     from .sources import source_state

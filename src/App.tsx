@@ -89,7 +89,7 @@ export default function App(){
         {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
         {tab==='incidents'&&<IncidentsPage user={user} segments={segments} config={config} onLogin={()=>setAuthOpen(true)}/>}
         {tab==='management'&&user?.role==='analyst'&&<ManagementPage user={user} segments={segments} cameras={cameras} demo={demo} onUpdated={refresh}/>}
-        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} segments={segments}/>}
+        {tab==='admin'&&user?.role==='admin'&&<AdminPage user={user} segments={segments} cameras={cameras} demo={demo} onUpdated={refresh}/>}
         {tab==='profile'&&user&&<ProfilePage user={user} onUser={onUser}/>}
         {!user&&blocked&&<section className="card"><Notice>Vui lòng đăng nhập để tiếp tục.</Notice><button className="button" onClick={()=>setAuthOpen(true)}>Đăng nhập</button></section>}
       </Suspense>}

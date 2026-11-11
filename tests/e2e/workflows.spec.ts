@@ -23,7 +23,7 @@ test('registration, save route, follow road, edit profile and logout',async({pag
   await navigate(page,'Cảnh báo giao thông');await page.getByRole('button',{name:'Thêm theo dõi',exact:true}).click();await expect(page.getByText('Mật độ cao',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Quản trị hệ thống'})).toHaveCount(0);
   await page.getByRole('button',{name:/Hồ sơ Người dùng E2E/}).click();await page.getByLabel('Họ và tên').fill('Hồ sơ E2E mới');await page.getByRole('button',{name:'Lưu hồ sơ',exact:true}).click();await expect(page.getByText('Đã cập nhật hồ sơ.')).toBeVisible();await page.getByRole('button',{name:'Đăng xuất',exact:true}).click();await expect(page.getByRole('button',{name:'Đăng nhập',exact:true})).toBeVisible();
 });
-test('admin starts in IT workspace and traffic URLs cannot open consumer pages',async({page})=>{
+test('admin keeps technical administration and system logs while hourly reports belong to managers',async({page})=>{
   await page.goto('/#history');await page.getByRole('button',{name:'Đăng nhập',exact:true}).first().click();await page.getByLabel('Email hoặc tên đăng nhập',{exact:true}).fill('e2e-admin@example.invalid');await page.getByLabel('Mật khẩu',{exact:true}).fill('test-only-password-123');await page.getByRole('dialog').getByRole('button',{name:'Đăng nhập',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/#admin$/);
   await expect(page.getByRole('heading',{name:'Không gian quản trị.'})).toBeVisible();
@@ -33,14 +33,20 @@ test('admin starts in IT workspace and traffic URLs cannot open consumer pages',
   await expect(page).toHaveURL(/#admin$/);
   await expect(page.getByRole('heading',{name:'Không gian quản trị.'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'Quản lý tài khoản',exact:true})).toBeVisible();
-  for(const label of ['Nguồn dữ liệu','Đoạn đường','Báo cáo theo giờ','Dữ liệu & mô hình','Dịch vụ & nhật ký']){
-    await expect(page.getByRole('button',{name:label,exact:true})).toHaveCount(0);
+  for(const label of ['Nguồn dữ liệu','Đoạn đường','Người dùng','Dữ liệu & mô hình','Camera & hiệu chỉnh','Hệ thống & nhật ký']){
+    await expect(page.getByRole('button',{name:label,exact:true})).toBeVisible();
   }
+  await expect(page.getByRole('button',{name:'Báo cáo theo giờ',exact:true})).toHaveCount(0);
   const query=new URLSearchParams({segment_id:'1',direction:'forward',start:new Date(Date.now()-86400000).toISOString(),end:new Date().toISOString()}).toString();
   expect((await page.request.get('/api/management/traffic-report?'+query)).status()).toBe(403);
   expect((await page.request.get('/api/reports')).status()).toBe(403);
-  expect((await page.request.get('/api/forecast/runs')).status()).toBe(403);
-  expect((await page.request.get('/api/management/sources')).status()).toBe(403);
+  expect((await page.request.get('/api/forecast/runs')).status()).toBe(200);
+  expect((await page.request.get('/api/management/sources')).status()).toBe(200);
+  await page.getByRole('button',{name:'Hệ thống & nhật ký',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Trạng thái dịch vụ',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Nhật ký hoạt động',exact:true})).toBeVisible();
+  expect((await page.request.get('/api/management/events')).status()).toBe(200);
+  expect((await page.request.get('/api/management/operations')).status()).toBe(200);
   await page.getByRole('button',{name:/^Hồ sơ /}).click();
   await expect(page.getByRole('heading',{name:'Hồ sơ của bạn.'})).toBeVisible();
   await expect(page.getByLabel('Nhận thông báo khi có cảnh báo được phát hành')).toHaveCount(0);

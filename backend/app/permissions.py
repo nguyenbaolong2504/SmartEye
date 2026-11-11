@@ -43,6 +43,7 @@ MANAGEMENT = {
     'models.manage': 'Chuẩn bị dữ liệu và huấn luyện mô hình',
     'diagnostics.view': 'Xem trạng thái dịch vụ và nhật ký vận hành',
 }
+ADMINISTRATION = {key: MANAGEMENT[key] for key in ('sources.manage','network.manage','models.manage','diagnostics.view')}
 PUBLIC = {'traffic.view', 'forecast.view', 'routes.search', 'warnings.view'}
 PARENTS = {
     **{key: key.split('.')[0]+'.view' for key in MANAGEMENT if key.split('.')[0]+'.view' in MANAGEMENT},
@@ -52,6 +53,8 @@ PARENTS = {
 
 
 def choices(role):
+    if role == 'admin':
+        return ADMINISTRATION
     if role == 'analyst':
         return {**COMMON, **MANAGEMENT}
     return COMMON if role == 'user' else {}

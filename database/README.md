@@ -20,7 +20,7 @@ Docker đầy đủ: `docker compose exec backend python scripts/init_db.py --de
 | Quản lý | analyst@smarteye.test | SmartEyeAnalyst@2026 |
 | Người dùng | user@smarteye.test | SmartEyeUser@2026 |
 
-Admin quản lý tài khoản, quyền và tuyến được phân công. Quản lý phụ trách dữ liệu, báo cáo và vận hành giao thông theo quyền, phạm vi được cấp. Tên vai trò lưu trong MongoDB lần lượt là `admin`, `analyst` và `user`.
+Admin quản lý tài khoản, phân quyền và các cấu hình kỹ thuật, gồm nhật ký hệ thống. Quản lý phụ trách báo cáo theo giờ và vận hành giao thông theo quyền, phạm vi được cấp. Tên vai trò lưu trong MongoDB lần lượt là `admin`, `analyst` và `user`.
 
 Script chỉ thêm user chưa tồn tại, giữ password/role/active cũ. Startup không tự tạo các tài khoản này; demo bị từ chối ở production. Bản thật dùng `scripts/create_admin.py`. Password web là scrypt hash có salt, không thể đọc lại password gốc từ DB; khác DB username/password.
 

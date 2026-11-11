@@ -61,7 +61,7 @@ Nếu chưa tạo: `docker compose exec backend python scripts/init_db.py --demo
 | Quản lý | analyst@smarteye.test | SmartEyeAnalyst@2026 |
 | Người dùng | user@smarteye.test | SmartEyeUser@2026 |
 
-Admin quản lý tài khoản, phân quyền và phân công tuyến. Quản lý xử lý toàn bộ nghiệp vụ giao thông, gồm báo cáo theo giờ trong **Giám sát & xử lý**, cùng nguồn dữ liệu, camera và mô hình trong **Dữ liệu & thiết lập**. Các màn hình và thao tác phụ thuộc quyền được cấp.
+Admin quản lý tài khoản, phân quyền, nguồn dữ liệu, đoạn đường, camera, mô hình và nhật ký hệ thống trong **Quản trị hệ thống**. Báo cáo theo giờ nằm trong **Giám sát & xử lý** của Quản lý. Quản lý còn có các chức năng cấu hình được cấp trong **Dữ liệu & thiết lập**, giới hạn theo tuyến phụ trách.
 
 Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của tài khoản đã tồn tại. Tài khoản database khác tài khoản website; MongoDB lưu password website dưới dạng hash.
 
@@ -70,7 +70,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 | Thành phần | Cách dùng hiện tại |
 |---|---|
 | XGBoost | Dự báo theo ngày/giờ từ lịch sử 7/14/21/28 ngày trước và đặc điểm thời gian; vẫn giữ pipeline ngắn hạn; chia train/validation/test theo thời gian |
-| GRU | Pipeline nghiên cứu trên dữ liệu/nhãn thực, trong phần Dữ liệu & mô hình của Quản lý được cấp quyền; chưa tự tuyên bố tốt hơn XGBoost |
+| GRU | Pipeline nghiên cứu trên dữ liệu/nhãn thực, trong phần Dữ liệu & mô hình của Admin hoặc Quản lý được cấp quyền. Dùng để so sánh với XGBoost |
 | A* | Mặc định tìm chi phí kết hợp trên đồ thị SmartEye hoặc mạng OSM tải đầy đủ |
 | Dijkstra | Thuật toán tham chiếu và chuẩn hóa chi phí; có API đối chiếu, không cần lựa chọn trên giao diện |
 | OSRM | Dịch vụ cung cấp nhanh các tuyến ô tô trên OSM. SmartEye xếp hạng các tuyến được trả về; không tuyên bố chạy A* trên đồ thị nội bộ của dịch vụ |

@@ -102,8 +102,10 @@ def test_demo_accounts_are_limited_to_their_workspaces(client,route_request):
         for path in ('/api/traffic/road?segment_id=1','/api/forecast/predict?segment_id=1','/api/warnings','/api/incidents','/api/alerts','/api/favorites','/api/monitor/cameras'):
             assert client.get(path).status_code==traffic,path
         assert client.post('/api/routes/search',json=route_request).status_code==traffic
-        for path in ('/api/management/monitor?segment_id=1','/api/management/incidents','/api/management/warnings','/api/management/rules','/api/management/sources','/api/management/events','/api/reports','/api/forecast/runs'):
+        for path in ('/api/management/monitor?segment_id=1','/api/management/incidents','/api/management/warnings','/api/management/rules','/api/reports'):
             assert client.get(path).status_code==(200 if role=='analyst' else 403),path
+        for path in ('/api/management/sources','/api/management/events','/api/forecast/runs','/api/cameras'):
+            assert client.get(path).status_code==(200 if role in ('admin','analyst') else 403),path
         assert client.patch('/api/auth/profile',json={'name':'Hồ sơ kiểm thử'}).status_code==200
         assert client.patch('/api/auth/profile',json={'name':'Hồ sơ kiểm thử','notifications_enabled':True}).status_code==traffic
         assert 'password' not in response.json()

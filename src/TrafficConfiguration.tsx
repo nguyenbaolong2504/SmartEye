@@ -3,7 +3,7 @@ import {Camera as CameraIcon, Plus, Settings2} from 'lucide-react';
 import {api,json} from './api';
 import {Modal,Notice,Spinner} from './components';
 import {can} from './permissions';
-import {SourcesPanel,SystemPanel} from './AdminOperations';
+import {AccountsPanel,SourcesPanel,SystemPanel} from './AdminOperations';
 import DemoSetup from './DemoSetup';
 import SegmentManager from './SegmentManager';
 import type {Camera,DemoStatus,Segment,User} from './types';
@@ -13,20 +13,23 @@ const ForecastManagement=lazy(()=>import('./ForecastManagement'));
 export default function TrafficConfiguration({user,segments,cameras,demo,onUpdated}: {
   user:User;segments:Segment[];cameras:Camera[];demo:DemoStatus|null;onUpdated:()=>void;
 }) {
-  const [chosen,setChosen]=useState('');
+  const isAdmin=user.role==='admin';
+  const [chosen,setChosen]=useState(isAdmin?'users':'');
   const [focusedSource,setFocusedSource]=useState<number>();
-  const globalScope=user.managed_segment_ids==null;
+  const globalScope=isAdmin||user.managed_segment_ids==null;
   const tabs=[
     {id:'sources',label:'Nguồn dữ liệu',allowed:can(user,'sources.manage')},
     {id:'segments',label:'Đoạn đường',allowed:can(user,'network.manage')},
+    {id:'users',label:'Người dùng',allowed:isAdmin},
     {id:'cameras',label:'Camera & hiệu chỉnh',allowed:can(user,'network.manage')},
     {id:'models',label:'Dữ liệu & mô hình',allowed:can(user,'models.manage')},
-    {id:'system',label:'Dịch vụ & nhật ký',allowed:globalScope&&can(user,'diagnostics.view')},
+    {id:'system',label:isAdmin?'Hệ thống & nhật ký':'Dịch vụ & nhật ký',allowed:globalScope&&can(user,'diagnostics.view')},
   ].filter(item=>item.allowed);
   const tab=tabs.some(item=>item.id===chosen)?chosen:tabs[0]?.id;
   return <>
     <div className="tabs workflow-tabs">{tabs.map(item=><button key={item.id} className={tab===item.id?'active':''} onClick={()=>setChosen(item.id)}>{item.label}</button>)}</div>
     {tab==='sources'&&<SourcesPanel segments={segments} focus={focusedSource}/>}
+    {tab==='users'&&<AccountsPanel currentUser={user} segments={segments}/>}
     {tab==='segments'&&<SegmentManager segments={segments} onUpdated={onUpdated} allowCreate={globalScope}/>}
     {tab==='cameras'&&<CameraSettings cameras={cameras} segments={segments.filter(s=>s.active)} onUpdated={onUpdated}/>}
     {tab==='models'&&<Suspense fallback={<Spinner/>}>{globalScope&&demo?.enabled&&!demo.planning_ready&&<DemoSetup demo={demo} user={user} onUpdated={onUpdated}/>}<ForecastManagement segments={segments} allowActivation={globalScope}/></Suspense>}
