@@ -5,6 +5,8 @@ import {Empty,Notice,Spinner} from './components';
 import {useRemote} from './business';
 import {TrafficMap} from './TrafficMap';
 import CameraAnalysis from './CameraAnalysis';
+import CameraDetectionOverlay from './CameraDetectionOverlay';
+import {useCameraAnalysis,type CameraAnalysisData} from './cameraAnalysisData';
 import {type TrafficCamera,type User} from './types';
 import './cameras.css';
 
@@ -19,8 +21,6 @@ export default function CameraPage({user,tileUrl,onForecast}:{
   const [area,setArea]=useState('');
   const [road,setRoad]=useState('');
   const [chosen,setChosen]=useState('');
-  const [second,setSecond]=useState(0);
-  const videoRef=useRef<HTMLVideoElement>(null);
   useEffect(()=>{
     const timer=setInterval(()=>{if(!document.hidden)reload();},30000);
     return()=>clearInterval(timer);
@@ -30,14 +30,6 @@ export default function CameraPage({user,tileUrl,onForecast}:{
   const roads=[...new Map(inArea.map(camera=>[camera.segment_id,camera.segment_name])).entries()];
   const filtered=useMemo(()=>inArea.filter(camera=>!road||String(camera.segment_id)===road),[inArea,road]);
   const selected=filtered.find(camera=>camera.id===chosen)||filtered[0];
-  useEffect(()=>setSecond(0),[selected?.id,selected?.video_url]);
-  function seek(at:number){
-    setSecond(at);
-    const player=videoRef.current;
-    if(!player)return;
-    if(player.readyState>=1)player.currentTime=at;
-    else{player.addEventListener('loadedmetadata',()=>{player.currentTime=at;},{once:true});player.load();}
-  }
   const markers=useMemo(()=>filtered.flatMap(camera=>camera.position?[{
     id:camera.id,name:camera.name,position:camera.position,available:Boolean(camera.image_url||camera.video_url),
   }]:[]),[filtered]);
@@ -57,8 +49,7 @@ export default function CameraPage({user,tileUrl,onForecast}:{
         <TrafficMap places={[]} segments={[]} routes={[]} selected="" onSelect={()=>{}} browserKey="" provider="osm" tileUrl={tileUrl} cameraMarkers={markers} selectedCameraId={selected?.id} onCameraSelect={setChosen}/>
         {selected?<section className="card camera-details">
           <div className="camera-details-heading"><div><h2>{selected.name}</h2><p><MapPin size={14}/>{selected.location_name} · {selected.area}</p></div><span className={`camera-status ${selected.state}`}>{labels[selected.state]}</span></div>
-          <CameraViewer key={`${selected.id}-${selected.image_url}-${selected.video_url}`} camera={selected} videoRef={videoRef} onTime={setSecond}/>
-          {selected.analysis_url&&<CameraAnalysis key={selected.analysis_url} url={selected.analysis_url} second={second} onSeek={seek}/>}
+          <CameraExperience key={`${selected.id}-${selected.video_url}-${selected.analysis_url}`} camera={selected}/>
           <dl className="camera-information"><div><dt>Tuyến đường</dt><dd>{selected.segment_name} · {selected.direction==='reverse'?'Chiều về':'Chiều đi'}</dd></div><div><dt>Nguồn hình ảnh</dt><dd>{selected.source_name}{selected.source_host&&<small>{selected.source_host}</small>}</dd></div><div><dt>Thời điểm ghi hình</dt><dd>{selected.captured_at?cameraTime(selected.captured_at):'Nguồn chưa cung cấp thời điểm ghi hình'}</dd></div><div><dt>Kiểm tra kết nối</dt><dd>{selected.checked_at?cameraTime(selected.checked_at):'Chưa có lần kiểm tra gần đây'}</dd></div></dl>
           {!selected.position_exact&&<p className="micro">Ghim được đặt theo đoạn đường đã khai báo{selected.is_demo?' trong dữ liệu minh họa':''}.</p>}
           <div className="camera-detail-actions">{can(user,'forecast.view')&&selected.segment_active&&<button className="button primary" onClick={()=>onForecast(selected.segment_id,selected.direction)}>Xem dự báo tuyến đường<ArrowRight size={16}/></button>}{selected.source_url&&<a className="button" href={selected.source_url} target="_blank" rel="noreferrer">Mở nguồn camera<ExternalLink size={15}/></a>}</div>
@@ -68,7 +59,21 @@ export default function CameraPage({user,tileUrl,onForecast}:{
   </>;
 }
 
-function CameraViewer({camera,videoRef,onTime}:{camera:TrafficCamera;videoRef:React.RefObject<HTMLVideoElement|null>;onTime:(second:number)=>void}){
+function CameraExperience({camera}:{camera:TrafficCamera}){
+  const videoRef=useRef<HTMLVideoElement>(null);
+  const [second,setSecond]=useState(0);
+  const view=useCameraAnalysis(camera.analysis_url||undefined);
+  function seek(at:number){
+    const player=videoRef.current;if(!player)return;
+    const move=()=>{player.currentTime=Math.min(at+.25/(view.data.fps||1),Math.max(0,player.duration-.001));};
+    if(player.readyState>=1)move();
+    else{player.addEventListener('loadedmetadata',move,{once:true});player.load();}
+  }
+  return <><CameraViewer camera={camera} videoRef={videoRef} onTime={setSecond} analysis={view.data}/>
+    {camera.analysis_url&&<CameraAnalysis view={view} second={second} onSeek={seek} onExplain={()=>videoRef.current?.pause()}/>}</>;
+}
+
+function CameraViewer({camera,videoRef,onTime,analysis}:{camera:TrafficCamera;videoRef:React.RefObject<HTMLVideoElement|null>;onTime:(second:number)=>void;analysis:CameraAnalysisData}){
   const [image,setImage]=useState('');
   const [received,setReceived]=useState('');
   const [busy,setBusy]=useState(Boolean(camera.image_url));
@@ -76,6 +81,7 @@ function CameraViewer({camera,videoRef,onTime}:{camera:TrafficCamera;videoRef:Re
   const [paused,setPaused]=useState(false);
   const [attempt,setAttempt]=useState(0);
   const [expanded,setExpanded]=useState(false);
+  const [showDetection,setShowDetection]=useState(true);
   const objectUrl=useRef('');
   useEffect(()=>{
     if(!camera.image_url)return;
@@ -113,11 +119,13 @@ function CameraViewer({camera,videoRef,onTime}:{camera:TrafficCamera;videoRef:Re
   const hasMedia=Boolean(camera.image_url||camera.video_url);
   return <div className={`camera-viewer ${expanded?'expanded':''}`}>
     <div className="camera-viewer-toolbar"><span>{camera.analysis_url?'Video minh họa':camera.media_kind==='recording'?'Ảnh/video đã lưu':camera.video_url?'Video từ nguồn':'Ảnh camera cập nhật'}</span><div>
+      {!!analysis.frames?.length&&<button type="button" className="button small" aria-pressed={showDetection} onClick={()=>setShowDetection(value=>!value)}>{showDetection?'Ẩn ô nhận diện':'Hiện ô nhận diện'}</button>}
       {!!camera.refresh_seconds&&camera.image_url&&<button type="button" className="button small" aria-label={paused?'Tiếp tục cập nhật':'Tạm dừng cập nhật'} aria-pressed={paused} onClick={()=>setPaused(value=>!value)}>{paused?<Play size={14}/>:<Pause size={14}/>}<span>{paused?'Tiếp tục cập nhật':'Tạm dừng cập nhật'}</span></button>}
       {hasMedia&&<button className="icon-button" aria-label={expanded?'Thu gọn hình ảnh':'Phóng to hình ảnh'} onClick={()=>setExpanded(value=>!value)}>{expanded?<Minimize size={17}/>:<Expand size={17}/>}</button>}
     </div></div>
     <div className="camera-picture">
-      {camera.video_url?<video ref={videoRef} key={attempt} controls playsInline preload="metadata" src={camera.video_url} poster={image||undefined} onTimeUpdate={event=>onTime(Math.floor(event.currentTarget.currentTime))} onError={()=>setError('Không phát được video từ nguồn. Bạn có thể thử lại hoặc mở nguồn camera.')}/>:
+      {camera.video_url?<div className="camera-video-stage" key={attempt}><video ref={videoRef} controls controlsList="nofullscreen" playsInline preload="auto" src={camera.video_url} poster={image||undefined} onTimeUpdate={event=>{if(!analysis.frames?.length)onTime(event.currentTarget.currentTime);}} onError={()=>setError('Không phát được video từ nguồn. Bạn có thể thử lại hoặc mở nguồn camera.')}/>
+        {!!analysis.frames?.length&&<CameraDetectionOverlay videoRef={videoRef} data={analysis} visible={showDetection} onTime={onTime}/>}</div>:
         image?<img src={image} alt={`Hình ảnh ${camera.name}`} onError={()=>setError('Không đọc được hình ảnh từ camera.')}/>:
         <Empty>{busy?<Spinner/>:<Camera size={40}/>}<p>{busy?'Đang lấy hình ảnh…':camera.state==='inactive'?'Camera đã ngừng hoạt động.':'Camera chưa có hình ảnh được chia sẻ.'}</p></Empty>}
     </div>

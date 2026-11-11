@@ -33,6 +33,8 @@
 .camera-viewer-toolbar>div {display:flex;gap:10px;align-items:center}
 .camera-picture {display:flex;align-items:center;justify-content:center;background:#eaf0f1;min-height:260px;aspect-ratio:16/9;overflow:hidden}
 .camera-picture img,.camera-picture video {display:block;max-width:100%;width:100%;height:100%;object-fit:contain}
+.camera-video-stage {position:relative;width:100%;height:100%;min-width:0;align-self:stretch}
+.camera-detection-overlay {position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .camera-picture .empty {min-height:200px;padding:24px;text-align:center}
 .camera-viewer-foot {display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;font-size:11px;color:#6f8391;background:#fff}
 .camera-viewer-foot .text-button {white-space:nowrap}
@@ -56,7 +58,7 @@
 .camera-density {font-size:24px;white-space:nowrap;color:#18896c}
 .camera-density.NORMAL {color:#b17c1d}
 .camera-density.HIGH {color:#c65163}
-.camera-counts {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}
+.camera-counts {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:20px}
 .camera-counts article {display:grid;align-content:start;gap:7px;border:1px solid #e0e9ef;border-radius:10px;padding:14px;color:#6a8491}
 .camera-counts b {font-size:25px;color:#264f62}
 .camera-counts span {font-size:11px;line-height:1.5}
@@ -69,11 +71,22 @@
 .camera-video-timeline button.selected {outline:2px solid #244f68;outline-offset:2px}
 .camera-forecast {margin-top:23px;padding:18px;background:#f6fafb;border:1px solid #dfe9ee;border-radius:11px}
 .camera-forecast h3 {display:flex;gap:8px;align-items:center}
+.camera-forecast h3 small {font-size:10px;font-weight:500;padding:4px 6px;background:#fff2d9;color:#92682a;border-radius:5px;white-space:nowrap}
 .camera-forecast>p {font-size:12px;line-height:1.7;color:#6e8591}
 .camera-forecast-cards {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .camera-forecast-cards article {background:#fff;padding:16px;border-radius:8px;border:1px solid #dce9e7;display:grid;gap:12px}
 .camera-forecast-cards span {font-size:11px;color:#788e99}
 .camera-forecast-cards strong {color:#18896c;font-size:21px}
+.camera-forecast-cards .camera-jam-probability {font-size:30px;color:#264f62;line-height:1.1}
+.camera-forecast-cards small {font-size:10px;line-height:1.6;color:#718794}
+.camera-forecast-cards .text-button {justify-self:start;display:flex;gap:5px;align-items:center;font-size:12px}
+.camera-forecast-explanation {color:#466370;font-size:13px;line-height:1.8}
+.camera-forecast-explanation h3 {font-size:15px;margin-top:22px}
+.camera-forecast-explanation ul {padding-left:20px}
+.camera-probability-breakdown {display:grid;gap:12px;margin:18px 0}
+.camera-probability-breakdown>div {display:grid;grid-template-columns:130px minmax(50px,1fr) 42px;gap:8px;align-items:center;font-size:12px}
+.camera-probability-breakdown progress {width:100%;accent-color:#188978}
+.camera-analysis>progress {width:100%;accent-color:#188978}
 .camera-forecast-cards .NORMAL strong {color:#b17c1d}
 .camera-forecast-cards .HIGH strong {color:#c65163}
 .camera-detection-details {margin:18px 0;font-size:12px;line-height:1.7;color:#65808d}
@@ -102,8 +115,11 @@
   .camera-viewer-toolbar>span {font-size:10px}
   .camera-information {grid-template-columns:1fr}
   .camera-counts {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .camera-counts article:first-child {grid-column:1/-1}
   .camera-forecast-cards {gap:6px}
   .camera-forecast-cards article {padding:12px 8px}
+  .camera-forecast-cards strong {font-size:15px;line-height:1.5}
+  .camera-forecast h3 {flex-wrap:wrap;font-size:16px}
   .camera-forecast {padding:14px}
   .camera-viewer-foot {flex-wrap:wrap}
   .camera-viewer.expanded {inset:10px}

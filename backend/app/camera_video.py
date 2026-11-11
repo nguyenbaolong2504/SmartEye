@@ -27,9 +27,9 @@ def matches(camera,job):
 
 
 def finish_analysis(ident):
-    from .video import analyze
+    from .camera_detection import analyze_camera
     from .camera_forecast import predict_samples
-    analyze(ident)
+    if not analyze_camera(ident):return
     with SessionLocal() as db:
         job=db.get(VideoJob,ident)
         if not job or job.status!='completed' or not job.result:return
@@ -37,7 +37,7 @@ def finish_analysis(ident):
         if not camera or camera.analysis_job_id!=ident or not matches(camera,job):return
         result=dict(job.result)
         try:
-            result['camera_forecast']=predict_samples(db.database,camera.segment_id,result['samples'],job.camera_config)
+            result['camera_forecast']=predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config)
         except Exception:
             logger.exception('Camera forecast unavailable for %s',ident)
             result['camera_forecast']={'state':'unavailable','is_demo':True,'timeline':[],
@@ -66,7 +66,7 @@ def queue_video(db,camera,user_id,path,metadata):
         shutil.copyfile(path,destination)
         filename=Path(path).name if Path(path).suffix.lower()=='.mp4' else 'camera.mp4'
         job=VideoJob(id=ident,user_id=user_id,camera_id=camera.id,filename=filename,
-            camera_config=camera_config(camera),retain_video=True,source_metadata=metadata)
+            camera_config=camera_config(camera),retain_video=True,source_metadata={**metadata,'detection_version':2})
         db.add(job);db.commit()
         condition={'analysis_job_id':camera.analysis_job_id,'active':camera.active,
                    **{key:getattr(camera,key) for key in CALIBRATION}}
@@ -133,7 +133,10 @@ def analysis(ident:int,user=Depends(permit('cameras.view')),db=Depends(get_db)):
             'vehicle_counts':{'car':counts['car'],'motorcycle':counts['motorcycle']+counts['motorbike'],
                               'bus':counts['bus'],'truck':counts['truck']}})
     forecast=result.get('camera_forecast') if can(user,'forecast.view') else None
+    frames=result.get('frames',[])
     return {**base,'duration_seconds':result['duration_seconds'],'samples':samples,
+        'frames':frames,'fps':result.get('fps',1),'roi':job.camera_config['roi'],
+        'detection_version':result.get('detection_version',1),'capacity':job.camera_config['capacity'],
         'average_count':result['average_count'],'peak_count':result['peak_count'],
         'low_threshold':job.camera_config['low_threshold'],'high_threshold':job.camera_config['high_threshold'],
         'frame_url':f'/api/traffic/cameras/recordings/{ident}/analysis-frame?v={job.id}',

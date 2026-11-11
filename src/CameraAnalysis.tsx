@@ -1,50 +1,58 @@
-import {useEffect} from 'react';
-import {Bike,Car,Clock3,ExternalLink,Truck} from 'lucide-react';
-import {Notice,Spinner} from './components';
-import {useRemote} from './business';
+import {useState} from 'react';
+import {Bike,Bus,Car,Clock3,ExternalLink,HelpCircle,Truck} from 'lucide-react';
+import {Modal,Notice,Spinner} from './components';
+import {atTime,type CameraAnalysisData,type CameraPrediction,type DetectionFrame} from './cameraAnalysisData';
 import type {Density} from './types';
 
-type Sample={second:number;count:number;score:number;occupancy:number;density:Density;vehicle_counts:{car:number;motorcycle:number;bus:number;truck:number}};
-type Forecast={horizon_minutes:number;label:Density};
-type Analysis={state:string;progress:number;message:string;is_demo:boolean;samples?:Sample[];duration_seconds?:number;high_threshold?:number;
-  average_count?:number;peak_count?:number;frame_url?:string;method?:string;
-  source?:{title:string;author:string;page_url:string;license:string;license_url:string;published_date:string;location_note:string};
-  forecast?:{is_demo:boolean;reference_at?:string;message:string;timeline:{second:number;predictions:Forecast[]}[]}|null};
-const empty:Analysis={state:'queued',progress:0,message:'Đang tải kết quả phân tích.',is_demo:true};
 const densityText:Record<Density,string>={LOW:'Thấp',NORMAL:'Vừa',HIGH:'Cao'};
+const trafficText={FREE:'Thông thoáng',SLOW:'Di chuyển chậm',JAM:'Dễ ùn tắc'};
 const timeText=(second:number)=>`${String(Math.floor(second/60)).padStart(2,'0')}:${String(Math.floor(second%60)).padStart(2,'0')}`;
+const percentage=(value:number)=>value<.01?'<1%':value>.99?'>99%':`${Math.round(value*100)}%`;
 
-export default function CameraAnalysis({url,second,onSeek}:{url:string;second:number;onSeek:(second:number)=>void}){
-  const view=useRemote<Analysis>(url.replace(/^\/api(?=\/)/,''),empty);
+export default function CameraAnalysis({view,second,onSeek,onExplain}:{view:{data:CameraAnalysisData;error:string;reload:()=>void};second:number;onSeek:(second:number)=>void;onExplain:()=>void}){
+  const [explaining,setExplaining]=useState<CameraPrediction|null>(null);
+  const [explainFrame,setExplainFrame]=useState<DetectionFrame|null>(null);
   const data=view.data;
-  useEffect(()=>{
-    if(!['queued','processing'].includes(data.state))return;
-    const timer=setInterval(view.reload,2500);
-    return()=>clearInterval(timer);
-  },[data.state,view.reload]);
   if(view.error)return <Notice kind="error">{view.error}<button className="text-button" onClick={view.reload}>Thử tải kết quả</button></Notice>;
-  if(data.state!=='completed')return <section className="camera-analysis"><h3>Phân tích video</h3><p>{['queued','processing'].includes(data.state)&&<Spinner/>} {data.message}</p></section>;
-  const samples=data.samples||[];
-  const sample=[...samples].reverse().find(row=>row.second<=Math.floor(second))||samples[0];
+  if(data.state!=='completed')return <section className="camera-analysis"><h3>Phân tích video</h3><p>{['queued','processing'].includes(data.state)&&<Spinner/>} {data.message}</p>{['queued','processing'].includes(data.state)&&<progress aria-label="Tiến độ phân tích" max={100} value={data.progress}/>}</section>;
+  const sample=atTime(data.frames?.length?data.frames:data.samples||[],second);
   if(!sample)return null;
-  const predictions=data.forecast?.timeline.find(row=>row.second===sample.second)?.predictions||[];
+  const basis=explainFrame||sample;
+  const predictions=atTime(data.forecast?.timeline||[],sample.second)?.predictions||[];
   const high=data.high_threshold??.6;
   const level=sample.density==='HIGH'&&sample.score>=high+(1-high)*.65?'Rất cao':densityText[sample.density];
   return <section className="camera-analysis" aria-label="Phân tích video camera">
-    <div className="camera-analysis-heading"><div><h3>Mật độ trong video</h3><p>Tại giây {timeText(sample.second)} · Kéo thanh phát để xem thời điểm khác</p></div><strong className={`camera-density ${sample.density}`}>{level}</strong></div>
-    <div className="camera-counts"><article><b>{sample.count}</b><span>Tổng xe / khung hình</span></article><article><Car size={17}/><b>{sample.vehicle_counts.car}</b><span>Ô tô</span></article><article><Bike size={17}/><b>{sample.vehicle_counts.motorcycle}</b><span>Xe máy</span></article><article><Truck size={17}/><b>{sample.vehicle_counts.bus+sample.vehicle_counts.truck}</b><span>Xe buýt, xe tải</span></article></div>
+    <div className="camera-analysis-heading"><div><h3>Xe đang xuất hiện trong video</h3><p>Tại {timeText(sample.second)}{sample.frame_index!=null?` · Khung hình ${sample.frame_index+1}`:''}</p></div><strong className={`camera-density ${sample.density}`}>{level}</strong></div>
+    <div className="camera-counts"><article><b>{sample.count}</b><span>Tổng xe đang nhận diện</span></article><article><Car size={17}/><b>{sample.vehicle_counts.car}</b><span>Ô tô</span></article><article><Bike size={17}/><b>{sample.vehicle_counts.motorcycle}</b><span>Xe máy</span></article><article><Bus size={17}/><b>{sample.vehicle_counts.bus}</b><span>Xe buýt</span></article><article><Truck size={17}/><b>{sample.vehicle_counts.truck}</b><span>Xe tải</span></article></div>
+    <p className="micro">Số đếm khớp với các ô nhận diện trong vùng đường được đánh dấu. Một xe có thể xuất hiện ở nhiều khung hình; xe bị che hoặc quá nhỏ có thể bị bỏ sót.</p>
     <div className="camera-density-track"><span style={{width:`${Math.min(100,sample.score*100)}%`}}/></div>
-    <div className="camera-video-timeline" aria-label="Mật độ theo thời gian video">{samples.map(row=><button key={row.second} type="button" className={`${row.density} ${row.second===sample.second?'selected':''}`} style={{height:`${12+row.score*44}px`}} aria-label={`Xem giây ${row.second}, mật độ ${densityText[row.density].toLowerCase()}`} title={`${timeText(row.second)} · ${row.count} xe`} onClick={()=>onSeek(row.second)}/>)}</div>
-    <p className="micro">Video dài {timeText(data.duration_seconds||0)} · Trung bình {data.average_count} xe/khung hình · Nhiều nhất {data.peak_count} xe. Các xe có thể xuất hiện lại ở nhiều giây.</p>
-    {data.forecast&&<div className="camera-forecast"><h3><Clock3 size={18}/>Dự báo mật độ chạy thử</h3><p>{data.forecast.message}</p>
-      {predictions.length?<div className="camera-forecast-cards">{predictions.map(item=><article key={item.horizon_minutes} className={item.label}><span>Sau {item.horizon_minutes} phút</span><strong>{densityText[item.label]}</strong></article>)}</div>:<p>Chưa có dự báo cho thời điểm này.</p>}
-      <p className="micro">Kết quả dùng lịch sử minh họa để chạy thử. Cần lịch sử camera thực tế để đánh giá độ chính xác trên tuyến đường.</p>
+    <div className="camera-video-timeline" aria-label="Mật độ theo thời gian video">{(data.samples||[]).map(row=><button key={row.second} type="button" className={`${row.density} ${Math.floor(row.second)===Math.floor(sample.second)?'selected':''}`} style={{height:`${12+row.score*44}px`}} aria-label={`Xem giây ${row.second}, mật độ ${densityText[row.density].toLowerCase()}`} title={`${timeText(row.second)} · ${row.count} xe`} onClick={()=>onSeek(row.second)}/>)}</div>
+    <p className="micro">Video dài {timeText(data.duration_seconds||0)} · Trung bình {data.average_count} xe/khung hình · Nhiều nhất {data.peak_count} xe.</p>
+    {data.forecast&&<div className="camera-forecast"><h3><Clock3 size={18}/>Khả năng ùn tắc sắp tới <small>Chạy thử</small></h3><p>{data.forecast.message}</p>
+      {data.forecast.reference_at&&<p className="micro">Tính từ mốc chạy thử {new Date(data.forecast.reference_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}.</p>}
+      {predictions.length?<div className="camera-forecast-cards">{predictions.map(item=><article key={item.horizon_minutes} className={item.label}><span>Sau {item.horizon_minutes} phút</span>
+        <strong>{item.congestion_label?trafficText[item.congestion_label]:densityText[item.label]}</strong>
+        {item.congestion_probability!=null?<><b className="camera-jam-probability">{percentage(item.congestion_probability)}</b><small>khả năng ùn tắc trong dữ liệu mẫu</small></>:<small>Chưa có xác suất phù hợp</small>}
+        <button type="button" className="text-button" aria-label={`Giải thích dự báo sau ${item.horizon_minutes} phút`} onClick={()=>{setExplainFrame(sample);onExplain();setExplaining(item);}}><HelpCircle size={14}/>Vì sao?</button>
+      </article>)}</div>:<p>Chưa có dự báo cho thời điểm này.</p>}
+      <p className="micro">Tỷ lệ được tính từ mô hình trên lịch sử minh họa, chưa được kiểm chứng ngoài đường. Mật độ cao chưa đủ để kết luận đang ùn tắc.</p>
     </div>}
-    <details className="camera-detection-details"><summary>Xem khung hình nhận diện và cách đánh giá</summary>
-      {data.frame_url&&<><p className="micro">Khung hình tại giây đầu của video</p><img loading="lazy" src={data.frame_url} alt="Khung hình được đánh dấu xe bằng YOLO"/></>}
-      <p>Mật độ dựa trên số xe và phần vùng quan sát có xe. Việc xác định ùn tắc cần thêm diễn biến di chuyển và lịch sử đã kiểm chứng.</p>
-      <p className="micro">Nhận diện bằng {data.method}. Phần dự báo chạy thử dùng XGBoost, thay mẫu mới nhất bằng kết quả video trong ngữ cảnh 60 phút có lịch sử minh họa.</p>
+    <details className="camera-detection-details"><summary>Cách nhận diện và đếm xe</summary>
+      <p>Ô tô màu xanh lá, xe máy màu xanh dương, xe buýt màu vàng và xe tải màu tím. Chỉ đếm các xe có ô trong vùng quan sát. Tổng xe bằng tổng bốn loại xe ở cùng khung hình.</p>
+      <p>Hệ thống nhận diện từng khung hình, loại các ô chồng trùng và chỉ xét vùng mặt đường. Kết quả cần đối chiếu với nhãn thủ công để biết độ chính xác; không cam kết đếm đúng mọi xe trong cảnh bị che khuất.</p>
+      <p className="micro">Nhận diện bằng {data.method}. Mức mật độ xét số xe so với sức chứa vùng đường và diện tích có xe. Không dùng số đếm này thay cho tốc độ hoặc tổng xe duy nhất qua đường.</p>
     </details>
     {data.source&&<div className="camera-video-credit"><b>Video minh họa</b><p>{data.source.location_note}</p><p>{data.source.title} · {data.source.author} · Công bố {data.source.published_date}</p><div><a href={data.source.page_url} target="_blank" rel="noreferrer">Video gốc<ExternalLink size={12}/></a><a href={data.source.license_url} target="_blank" rel="noreferrer">{data.source.license}</a></div></div>}
+    {explaining&&<Modal title={`Vì sao có dự báo sau ${explaining.horizon_minutes} phút?`} onClose={()=>setExplaining(null)}>
+      <div className="camera-forecast-explanation"><p><b>{explaining.congestion_label?trafficText[explaining.congestion_label]:densityText[explaining.label]}</b>{explaining.congestion_probability!=null&&<> · Khả năng ùn tắc ước tính <b>{percentage(explaining.congestion_probability)}</b> trong dữ liệu mẫu.</>}</p>
+        <h3>Căn cứ hệ thống đã xem</h3><ul><li>Khung hình lúc {timeText(basis.second)} có {basis.count} xe, gồm {basis.vehicle_counts.car} ô tô, {basis.vehicle_counts.motorcycle} xe máy, {basis.vehicle_counts.bus} xe buýt và {basis.vehicle_counts.truck} xe tải.</li>
+          <li>Xe chiếm khoảng {Math.round(basis.occupancy*100)}% vùng quan sát. Sức chứa chạy thử của vùng này là {data.capacity??'chưa thiết lập'} xe.</li>
+          <li>Đối chiếu lịch sử cùng giờ, cùng thứ trong tuần và diễn biến trước thời điểm dự báo.</li></ul>
+        {explaining.history&&<p>Trong {explaining.history.lookback_days} ngày minh họa gần nhất, có {explaining.history.matching_days} ngày cùng thứ có dữ liệu lúc {explaining.history.hour}; {explaining.history.jam_days} ngày được gắn nhãn ùn tắc. Đây là tần suất lịch sử, không phải chính tỷ lệ dự báo.</p>}
+        {explaining.congestion_probabilities&&<div className="camera-probability-breakdown">{(['FREE','SLOW','JAM'] as const).map(state=><div key={state}><span>{trafficText[state]}</span><progress max={1} value={explaining.congestion_probabilities![state]}/><b>{percentage(explaining.congestion_probabilities![state])}</b></div>)}</div>}
+        <h3>Hiểu đúng tỷ lệ này</h3><p>Con số được tính từ các trạng thái mà mô hình đã học, sau khi hiệu chỉnh trên phần dữ liệu riêng. Ví dụ 90% là mức khả năng dự báo cho một tình huống; không có nghĩa hệ thống đếm đúng 90% số xe hoặc luôn dự đoán đúng 90%.</p>
+        <p>Video hiện tại chưa xác minh đúng tuyến đang chọn. Lịch sử 60 phút dùng 11 mốc minh họa và mốc mới nhất từ video. Chưa có tốc độ thực hoặc nhãn ùn tắc đã kiểm chứng, nên chỉ dùng để chạy thử cách hoạt động.</p>
+      </div>
+    </Modal>}
   </section>;
 }

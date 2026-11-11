@@ -11,6 +11,7 @@ from .history import LOCAL
 from .traffic import classify
 
 HORIZONS=(15,30,60)
+VERSION=2
 FOLDER=DATA/'camera-density'
 _models={}
 
@@ -23,7 +24,24 @@ def density_row(row):
 
 
 def model_folder(active):
-    return FOLDER/str(uuid.UUID(active['run_id']))
+    return FOLDER/str(uuid.UUID(active['run_id']))/f'v{VERSION}'
+
+
+def probabilities(raw,temperature=1.):
+    logits=np.log(np.clip(np.asarray(raw,dtype=float),1e-9,1))/temperature
+    logits-=logits.max(axis=1,keepdims=True)
+    values=np.exp(logits)
+    return values/values.sum(axis=1,keepdims=True)
+
+
+def negative_log_loss(y,p):
+    return float(-np.log(np.clip(p[np.arange(len(y)),y],1e-9,1)).mean())
+
+
+def fit_temperature(y,p):
+    from scipy.optimize import minimize_scalar
+    return float(minimize_scalar(lambda t:negative_log_loss(y,probabilities(p,t)),
+        bounds=(.2,5.),method='bounded').x)
 
 
 def prepare_models(database,estimators=80):
@@ -31,23 +49,30 @@ def prepare_models(database,estimators=80):
     from .forecast_ml import metrics
     active=require_active(database)
     folder=model_folder(active)
-    if (folder/'metadata.json').is_file() and all((folder/f'xgb-{h}.json').is_file() for h in HORIZONS):
+    if (folder/'metadata.json').is_file() and all((folder/f'{target}-{h}.json').is_file() for h in HORIZONS for target in CLASSES):
         return json.loads((folder/'metadata.json').read_text(encoding='utf-8'))
     today=now().astimezone(LOCAL).date()
     query={'dataset_id':active['run_id'],'segment_id':{'$in':active['segment_ids']},
            'date':{'$gte':(today-timedelta(days=8)).isoformat(),'$lt':today.isoformat()}}
-    series={sid:{} for sid in active['segment_ids']}
+    series={sid:{} for sid in active['segment_ids']};labels={}
     for doc in database.demo_profiles.find(query):
         day=datetime.fromisoformat(doc['date']).date()
         for slot in doc['slots']:
             row=density_row(feature_row(day,slot))
             series[doc['segment_id']][row['at']]=row
+            labels[(doc['segment_id'],row['at'])]=slot['state']
     folder.mkdir(parents=True,exist_ok=True)
-    report={'is_demo':True,'target':'density','model':'XGBoost','run_id':active['run_id'],
+    report={'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
             'segment_ids':active['segment_ids'],'created_at':stamp(),'horizons':{}}
     for horizon in HORIZONS:
-        data=examples(series,{},active['segment_ids'],'density',horizon)
+      report['horizons'][str(horizon)]={}
+      for target in CLASSES:
+        data=examples(series,labels,active['segment_ids'],target,horizon)
         train,validation,test=split_indices(data,horizon)
+        midpoint=np.unique(data['times'][validation])[len(np.unique(data['times'][validation]))//2]
+        early=validation[data['times'][validation]+horizon*60<midpoint]
+        calibration=validation[data['times'][validation]>=midpoint]
+        if min(len(early),len(calibration))<25:raise ValueError('Chưa đủ dữ liệu riêng cho hiệu chỉnh xác suất.')
         raw=data['x'].reshape(len(data['x']),-1)
         mean=raw[train].mean(axis=0)
         std=np.maximum(raw[train].std(axis=0),.001)
@@ -55,21 +80,41 @@ def prepare_models(database,estimators=80):
         model=XGBClassifier(n_estimators=estimators,max_depth=4,learning_rate=.08,subsample=.9,
             colsample_bytree=.9,objective='multi:softprob',num_class=3,tree_method='hist',
             n_jobs=1,random_state=42,eval_metric='mlogloss',early_stopping_rounds=10)
-        model.fit(x[train],data['y'][train],eval_set=[(x[validation],data['y'][validation])],verbose=False)
-        pending=folder/f'xgb-{horizon}.pending.json'
-        model.save_model(pending);pending.replace(folder/f'xgb-{horizon}.json')
-        report['horizons'][str(horizon)]={'mean':mean.tolist(),'std':std.tolist(),
-            'validation':metrics(data['y'][validation],model.predict(x[validation])),
+        model.fit(x[train],data['y'][train],eval_set=[(x[early],data['y'][early])],verbose=False)
+        temperature=fit_temperature(data['y'][calibration],model.predict_proba(x[calibration]))
+        test_prob=probabilities(model.predict_proba(x[test]),temperature)
+        pending=folder/f'{target}-{horizon}.pending.json'
+        model.save_model(pending);pending.replace(folder/f'{target}-{horizon}.json')
+        report['horizons'][str(horizon)][target]={'mean':mean.tolist(),'std':std.tolist(),'temperature':temperature,
+            'validation':metrics(data['y'][early],model.predict(x[early])),
             'test':metrics(data['y'][test],model.predict(x[test])),
             'baseline':metrics(data['y'][test],data['baseline'][test]),
+            'test_log_loss':negative_log_loss(data['y'][test],test_prob),
+            'test_high_brier':float(np.mean((test_prob[:,2]-(data['y'][test]==2))**2)),
             'train_label_end':float((data['times'][train]+horizon*60).max()),
-            'validation_issue_start':float(data['times'][validation].min()),
-            'validation_label_end':float((data['times'][validation]+horizon*60).max()),
+            'validation_issue_start':float(data['times'][early].min()),
+            'validation_label_end':float((data['times'][early]+horizon*60).max()),
+            'calibration_issue_start':float(data['times'][calibration].min()),
+            'calibration_label_end':float((data['times'][calibration]+horizon*60).max()),
             'test_issue_start':float(data['times'][test].min())}
     pending=folder/'metadata.pending'
     pending.write_text(json.dumps(report,ensure_ascii=False),encoding='utf-8')
     pending.replace(folder/'metadata.json')
     return report
+
+
+def history_evidence(database,active,segment_id,issue):
+    cutoff=issue.date();documents=list(database.demo_profiles.find({'dataset_id':active['run_id'],
+        'segment_id':segment_id,'date':{'$gte':(cutoff-timedelta(days=100)).isoformat(),'$lt':cutoff.isoformat()}},
+        {'date':1,'slots':1}))
+    output={}
+    for horizon in HORIZONS:
+        target=issue+timedelta(minutes=horizon);minute=target.hour*60+target.minute
+        values=[slot for doc in documents if datetime.fromisoformat(doc['date']).weekday()==target.weekday()
+                for slot in doc['slots'] if slot['minute']==minute]
+        output[horizon]={'is_demo':True,'lookback_days':100,'matching_days':len(values),
+            'jam_days':sum(row['state']=='JAM' for row in values),'same_weekday':True,'hour':target.strftime('%H:%M')}
+    return output
 
 
 def normalized_score(score,low,high):
@@ -88,7 +133,8 @@ def predict_samples(database,segment_id,samples,config,issue=None):
         metadata=json.loads((folder/'metadata.json').read_text(encoding='utf-8'))
         models={}
         for horizon in HORIZONS:
-            model=XGBClassifier(n_jobs=1);model.load_model(folder/f'xgb-{horizon}.json');models[horizon]=model
+          for target in CLASSES:
+            model=XGBClassifier(n_jobs=1);model.load_model(folder/f'{target}-{horizon}.json');models[(horizon,target)]=model
         if len(_models)>=2:_models.pop(next(iter(_models)))
         _models[active['run_id']]=(metadata,models)
     metadata,models=_models[active['run_id']]
@@ -103,13 +149,21 @@ def predict_samples(database,segment_id,samples,config,issue=None):
         context=rows[:-1]+[density_row(last)]
         inputs.append(features(context,active['segment_ids'],segment_id).reshape(-1))
     raw=np.asarray(inputs,dtype=np.float32)
+    evidence=history_evidence(database,active,segment_id,issue)
     output=[{'second':sample['second'],'predictions':[]} for sample in samples]
     for horizon in HORIZONS:
-        info=metadata['horizons'][str(horizon)]
+      predictions=[{'horizon_minutes':horizon,'history':evidence[horizon]} for _ in samples]
+      for target in CLASSES:
+        info=metadata['horizons'][str(horizon)][target]
         x=((raw-np.asarray(info['mean']))/np.asarray(info['std'])).astype(np.float32)
-        labels=models[horizon].predict(x)
-        for row,label in zip(output,labels):
-            row['predictions'].append({'horizon_minutes':horizon,'label':CLASSES['density'][int(label)]})
-    return {'is_demo':True,'target':'density','model':'XGBoost','run_id':active['run_id'],
+        p=probabilities(models[(horizon,target)].predict_proba(x),info['temperature'])
+        for row,values in zip(predictions,p):
+            distribution={name:round(float(value),6) for name,value in zip(CLASSES[target],values)}
+            label=CLASSES[target][int(values.argmax())]
+            if target=='density':row.update(label=label,probabilities=distribution)
+            else:row.update(congestion_label=label,congestion_probability=distribution['JAM'],congestion_probabilities=distribution)
+      for row,prediction in zip(output,predictions):row['predictions'].append(prediction)
+    return {'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
         'reference_at':issue.isoformat(),'context_minutes':60,'synthetic_context_slots':11,
-        'message':'Kết hợp mật độ trong video với lịch sử minh họa của tuyến đường.','timeline':output}
+        'probability_kind':'calibrated_synthetic','real_world_validated':False,
+        'message':'Kết hợp lượng xe trong video với lịch sử minh họa cùng giờ và ngày trong tuần.','timeline':output}

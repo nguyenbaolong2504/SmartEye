@@ -74,7 +74,9 @@ def setup(ids=None,refresh=False):
                 camera.roi=source['roi'];camera.capacity=source['capacity']
             if (not refresh and previous and previous.status=='completed' and previous.source_metadata.get('sha256')==digest
                 and all(previous.camera_config.get(key)==getattr(camera,key) for key in ('segment_id','roi','capacity','low_threshold','high_threshold'))
-                and previous.result and previous.result.get('camera_forecast',{}).get('run_id')==report['run_id']
+                and previous.result and previous.result.get('detection_version')==2
+                and previous.result.get('camera_forecast',{}).get('version')==report.get('version')
+                and previous.result.get('camera_forecast',{}).get('run_id')==report['run_id']
                 and (UPLOADS/f'{previous.id}.retained').is_file() and camera.preview_public and camera.preview_job_id==previous.id):
                 if not camera.active:db.update(Camera,camera.id,{'active':True})
                 print(f'Đã có kết quả cho {camera.name}',flush=True)

@@ -130,16 +130,90 @@ def test_density_model_has_purged_time_splits_and_never_writes_real_observations
     protected=('observations','traffic_samples','traffic_labels','forecast_runs','forecast_registry')
     before={name:list(database[name].find()) for name in protected}
     report=camera_forecast.prepare_models(database,estimators=5)
-    for horizon,metrics in report['horizons'].items():
+    for horizon,targets in report['horizons'].items():
+      for metrics in targets.values():
         assert metrics['train_label_end']<metrics['validation_issue_start']
-        assert metrics['validation_label_end']<metrics['test_issue_start']
-        assert metrics['test']['samples']>0
+        assert metrics['validation_label_end']<metrics['calibration_issue_start']
+        assert metrics['calibration_label_end']<metrics['test_issue_start']
+        assert metrics['test']['samples']>0 and metrics['test_log_loss']>=0
+        assert 0<=metrics['test_high_brier']<=1
     output=camera_forecast.predict_samples(database,1,[{'second':0,'count':4,'score':.1},
         {'second':1,'count':25,'score':.9}],{'low_threshold':.25,'high_threshold':.6})
-    assert output['is_demo'] and output['target']=='density' and output['synthetic_context_slots']==11
+    assert output['is_demo'] and output['target']=='density_and_congestion' and output['synthetic_context_slots']==11
+    assert output['probability_kind']=='calibrated_synthetic' and not output['real_world_validated']
     assert {item['horizon_minutes'] for item in output['timeline'][0]['predictions']}=={15,30,60}
+    for frame in output['timeline']:
+      for prediction in frame['predictions']:
+        assert sum(prediction['congestion_probabilities'].values())==pytest.approx(1,abs=2e-6)
+        assert prediction['congestion_probability']==prediction['congestion_probabilities']['JAM']
+        assert prediction['congestion_label'] in ('FREE','SLOW','JAM')
+        assert prediction['history']['is_demo']
     assert {name:list(database[name].find()) for name in protected}==before
-    assert json.loads((tmp_path/active['run_id']/'metadata.json').read_text(encoding='utf-8'))['is_demo']
+    assert json.loads((camera_forecast.model_folder(active)/'metadata.json').read_text(encoding='utf-8'))['is_demo']
+
+
+def test_camera_detection_processes_every_frame_and_counts_exactly_the_displayed_boxes(tmp_path,monkeypatch):
+    import cv2
+    import numpy as np
+    from types import SimpleNamespace
+    from backend.app import camera_detection
+    path=tmp_path/'input.avi'
+    writer=cv2.VideoWriter(str(path),cv2.VideoWriter_fourcc(*'MJPG'),12,(400,240))
+    for _ in range(4):writer.write(np.zeros((240,400,3),dtype=np.uint8))
+    writer.release()
+    weights=tmp_path/'model.pt';weights.write_bytes(b'fake-only-for-unit-test')
+    monkeypatch.setattr(camera_detection,'MODEL_PATH',weights)
+    monkeypatch.setattr(camera_detection,'FOLDER',tmp_path/'cache')
+    calls=[]
+    class Detector:
+        def predict(self,frame,**options):
+            calls.append((frame.shape,options))
+            return [SimpleNamespace(names={2:'car',3:'motorcycle'},boxes=[
+                SimpleNamespace(cls=[2],xyxy=[[10,10,90,90]],conf=[.9]),
+                SimpleNamespace(cls=[3],xyxy=[[150,80,170,100]],conf=[.8])])]
+    monkeypatch.setattr(video,'get_model',lambda:Detector())
+    config={'roi':[.1,.25,.9,.9],'capacity':20,'low_threshold':.25,'high_threshold':.6}
+    result=camera_detection.detect_clip(path,config,lambda _:None)
+    assert len(result['frames'])==4 and result['fps']==12 and len(calls)==4
+    assert [frame['frame_index'] for frame in result['frames']]==[0,1,2,3]
+    for frame in result['frames']:
+        assert frame['count']==len(frame['boxes'])==sum(frame['vehicle_counts'].values())==2
+        assert frame['vehicle_counts']=={'car':1,'motorcycle':1,'bus':0,'truck':0}
+        assert frame['boxes'][0]['box']==[50,70,130,150]
+    assert calls[0][0]==(156,320,3) and calls[0][1]['agnostic_nms']
+    again=camera_detection.detect_clip(path,{**config,'capacity':50},lambda _:None)
+    assert len(calls)==4 and again['frames'][0]['count']==2
+
+
+def test_probability_temperature_outputs_distribution_without_forcing_ninety_percent():
+    import numpy as np
+    values=camera_forecast.probabilities(np.array([[.1,.2,.7],[.6,.3,.1]]),2.)
+    assert values.sum(axis=1)==pytest.approx([1,1])
+    assert 0<values[0,2]<.7 and values[1,2]!=values[0,2]
+
+
+@pytest.mark.parametrize('status,suffix',[('completed','retained'),('processing','video')])
+def test_duplicate_camera_worker_does_not_delete_another_runs_video(client,tmp_path,monkeypatch,status,suffix):
+    from backend.app import camera_detection
+    job=published_video()
+    monkeypatch.setattr(camera_detection,'UPLOADS',tmp_path)
+    path=tmp_path/f'{job.id}.{suffix}';path.write_bytes(b'owned-by-another-invocation')
+    with SessionLocal() as db:db.update(VideoJob,job.id,{'status':status})
+    assert camera_detection.analyze_camera(job.id) is False
+    assert path.read_bytes()==b'owned-by-another-invocation'
+
+
+def test_camera_explanation_uses_only_prior_days_at_the_matching_hour_and_weekday(client):
+    from datetime import datetime
+    database=get_database();active={'run_id':str(uuid.uuid4())}
+    issue=datetime(2026,11,12,17,0,tzinfo=LOCAL)
+    for day in ('2026-11-05','2026-11-06','2026-11-12','2026-11-19'):
+        database.demo_profiles.insert_one({'dataset_id':active['run_id'],'segment_id':1,'date':day,
+            'slots':[{'minute':17*60+15,'state':'JAM'},{'minute':17*60+30,'state':'FREE'}]})
+    evidence=camera_forecast.history_evidence(database,active,1,issue)
+    assert evidence[15]['matching_days']==evidence[15]['jam_days']==1
+    assert evidence[15]['hour']=='17:15' and evidence[15]['lookback_days']==100
+    assert evidence[30]['matching_days']==1 and evidence[30]['jam_days']==0
 
 
 @pytest.mark.parametrize('score,expected',[(.1,.125),(.4,.425),(.9,.9)])

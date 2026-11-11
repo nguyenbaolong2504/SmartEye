@@ -64,7 +64,7 @@ Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sác
 5. Ảnh nguồn được cập nhật theo chu kỳ đã cấu hình, có thể tạm dừng, tải lại và phóng to. Video MP4/WebM được phát bằng nút điều khiển. Hình ảnh lưu từ trước được ghi rõ loại và thời điểm ghi hình.
 6. Hệ thống hiển thị nguồn, thời điểm ghi hình khi có, thời điểm nhận ảnh và lần kiểm tra kết nối. Nguồn không cung cấp thời điểm ghi hình được ghi nhận rõ. Ghim theo đoạn đường có ghi chú về vị trí.
 7. Người xem chọn **Xem dự báo tuyến đường** nếu được cấp quyền dự báo. Hệ thống mở đúng tuyến và chiều của camera.
-8. Với camera có video mẫu đã phân tích, người xem phát/tua video hoặc nhấn cột thời gian để xem số xe, mức mật độ và thống kê khung hình. Nguồn và ghi chú video minh họa xuất hiện cùng kết quả. Nếu có quyền dự báo và lịch sử minh họa phù hợp, hệ thống hiển thị thêm mật độ chạy thử sau 15/30/60 phút.
+8. Với camera có video mẫu đã phân tích, người xem phát/tua video hoặc nhấn cột thời gian để xem ô nhận diện, tên loại xe, số xe từng loại và mức mật độ đồng bộ từng khung hình. Có thể ẩn/hiện nhận diện và phóng to video. Nguồn và ghi chú video minh họa xuất hiện cùng kết quả. Nếu có quyền dự báo và lịch sử minh họa phù hợp, hệ thống hiển thị mật độ, khả năng ùn tắc chạy thử sau 15/30/60 phút. Nhấn **Vì sao?** để tạm dừng và xem căn cứ, phân bố các trạng thái, lịch sử cùng giờ/cùng thứ và giới hạn dữ liệu.
 
 **Luồng ngoại lệ**
 
