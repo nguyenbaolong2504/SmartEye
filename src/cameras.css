@@ -1,0 +1,71 @@
+.camera-filters {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:18px;
+  margin-bottom:20px;
+}
+.camera-filters .field {margin:0;min-width:0}
+.camera-workspace {display:grid;grid-template-columns:minmax(250px,320px) minmax(0,1fr);gap:20px;align-items:start}
+.camera-directory {padding:20px;min-width:0}
+.camera-directory .section-title {margin-bottom:16px}
+.camera-directory .section-title h2 {font-size:16px}
+.camera-directory-list {display:grid;gap:10px;max-height:780px;overflow-y:auto;padding:3px}
+.camera-list-item {display:grid;align-content:start;align-items:start;text-align:left;gap:9px;background:#fff;border:1px solid #dce7ec;border-radius:12px;padding:16px;color:#365565;cursor:pointer;font:inherit;overflow-wrap:anywhere}
+.camera-list-item:hover,.camera-list-item.selected {border-color:#168b75;background:#eef8f5}
+.camera-list-item:focus-visible {outline:3px solid #459dd3;outline-offset:2px}
+.camera-list-title {display:flex;gap:9px;align-items:center;color:#163f51}
+.camera-list-title svg {flex-shrink:0}
+.camera-list-item>span:not(.camera-list-title) {font-size:12px}
+.camera-list-item small {display:flex;align-items:center;gap:5px;color:#6b8190;font-size:11px}
+.camera-status {display:inline-flex;justify-self:start;padding:5px 9px;font-size:11px;border-radius:6px;background:#edf1f3;color:#637e89;white-space:normal}
+.camera-status.ready {background:#e1f4eb;color:#157356}
+.camera-status.error {background:#feeeee;color:#b63f50}
+.camera-status.stale {background:#fff4df;color:#916113}
+.camera-status.archive {background:#eaf1fb;color:#416698}
+.camera-observation {min-width:0;display:grid;gap:18px}
+.camera-observation .street-map-panel {height:370px;min-height:280px}
+.camera-details {min-width:0;padding:24px}
+.camera-details-heading {display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:18px}
+.camera-details-heading h2 {font-size:20px;margin:0 0 8px}
+.camera-details-heading p {display:flex;gap:5px;align-items:center;font-size:12px;margin:0;color:#738795}
+.camera-viewer {border:1px solid #dae6ec;border-radius:12px;overflow:hidden;background:#f4f7f8}
+.camera-viewer-toolbar {display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;font-size:12px;color:#526e7c;background:#fff}
+.camera-viewer-toolbar>div {display:flex;gap:10px;align-items:center}
+.camera-picture {display:flex;align-items:center;justify-content:center;background:#eaf0f1;min-height:260px;aspect-ratio:16/9;overflow:hidden}
+.camera-picture img,.camera-picture video {display:block;max-width:100%;width:100%;height:100%;object-fit:contain}
+.camera-picture .empty {min-height:200px;padding:24px;text-align:center}
+.camera-viewer-foot {display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;font-size:11px;color:#6f8391;background:#fff}
+.camera-viewer-foot .text-button {white-space:nowrap}
+.camera-information {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:22px 0 14px}
+.camera-information>div {min-width:0;overflow-wrap:anywhere}
+.camera-information dt {font-size:11px;color:#7b8e98;margin-bottom:6px}
+.camera-information dd {margin:0;font-size:13px;color:#294c5d;line-height:1.6}
+.camera-information dd small {display:block;color:#7b8e98}
+.camera-detail-actions {display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+.camera-viewer.expanded {position:fixed;inset:24px;z-index:130;box-shadow:0 0 0 100vmax #163b4ae8;display:flex;flex-direction:column;overflow:auto}
+.camera-viewer.expanded .camera-picture {flex:1;min-height:0;aspect-ratio:auto}
+.camera-map-pin {border:0;background:transparent}
+.camera-map-pin>span {display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#8497a3;color:#fff;box-shadow:0 2px 8px #173d5133;border:3px solid white}
+.camera-map-pin.available>span {background:#168b75}
+.camera-map-pin.chosen>span {outline:3px solid #2474cc}
+.camera-map-pin svg {width:21px;height:21px}
+@media(max-width:1100px) {
+  .camera-workspace {grid-template-columns:minmax(220px,270px) minmax(0,1fr);gap:16px}
+  .camera-details {padding:18px}
+  .camera-viewer-toolbar .button span {display:none}
+}
+@media(max-width:760px) {
+  .camera-filters {grid-template-columns:1fr;gap:14px}
+  .camera-workspace {grid-template-columns:1fr}
+  .camera-directory-list {display:flex;align-items:flex-start;max-height:none;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity}
+  .camera-list-item {flex:0 0 250px;scroll-snap-align:start}
+  .camera-observation .street-map-panel {height:320px}
+  .camera-picture {min-height:200px}
+  .camera-details-heading {flex-direction:column;gap:8px}
+  .camera-details-heading h2 {font-size:18px}
+  .camera-viewer-toolbar {padding:9px}
+  .camera-viewer-toolbar>span {font-size:10px}
+  .camera-information {grid-template-columns:1fr}
+  .camera-viewer-foot {flex-wrap:wrap}
+  .camera-viewer.expanded {inset:10px}
+}

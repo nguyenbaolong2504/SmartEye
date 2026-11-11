@@ -519,6 +519,8 @@ def system(user=Depends(admin),db=Depends(get_db)):
 
 from .monitoring import router as monitoring_router
 app.include_router(monitoring_router)
+from .public_cameras import router as public_camera_router
+app.include_router(public_camera_router)
 from .forecast_api import router as forecast_router
 app.include_router(forecast_router)
 from .incidents import router as incidents_router

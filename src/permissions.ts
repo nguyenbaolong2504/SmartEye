@@ -1,6 +1,6 @@
 import type {User} from './types';
 
-const publicPermissions = new Set(['traffic.view','forecast.view','routes.search','warnings.view']);
+const publicPermissions = new Set(['traffic.view','forecast.view','routes.search','warnings.view','cameras.view']);
 
 export function can(user:User|null, permission:string) {
   return user ? user.permissions?.includes(permission) ?? false : publicPermissions.has(permission);

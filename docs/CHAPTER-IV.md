@@ -16,6 +16,7 @@
 | UC10 · Quản lý tài khoản và phân quyền | — | — | Có |
 | UC11 · Theo dõi dịch vụ, tình trạng tiếp nhận và nhật ký | — | Nhật ký vận hành giao thông, Quản lý toàn bộ tuyến có quyền xem dịch vụ | Toàn bộ nhật ký hệ thống |
 | UC12 · Cấu hình, ánh xạ, kiểm tra và bật/tắt nguồn dữ liệu | — | Theo phạm vi được phân công | Có |
+| UC14 · Xem camera giao thông công khai và chuyển sang dự báo tuyến | Có | Có, khi được cấp quyền xem camera công khai | Cấu hình và cấp quyền trong không gian quản trị |
 
 UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang công khai. Phản ánh, hành trình đã lưu và thông báo cá nhân cần tài khoản Người dùng hoặc Quản lý. Tìm tuyến và lưu hành trình là chức năng có sẵn của SmartEye ngoài danh mục Chương IV, dùng chung cho Người dùng và Quản lý. Quản lý cấu hình đoạn đường, hiệu chỉnh camera, chuẩn bị dữ liệu và huấn luyện mô hình trong phạm vi được giao. Tạo đoạn đường mới, kích hoạt/ngừng mô hình đang phục vụ, tạo lại bộ mẫu và xem trạng thái dịch vụ toàn hệ thống dành cho Admin hoặc Quản lý phụ trách toàn bộ tuyến có quyền tương ứng. Admin có các mục Nguồn dữ liệu, Đoạn đường, Người dùng, Dữ liệu & mô hình, Hệ thống & nhật ký và Camera & hiệu chỉnh. Báo cáo theo giờ thuộc không gian Quản lý.
 
@@ -46,3 +47,33 @@ Dự báo theo giờ đối chiếu 100 ngày lịch, tách ngày làm việc v�
 Trong **Quản trị hệ thống → Người dùng → Phân quyền**, Admin có thể bỏ chọn từng quyền của một tài khoản Người dùng hoặc Quản lý. Ví dụ, giữ **Xem phản ánh của mình** và bỏ **Gửi phản ánh** để tài khoản chỉ xem được. Quyền thao tác của Quản lý còn phụ thuộc quyền xem nhóm chức năng, tuyến được phân công và trạng thái hồ sơ. Tài khoản đăng nhập lại sau khi quyền thay đổi.
 
 Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sách mật khẩu đang dùng và cho phép cấu hình các tham số nguồn, thời hạn dữ liệu, ngưỡng quy tắc. Đăng ký tạo tài khoản dùng được ngay. Khôi phục mật khẩu cần SMTP. Camera cần địa chỉ HTTPS được phép sử dụng, trả ảnh JPG/PNG/WebP hoặc clip MP4/WebM. Dịch vụ lấy số liệu thật cần địa chỉ nguồn và thông tin xác thực nếu nguồn yêu cầu. Nguồn mới dùng mã truy cập trong biến môi trường phải trỏ đến máy chủ HTTPS đã cấu hình trước bằng biến cùng tên thêm hậu tố `_HOST`, dùng cổng 443. Ví dụ mã `TRAFFIC_SOURCE_DEMO` có máy chủ cho phép tại `TRAFFIC_SOURCE_DEMO_HOST=traffic.example.org`. Giao diện chỉ chọn tên biến, không hiển thị giá trị mã.
+
+
+## UC14. Xem camera giao thông
+
+**Tác nhân** gồm Người dùng và Quản lý có quyền xem camera công khai. Trang cho phép xem camera công khai trước khi đăng nhập. Admin cấu hình nguồn và quyền xem trong không gian quản trị.
+
+**Điều kiện** gồm đoạn đường đã khai báo, camera có vị trí theo tọa độ hoặc theo đoạn đường. Nguồn ảnh/video phải được phép sử dụng, kiểm tra kết nối, bật nguồn và xác nhận cho người dùng xem. Nguồn riêng tư không được đưa vào danh sách công khai.
+
+**Luồng chính**
+
+1. Người xem mở **Giao thông → Camera giao thông**.
+2. Hệ thống tải danh sách camera và ghim trên bản đồ, kèm tuyến, vị trí và trạng thái kết nối.
+3. Người xem chọn lần lượt tỉnh/thành phố, tuyến đường và vị trí camera. Đổi tỉnh/thành phố đặt lại bộ lọc tuyến và camera.
+4. Người xem chọn một dòng trong danh sách hoặc ghim trên bản đồ. Hệ thống hiển thị cùng camera trong khung quan sát.
+5. Ảnh nguồn được cập nhật theo chu kỳ đã cấu hình, có thể tạm dừng, tải lại và phóng to. Video MP4/WebM được phát bằng nút điều khiển. Hình ảnh lưu từ trước được ghi rõ loại và thời điểm ghi hình.
+6. Hệ thống hiển thị nguồn, thời điểm ghi hình khi có, thời điểm nhận ảnh và lần kiểm tra kết nối. Nguồn không cung cấp thời điểm ghi hình được ghi nhận rõ. Ghim theo đoạn đường có ghi chú về vị trí.
+7. Người xem chọn **Xem dự báo tuyến đường** nếu được cấp quyền dự báo. Hệ thống mở đúng tuyến và chiều của camera.
+
+**Luồng ngoại lệ**
+
+- Khu vực không có camera được chia sẻ hiển thị danh sách trống và hướng dẫn chọn khu vực khác.
+- Camera tắt hoặc chưa có ảnh hiển thị trạng thái tương ứng. Dữ liệu thiếu không được diễn giải thành đường thông thoáng.
+- Mất kết nối hoặc sai định dạng có thông báo và nút tải lại. Ảnh cũ còn hiển thị được giữ cùng mốc nhận ảnh cũ.
+- Nguồn bị tắt hoặc thu hồi chia sẻ chặn ngay yêu cầu ảnh tiếp theo, kể cả khi ảnh đã nằm trong bộ nhớ đệm máy chủ.
+- Tài khoản bị bỏ quyền xem camera không được mở trang hoặc gọi API xem ảnh. Quyền dự báo được kiểm tra riêng.
+- Tuyến chưa đủ lịch sử mở trang dự báo với thông báo thiếu dữ liệu theo luồng dự báo hiện có.
+
+**Cấu hình để chạy thử**
+
+Admin mở **Quản trị hệ thống → Nguồn dữ liệu → Thêm nguồn**, chọn Camera, đoạn đường, chiều, định dạng Ảnh hoặc Video và URL nguồn được phép sử dụng. Nhập tên giao lộ và tọa độ nếu có. Tích **Cho phép người dùng xem camera trên trang Camera giao thông**, xác nhận quyền sử dụng, lưu, kiểm tra nguồn rồi bật nguồn. Ảnh hỗ trợ JPG/PNG/WebP. Video chia sẻ cần URL MP4/WebM công khai, không chứa mã truy cập. Nguồn ảnh có mã truy cập được lấy qua máy chủ và giữ kín mã. Camera nguồn không tự tạo nhãn ùn tắc hoặc dữ liệu huấn luyện chỉ bằng thao tác xem.

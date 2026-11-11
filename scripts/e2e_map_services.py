@@ -4,6 +4,7 @@ Never used as a production fallback. Tests remain deterministic without calling
 public address/Overpass services for each browser run.
 """
 import json
+import base64
 from pathlib import Path
 from fastapi import FastAPI, Body
 from fastapi.responses import Response
@@ -75,3 +76,8 @@ def motorcycle_routes(body:dict=Body(...)):
 def tile(z:int,x:int,y:int):
     return Response('<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edf1ef"/><path d="M0 128H256M128 0V256" stroke="white" stroke-width="12"/></svg>',
                     media_type='image/svg+xml',headers={'Cache-Control':'public, max-age=3600'})
+
+
+@app.api_route('/camera.png',methods=['GET','HEAD'])
+def camera_image():
+    return Response(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a7WQAAAAASUVORK5CYII='),media_type='image/png')

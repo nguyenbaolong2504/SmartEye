@@ -54,3 +54,11 @@ API dữ liệu, nhãn thực tế, tác vụ huấn luyện, xuất báo cáo, 
 `/api/routes/search` nhận thêm `algorithm` (compare/dijkstra/astar), mặc định astar cho đồ thị tự quản lý. `weights` nhận time/distance và density tùy chọn. Có `optimization` và `cost_components` trong response; scope Google chỉ là tập ứng viên. `/api/segments` hỗ trợ `one_way` mặc định false; `/api/places` gồm cả các nút của đoạn đang hoạt động. Xem [ROUTING.md](ROUTING.md).
 
 Giao diện mặc định dùng `provider=auto`: `DRIVE` lấy các tuyến OSRM (`scope=osrm_candidates`), `TWO_WHEELER` dùng Valhalla motorcycle (`scope=valhalla_candidates`). Cả hai trả `algorithm=null`, chỉ xếp hạng trong tập ứng viên dịch vụ cung cấp. Ứng viên cache 10 phút; thời điểm khởi hành, dữ liệu giao thông và trọng số được đánh giá lại mỗi lần. Xe máy không tải Overpass trong luồng này. Khi đã cấu hình đủ hai khóa Google, auto chuyển sang Google và giữ dữ liệu quan sát thực tách khỏi mô phỏng. [Điều kiện, hạn mức và xác nhận tuyến xe máy](MAPS.md).
+
+
+## Camera giao thông công khai
+
+- `GET /api/traffic/cameras` trả danh sách camera, tỉnh/thành phố, tuyến, vị trí, trạng thái, mốc thời gian và đường dẫn media được phép chia sẻ. Yêu cầu quyền `cameras.view`, mặc định có cho khách và vai trò Người dùng/Quản lý. Nguồn riêng tư, tên biến xác thực và mã truy cập không xuất hiện trong kết quả.
+- `GET /api/traffic/cameras/sources/{id}/frame` lấy ảnh nguồn đã được chia sẻ và bật. Kiểm tra quyền chia sẻ ở từng lượt, giữ bộ nhớ đệm ngắn để giảm tải nguồn. Header `X-Camera-Received-At` ghi lúc máy chủ nhận ảnh từ nguồn. Không dùng mốc này làm thời điểm camera ghi hình.
+- `GET /api/traffic/cameras/recordings/{id}/frame` và `/video` đọc media đã được công bố qua luồng camera có sẵn, hỗ trợ HTTP Range cho video.
+- Cấu hình nguồn camera nhận thêm `public_preview` (mặc định false), `location_name` và `position` theo thứ tự vĩ độ, kinh độ. Các nguồn cũ vẫn dùng được và mặc định giữ riêng tư. Đổi cấu hình yêu cầu kiểm tra và bật lại theo luồng nguồn hiện có.

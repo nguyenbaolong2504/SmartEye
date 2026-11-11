@@ -1,6 +1,7 @@
 """Action permissions limited by the actor's Chương IV role."""
 
 COMMON = {
+    'cameras.view': 'Xem camera giao thông công khai',
     'traffic.view': 'Xem tình trạng, lịch sử và bản đồ',
     'forecast.view': 'Xem dự báo theo ngày và giờ',
     'routes.search': 'Tìm tuyến đường',
@@ -44,7 +45,7 @@ MANAGEMENT = {
     'diagnostics.view': 'Xem trạng thái dịch vụ và nhật ký vận hành',
 }
 ADMINISTRATION = {key: MANAGEMENT[key] for key in ('sources.manage','network.manage','models.manage','diagnostics.view')}
-PUBLIC = {'traffic.view', 'forecast.view', 'routes.search', 'warnings.view'}
+PUBLIC = {'traffic.view', 'forecast.view', 'routes.search', 'warnings.view', 'cameras.view'}
 PARENTS = {
     **{key: key.split('.')[0]+'.view' for key in MANAGEMENT if key.split('.')[0]+'.view' in MANAGEMENT},
     'favorites.delete': 'favorites.view', 'favorites.add': 'routes.search',

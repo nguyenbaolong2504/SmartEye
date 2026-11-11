@@ -97,6 +97,9 @@ class DataSource(Document):
     interval_seconds: int = 60
     stale_minutes: int = 15
     authorized: bool = False
+    public_preview: bool = False
+    location_name: str = ''
+    position: list | None = None
     speed_verified: bool = False
     state_verified: bool = False
     count_method: str = 'occupancy'

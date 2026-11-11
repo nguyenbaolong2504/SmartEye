@@ -98,9 +98,18 @@ class SourceInput(Input):
     interval_seconds: int = Field(default=60,ge=5,le=3600)
     stale_minutes: int = Field(default=15,ge=1,le=1440)
     authorized: bool = False
+    public_preview: bool = False
+    location_name: str = Field(default='',max_length=160)
+    position: list[float] | None = Field(default=None,min_length=2,max_length=2)
     speed_verified: bool = False
     state_verified: bool = False
     count_method: Literal['occupancy','crossings'] = 'occupancy'
+    @field_validator('position')
+    @classmethod
+    def camera_position(cls,value):
+        if value is not None and not (-90<=value[0]<=90 and -180<=value[1]<=180):
+            raise ValueError('Tọa độ camera chưa hợp lệ')
+        return value
     @model_validator(mode='after')
     def coherent(self):
         if not self.authorized:raise ValueError('Cần xác nhận quyền sử dụng nguồn dữ liệu')
@@ -108,6 +117,9 @@ class SourceInput(Input):
         if self.kind!='camera' and self.format not in ('json','csv'):raise ValueError('Nguồn số liệu cần JSON hoặc CSV')
         if self.kind!='file' and not self.url:raise ValueError('Cần địa chỉ kết nối của nguồn')
         if self.kind=='file' and self.url:raise ValueError('Nguồn tệp được nhập trực tiếp, không dùng địa chỉ kết nối')
+        if self.public_preview and self.kind!='camera':raise ValueError('Chỉ chia sẻ hình ảnh từ nguồn camera')
+        if self.public_preview and self.format=='video' and self.credential_env:
+            raise ValueError('Video chia sẻ cần địa chỉ phát công khai không chứa mã truy cập')
         return self
 
 

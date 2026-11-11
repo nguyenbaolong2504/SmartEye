@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, MapPin, LogIn, Activity, LayoutDashboard, BrainCircuit, MessageSquare } from 'lucide-react';
+import { Navigation, Bookmark, Bell, Settings2, ChevronRight, Menu, X, Radio, MapPin, LogIn, Activity, LayoutDashboard, BrainCircuit, MessageSquare, Camera as CameraIcon } from 'lucide-react';
 import { api } from './api';
 import { AuthModal,ProfilePage } from './Auth';
 import { Modal,Notice,Spinner } from './components';
@@ -8,14 +8,15 @@ import { type Place,type Segment,type Camera,type Config,type User,type Favorite
 const OverviewPage=lazy(()=>import('./OverviewPage'));
 const RoutesPage=lazy(()=>import('./RoutesPage'));
 const TrafficMonitor=lazy(()=>import('./TrafficMonitor'));
+const CameraPage=lazy(()=>import('./CameraPage'));
 const ForecastPage=lazy(()=>import('./ForecastPage'));
 const HistoryPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.HistoryPage})));
 const AlertsPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.AlertsPage})));
 const AdminPage=lazy(()=>import('./WorkspacePages').then(m=>({default:m.AdminPage})));
 const IncidentsPage=lazy(()=>import('./IncidentsPage'));
 const ManagementPage=lazy(()=>import('./ManagementPage'));
-type Tab='overview'|'forecast'|'routes'|'monitor'|'history'|'alerts'|'incidents'|'management'|'admin'|'profile';
-const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Tình trạng & thống kê',icon:Activity},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'incidents',label:'Phản ánh giao thông',icon:MessageSquare},{id:'management',label:'Giám sát & xử lý',icon:Activity},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
+type Tab='overview'|'forecast'|'routes'|'monitor'|'cameras'|'history'|'alerts'|'incidents'|'management'|'admin'|'profile';
+const navigation=[{id:'overview',label:'Tổng quan',icon:LayoutDashboard},{id:'monitor',label:'Tình trạng & thống kê',icon:Activity},{id:'cameras',label:'Camera giao thông',icon:CameraIcon},{id:'forecast',label:'Dự báo giao thông',icon:BrainCircuit},{id:'routes',label:'Tìm tuyến đường',icon:Navigation},{id:'history',label:'Hành trình & dữ liệu',icon:Bookmark},{id:'alerts',label:'Cảnh báo giao thông',icon:Bell},{id:'incidents',label:'Phản ánh giao thông',icon:MessageSquare},{id:'management',label:'Giám sát & xử lý',icon:Activity},{id:'admin',label:'Quản trị hệ thống',icon:Settings2}] as const;
 function readTab():Tab|null {
   const view=location.hash.slice(1);
   return view==='profile'||navigation.some(n=>n.id===view)?view as Tab:null;
@@ -27,6 +28,7 @@ function canOpen(tab:Tab, user:User|null) {
   if(tab==='admin')return false;
   if(tab==='management')return hasManagement(user);
   if(tab==='monitor')return can(user,'traffic.view');
+  if(tab==='cameras')return can(user,'cameras.view');
   if(tab==='forecast')return can(user,'forecast.view');
   if(tab==='routes')return can(user,'routes.search');
   if(tab==='history')return can(user,'favorites.view')||!user;
@@ -42,6 +44,7 @@ export default function App(){
   const[loadedMode,setLoadedMode]=useState<DataMode|null>(null);const[config,setConfig]=useState<Config|null>(null);const[demo,setDemo]=useState<DemoStatus|null>(null);const[user,setUser]=useState<User|null>(null);
   const[error,setError]=useState('');const[authOpen,setAuthOpen]=useState(Boolean(new URLSearchParams(location.search).get('reset')));const[mobileOpen,setMobileOpen]=useState(false);
   const[initialRoad,setInitialRoad]=useState<number>();const[initialDeparture,setInitialDeparture]=useState('');const[preset,setPreset]=useState<Favorite|null>(null);const[routeKey,setRouteKey]=useState(0);const[toast,setToast]=useState('');const[legal,setLegal]=useState(false);const version=useRef(0);
+  const[initialDirection,setInitialDirection]=useState<'forward'|'reverse'>('forward');
   const refresh=useCallback(()=>{
     const current=++version.current;
     api<Bootstrap>(`/bootstrap?data_mode=${dataMode}`).then(data=>{
@@ -82,9 +85,10 @@ export default function App(){
     <main>{error&&<div className="connection-error"><Notice kind="error">{error}</Notice><button className="button" onClick={refresh}>Thử kết nối lại</button></div>}
       {(!config||loadedMode!==dataMode)&&!error?<div className="loading-page"><Spinner/><p>Đang kết nối SmartEye…</p></div>:config&&<Suspense fallback={<div className="loading-page"><Spinner/><p>Đang mở trang…</p></div>}>
         {tab==='overview'&&<OverviewPage user={user} segments={segments} places={places} onNavigate={navigate} dataMode={dataMode}/>}
-        {tab==='forecast'&&<ForecastPage segments={segments} user={user} initialRoad={initialRoad} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}}/>}
+        {tab==='forecast'&&<ForecastPage segments={segments} user={user} initialRoad={initialRoad} initialDirection={initialDirection} onHistory={id=>{setInitialRoad(id);navigate('monitor');}} onFindRoute={at=>{setPreset(null);setInitialDeparture(at);setRouteKey(k=>k+1);navigate('routes');}}/>}
+        {tab==='cameras'&&<CameraPage user={user} tileUrl={config.osm_tile_url} onForecast={(id,direction)=>{setInitialRoad(id);setInitialDirection(direction);navigate('forecast');}}/>}
         {tab==='routes'&&<RoutesPage key={`${routeKey}-${dataMode}`} places={places} segments={segments} config={config} user={user} dataMode={dataMode} initialDeparture={initialDeparture} onLogin={()=>setAuthOpen(true)} preset={preset} onSaved={()=>setToast('Đã lưu hành trình yêu thích.')}/>}
-        {tab==='monitor'&&<TrafficMonitor tileUrl={config.osm_tile_url} key={initialRoad||'all'} initialRoad={initialRoad} onForecast={id=>{setInitialRoad(id);navigate('forecast');}} segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
+        {tab==='monitor'&&<TrafficMonitor tileUrl={config.osm_tile_url} key={initialRoad||'all'} initialRoad={initialRoad} onForecast={id=>{setInitialRoad(id);setInitialDirection('forward');navigate('forecast');}} segments={segments} dataMode={dataMode} demo={demo} onFindRoute={()=>navigate('routes')} user={user} onUpdated={refresh}/>}
         {tab==='history'&&<HistoryPage user={user} onLogin={()=>setAuthOpen(true)} onFavorite={f=>{setPreset(f);setRouteKey(k=>k+1);navigate('routes');}}/>}
         {tab==='alerts'&&<AlertsPage user={user} onLogin={()=>setAuthOpen(true)} segments={segments}/>}
         {tab==='incidents'&&<IncidentsPage user={user} segments={segments} config={config} onLogin={()=>setAuthOpen(true)}/>}

@@ -20,8 +20,8 @@ type Outlook={date:string;hour:number;segment_id:number;segment_name:string;sele
 type PlaceResult={id:string;name:string};
 type ForecastQuery={road:number;day:string;hour:number;direction:Direction};
 
-export default function ForecastPage({segments,user,onHistory,onFindRoute,initialRoad}:{
-  segments:Segment[];user:User|null;onHistory:(id:number)=>void;onFindRoute:(at:string)=>void;initialRoad?:number;
+export default function ForecastPage({segments,user,onHistory,onFindRoute,initialRoad,initialDirection='forward'}:{
+  segments:Segment[];user:User|null;onHistory:(id:number)=>void;onFindRoute:(at:string)=>void;initialRoad?:number;initialDirection?:Direction;
 }){
   const active=segments.filter(s=>s.active);
   const first=active.find(s=>s.id===initialRoad)||active.find(s=>s.name==='Hoàng Quốc Việt')||active[0];
@@ -29,8 +29,8 @@ export default function ForecastPage({segments,user,onHistory,onFindRoute,initia
   const [text,setText]=useState(first?roadName(first):'');
   const [day,setDay]=useState(localDay(1));
   const [hour,setHour]=useState(17);
-  const [direction,setDirection]=useState<Direction>('forward');
-  const [query,setQuery]=useState<ForecastQuery|null>(first?{road:first.id,day:localDay(1),hour:17,direction:'forward'}:null);
+  const [direction,setDirection]=useState<Direction>(initialDirection);
+  const [query,setQuery]=useState<ForecastQuery|null>(first?{road:first.id,day:localDay(1),hour:17,direction:initialDirection}:null);
   const [result,setResult]=useState<Outlook|null>(null);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(false);
