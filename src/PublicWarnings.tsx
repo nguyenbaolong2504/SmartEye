@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {Bell, ChevronRight} from 'lucide-react';
+import {Bell, BellRing, ChevronRight} from 'lucide-react';
 import {api} from './api';
 import {Empty, Modal} from './components';
 import {Feedback, Loading, kinds, severityText, useAction, useRemote, type Direction} from './business';
@@ -49,12 +49,12 @@ export default function PublicWarnings({segments,compact=false,onAll}:{segments:
   },[nextExpiry,list.reload]);
   return <section className="card workflow-section">
     <div className="section-title"><Bell size={18}/><h2>{compact?'Cảnh báo giao thông':'Cảnh báo đã phát hành'}</h2>{compact&&onAll&&<button className="text-button" onClick={onAll}>Xem tất cả<ChevronRight size={15}/></button>}</div>
-    {compact?<p className="muted">Thông tin ùn tắc và sự cố đã được Quản lý xác minh.</p>:<label className="field">Lọc theo tuyến đường<select value={segment} onChange={e => setSegment(e.target.value)}><option value="">Tất cả tuyến</option>{segments.filter(s => s.active).map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select></label>}
+    {compact?<p className="muted">Thông tin sự cố và ùn tắc đã được xác minh.</p>:<label className="field">Lọc theo tuyến đường<select value={segment} onChange={e => setSegment(e.target.value)}><option value="">Tất cả tuyến</option>{segments.filter(s => s.active).map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select></label>}
     <Feedback error={action.error}/>
     <Loading loading={list.loading} error={list.error} onRetry={list.reload}>
       {visible.length ? <div className="workflow-list">{visible.map(w => <button key={w.id} className="workflow-list-item" disabled={action.busy} onClick={() => action.run(async () => setDetail(await api<PublishedWarning>(`/warnings/${w.id}`)), '')}>
         <div><b>{kinds[w.kind]} · {segments.find(s => s.id === w.segment_id)?.name || 'Tuyến đường theo dõi'}</b><p>{w.content}</p><small>{w.upcoming ? `Bắt đầu ${dateTime(w.start_at)}` : 'Đang áp dụng'}{w.end_at && ` · Hết hiệu lực ${dateTime(w.end_at)}`}</small></div><ChevronRight size={17}/>
-      </button>)}</div> : <Empty><p>Hiện chưa có cảnh báo.</p></Empty>}
+      </button>)}</div> : compact?<div className="home-warnings-empty"><BellRing size={22}/><div><b>Chưa có cảnh báo mới</b><p>Thông báo đã được xác minh sẽ xuất hiện tại đây.</p></div></div>:<Empty><p>Hiện chưa có cảnh báo.</p></Empty>}
     </Loading>
     {detail && <WarningDetail value={detail} segments={segments} onClose={() => setDetail(null)}/>}
   </section>;

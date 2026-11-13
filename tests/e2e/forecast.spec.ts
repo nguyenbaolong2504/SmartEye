@@ -5,7 +5,7 @@ test('day-ahead forecasts explain recurring congestion without technical banners
   test.setTimeout(240000);
   await expect.poll(async()=>{const r=await request.get('/api/demo/status');return (await r.json()).planning_ready;},{timeout:180000,intervals:[2000]}).toBe(true);
   await page.goto('/');await expect(page.getByRole('heading',{name:/Hiểu đường đi/})).toBeVisible();
-  await expect(page.getByRole('img',{name:'Sơ đồ các đoạn đường đang theo dõi'})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Tình hình các tuyến đường'})).toBeVisible();
   await expect(page.locator('.data-mode-bar')).toHaveCount(0);await expect(page.getByLabel('Nguồn dữ liệu',{exact:true})).toHaveCount(0);
   await expect(page.getByText('XGBoost',{exact:false})).toHaveCount(0);await expect(page.getByRole('link',{name:'Mã nguồn dự án',exact:true})).toHaveCount(0);
   await navigate(page,'Dự báo giao thông');
