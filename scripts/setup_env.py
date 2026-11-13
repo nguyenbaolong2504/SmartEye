@@ -20,6 +20,7 @@ def configure(mode,root=ROOT):
     for name in ('DATABASE_URL','DB_ENGINE','POSTGRES_HOST','POSTGRES_PORT','POSTGRES_DB','POSTGRES_USER','POSTGRES_PASSWORD'):
         values.pop(name,None)
     values.update({'APP_ENV':'development','COOKIE_SECURE':'false','MONGODB_DB':values.get('MONGODB_DB') or 'smarteye'})
+    if not values.get('AUTH_OTP_SECRET'):values['AUTH_OTP_SECRET']=secrets.token_urlsafe(48)
     if mode=='local':
         values.update({'MONGODB_URI':'mongodb://127.0.0.1:27017/','MONGODB_HOST':'127.0.0.1','MONGODB_PORT':'27017',
                        'APP_BASE_URL':'http://127.0.0.1:5173'})

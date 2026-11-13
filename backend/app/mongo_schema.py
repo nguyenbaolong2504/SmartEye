@@ -48,6 +48,10 @@ SCHEMAS={
         'status':{'enum':['queued','processing','completed','failed','cancelled']},'progress':{**INTEGER,'minimum':0,'maximum':100},'camera_config':{'bsonType':'object'}}),
     'sessions':validator(['user_id','expires_at'],{'_id':TEXT,'user_id':INTEGER,'expires_at':TEXT,'expires_on':{'bsonType':'date'}}),
     'reset_tokens':validator(['user_id','expires_at'],{'_id':TEXT,'user_id':INTEGER,'expires_at':TEXT,'expires_on':{'bsonType':'date'}}),
+    'password_otps':validator(['challenge_hash','otp_hash','delivery','requested_at','expires_at','attempts','verified','sent'],{
+        '_id':TEXT,'challenge_hash':TEXT,'otp_hash':TEXT,'delivery':{'enum':['email','sms']},
+        'user_id':{'bsonType':['int','long','null']},'email':{'bsonType':['string','null']},'phone':{'bsonType':['string','null']},
+        'attempts':{**INTEGER,'minimum':0},'verified':BOOL,'sent':BOOL,'requested_at':TEXT,'expires_at':TEXT,'expires_on':{'bsonType':'date'}}),
     'favorites':validator(['user_id','name','request'],{'user_id':INTEGER,'name':TEXT,'request':{'bsonType':'object'}}),
     'alert_rules':validator(['user_id','segment_id','density','active'],{'user_id':INTEGER,'segment_id':INTEGER,'density':{'enum':['LOW','NORMAL','HIGH']},'active':BOOL}),
     'notifications':validator(['user_id','message','read'],{'user_id':INTEGER,'message':TEXT,'read':BOOL}),

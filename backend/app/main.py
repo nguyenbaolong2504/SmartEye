@@ -5,26 +5,23 @@ import io
 import logging
 import os
 import re
-import secrets
-import smtplib
 import threading
 import time
 import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Literal
-from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Form
+from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, Request, Response, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from . import schemas as S
 from .config import COOKIE_SECURE, PRODUCTION, UPLOADS, MAX_UPLOAD, MODEL_PATH, TTL_MINUTES
 from .db import initialize_database, get_database, get_db, SessionLocal, stamp, now
-from .models import User, LoginSession, ResetToken, Segment, Camera, Observation, VideoJob, Favorite, AlertRule, Notification, Audit
+from .models import User, LoginSession, ResetToken, PasswordOTP, Segment, Camera, Observation, VideoJob, Favorite, AlertRule, Notification, Audit
 from .security import optional_user, require_user, traffic_member, can, permit, admin, hash_password, verify_password, token_hash, create_session, public_user, audit
 from .business_common import allowed_query, check_segment_scope, require_global_scope
 from .seed import seed, PLACES
@@ -155,7 +152,9 @@ def health():
 
 @app.get('/api/config')
 def config():
-    return {**map_settings(),'google_routes_available':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'maps_browser_key':os.getenv('GOOGLE_MAPS_BROWSER_KEY',''),'video_available':os.getenv('VIDEO_FEATURE_ENABLED','false').lower()=='true' and MODEL_PATH.is_file(),'max_upload_mb':MAX_UPLOAD//1024//1024,'observation_ttl_minutes':TTL_MINUTES,'demo_available':demo_enabled(),'password_reset_available':bool(os.getenv('SMTP_HOST'))}
+    from .password_recovery import settings
+    channels=settings()
+    return {**map_settings(),'google_routes_available':bool(os.getenv('GOOGLE_ROUTES_API_KEY')),'maps_browser_key':os.getenv('GOOGLE_MAPS_BROWSER_KEY',''),'video_available':os.getenv('VIDEO_FEATURE_ENABLED','false').lower()=='true' and MODEL_PATH.is_file(),'max_upload_mb':MAX_UPLOAD//1024//1024,'observation_ttl_minutes':TTL_MINUTES,'demo_available':demo_enabled(),'password_reset_available':any(channels.values()),'password_reset_channels':channels}
 
 @app.post('/api/auth/register',status_code=201)
 def register(body:S.Register,response:Response,db=Depends(get_db)):
@@ -212,23 +211,14 @@ def change_password(body:S.PasswordChange,response:Response,user=Depends(require
     return {'message':'Đã đổi mật khẩu và thu hồi các phiên cũ.'}
 
 @app.post('/api/auth/forgot-password')
-def forgot_password(body:S.ResetRequest,db=Depends(get_db)):
-    if not os.getenv('SMTP_HOST'): raise HTTPException(503,'Hệ thống chưa cấu hình email đặt lại mật khẩu. Vui lòng liên hệ quản trị viên.')
-    row = db.find_one(User,{'email':body.email.strip().lower(),'active':True})
-    if row:
-        token = secrets.token_urlsafe(32)
-        db.delete_many(ResetToken,{'user_id':row.id})
-        db.add(ResetToken(token_hash=token_hash(token),user_id=row.id,auth_version=row.auth_version,expires_at=(now()+timedelta(minutes=30)).isoformat())); db.commit()
-        msg = EmailMessage(); msg['Subject']='Đặt lại mật khẩu SmartEye'; msg['From']=os.getenv('SMTP_FROM',os.getenv('SMTP_USER','')); msg['To']=row.email
-        msg.set_content(f'Mở liên kết sau trong 30 phút để đặt lại mật khẩu: {os.getenv("APP_BASE_URL","http://localhost:5173")}/?reset={token}\nNếu bạn không yêu cầu, hãy bỏ qua email này.')
-        try:
-            with smtplib.SMTP(os.environ['SMTP_HOST'],int(os.getenv('SMTP_PORT','587')),timeout=10) as smtp:
-                smtp.starttls()
-                if os.getenv('SMTP_USER'): smtp.login(os.environ['SMTP_USER'],os.getenv('SMTP_PASSWORD',''))
-                smtp.send_message(msg)
-        except Exception:
-            logger.warning('Password reset mail delivery failed')
-    return {'message':'Nếu email thuộc một tài khoản hoạt động, hướng dẫn đặt lại mật khẩu sẽ được gửi.'}
+def forgot_password(body:S.ResetRequest,tasks:BackgroundTasks,db=Depends(get_db)):
+    from .password_recovery import request_code
+    return request_code(body,db,tasks)
+
+@app.post('/api/auth/verify-reset-otp')
+def verify_reset_otp(body:S.VerifyResetOTP,db=Depends(get_db)):
+    from .password_recovery import verify_code
+    return verify_code(body,db)
 
 @app.post('/api/auth/reset-password')
 def reset_password(body:S.ResetPassword,db=Depends(get_db)):
@@ -236,11 +226,18 @@ def reset_password(body:S.ResetPassword,db=Depends(get_db)):
     if not token: raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
     row = item(db,User,token.user_id)
     if not row.active: raise HTTPException(400,'Tài khoản đã bị khóa.')
-    changed=db.update(User,row.id,{'password':hash_password(body.password)},condition={'auth_version':token.auth_version,'active':True},increment={'auth_version':1})
+    condition={'auth_version':token.auth_version,'active':True}
+    if token.recovery_key:
+        verified=db.database.password_otps.find_one({'_id':token.recovery_key,'challenge_hash':token.recovery_challenge_hash,
+            'verified':True,'sent':True,'expires_at':{'$gt':stamp()}})
+        if not verified:raise HTTPException(400,'Phiên đặt lại mật khẩu đã hết hạn. Vui lòng yêu cầu mã mới.')
+        condition.update(email=token.contact_email,phone=token.contact_phone)
+    changed=db.update(User,row.id,{'password':hash_password(body.password)},condition=condition,increment={'auth_version':1})
     if not changed: raise HTTPException(400,'Liên kết không hợp lệ hoặc đã hết hạn.')
     try:
         db.delete_many(ResetToken,{'user_id':row.id})
         db.delete_many(LoginSession,{'user_id':row.id})
+        db.delete_many(PasswordOTP,{'user_id':row.id})
     except PyMongoError:
         logger.warning('Password reset token cleanup deferred')
     from .business_common import log_event

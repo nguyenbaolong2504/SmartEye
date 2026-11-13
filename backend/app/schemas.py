@@ -2,7 +2,7 @@ import re
 import math
 from datetime import datetime, timezone
 from typing import Literal
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AliasChoices,BaseModel,Field,field_validator,model_validator
 
 class Register(BaseModel):
     name: str = Field(min_length=2, max_length=100)
@@ -179,9 +179,24 @@ class ProfileInput(BaseModel):
     def email_valid(cls,value):return Register.email_valid(value) if value is not None else None
 
 class ResetRequest(BaseModel):
-    email: str = Field(max_length=254)
-    _email = field_validator('email')(Register.email_valid.__func__)
+    identifier: str = Field(min_length=3,max_length=254,validation_alias=AliasChoices('identifier','email'))
+    delivery: Literal['email','sms']='email'
+    @model_validator(mode='after')
+    def valid_identifier(self):
+        self.identifier=Register.email_valid(self.identifier) if self.delivery=='email' else Register.phone_valid(self.identifier)
+        if not self.identifier:raise ValueError('Vui lòng nhập thông tin đã dùng khi đăng ký')
+        return self
+
+class VerifyResetOTP(BaseModel):
+    challenge: str = Field(min_length=32,max_length=128)
+    code: str = Field(pattern=r'^[0-9]{6}$')
 
 class ResetPassword(BaseModel):
     token: str = Field(max_length=200)
     password: str = Field(min_length=10, max_length=128)
+    password_confirmation: str | None = Field(default=None,min_length=10,max_length=128)
+    @model_validator(mode='after')
+    def confirmed(self):
+        if self.password_confirmation is not None and self.password!=self.password_confirmation:
+            raise ValueError('Mật khẩu và xác nhận không khớp')
+        return self

@@ -46,7 +46,7 @@ Trang Camera dùng nguồn video tải lên đã được cho phép chia sẻ, c
 
 Theo dõi đường/mức → quan sát mới, còn hiệu lực và được xác nhận → notification → đánh dấu đọc. Không tạo rule trùng user/đường/mức; cooldown 10 phút/rule. Dữ liệu cũ không cảnh báo. Đây là cảnh báo trong ứng dụng, chưa có SMS/push nền.
 
-Signup luôn User. Chỉ Admin đổi vai trò/khóa/mở/thu hồi phiên; không tự khóa/hạ quyền Admin đang thao tác. Thay quyền/mật khẩu thu hồi phiên cũ. Password reset SMTP: token băm, một lần, 30 phút, không trả token ra API.
+Signup luôn User. Chỉ Admin đổi vai trò/khóa/mở/thu hồi phiên; không tự khóa/hạ quyền Admin đang thao tác. Thay quyền/mật khẩu thu hồi phiên cũ. Khôi phục mật khẩu qua OTP email/SMS: đối chiếu đúng liên hệ đã đăng ký, mã 6 số băm HMAC, dùng một lần trong 10 phút, tối đa 5 lần thử; chờ 60 giây khi gửi lại và tối đa 5 lượt mỗi giờ/tài khoản. Sau đúng OTP, API cấp token ngẫu nhiên có quyền đặt lại mật khẩu trong 5 phút; chỉ lưu hash và ràng buộc phiên bản tài khoản/liên hệ/lượt xác nhận. Token/mã không ghi log. [Chi tiết](AUTH-OTP.md).
 
 Ngừng camera/đường có thể khôi phục qua sửa trạng thái, giữ lịch sử. Ngừng đường tự ngừng camera liên quan. CSV chỉ có dữ liệu ứng dụng, chống formula injection. Audit không ghi secrets.
 

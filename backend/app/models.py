@@ -64,6 +64,30 @@ class ResetToken(Document):
     user_id: int
     expires_at: str
     auth_version: int = 0
+    recovery_key: str | None = None
+    recovery_challenge_hash: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+
+
+@dataclass(kw_only=True)
+class PasswordOTP(Document):
+    collection: ClassVar[str] = 'password_otps'
+    primary: ClassVar[str] = 'identity_hash'
+    identity_hash: str
+    challenge_hash: str
+    otp_hash: str
+    user_id: int | None
+    email: str | None
+    phone: str | None
+    auth_version: int | None
+    delivery: str
+    requested_at: str
+    expires_at: str
+    attempts: int = 0
+    verified: bool = False
+    sent: bool = False
+    request_times: list[str] = field(default_factory=list)
 
 
 @dataclass(kw_only=True)
@@ -232,6 +256,6 @@ class ForecastRegistry(Document):
     activated_at: str = field(default_factory=timestamp)
 
 
-ALL_MODELS = (User, LoginSession, ResetToken, Segment, Camera, Observation,
+ALL_MODELS = (User, LoginSession, ResetToken, PasswordOTP, Segment, Camera, Observation,
               VideoJob, Favorite, AlertRule, Notification, Audit, TrafficSample,
               ForecastRun, TrafficLabel, ForecastRegistry)

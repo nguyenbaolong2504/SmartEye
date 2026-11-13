@@ -647,5 +647,79 @@
         }
       }
     }
+  },
+  "password_otps": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "challenge_hash",
+        "otp_hash",
+        "delivery",
+        "requested_at",
+        "expires_at",
+        "attempts",
+        "verified",
+        "sent"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "challenge_hash": {
+          "bsonType": "string"
+        },
+        "otp_hash": {
+          "bsonType": "string"
+        },
+        "delivery": {
+          "enum": [
+            "email",
+            "sms"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long",
+            "null"
+          ]
+        },
+        "email": {
+          "bsonType": [
+            "string",
+            "null"
+          ]
+        },
+        "phone": {
+          "bsonType": [
+            "string",
+            "null"
+          ]
+        },
+        "attempts": {
+          "bsonType": [
+            "int",
+            "long"
+          ],
+          "minimum": 0
+        },
+        "verified": {
+          "bsonType": "bool"
+        },
+        "sent": {
+          "bsonType": "bool"
+        },
+        "requested_at": {
+          "bsonType": "string"
+        },
+        "expires_at": {
+          "bsonType": "string"
+        },
+        "expires_on": {
+          "bsonType": "date"
+        }
+      }
+    }
   }
 }

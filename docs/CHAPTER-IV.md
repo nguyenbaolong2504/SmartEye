@@ -33,7 +33,7 @@ UC13 là đăng ký dành cho khách truy cập. Khách có thể xem các trang
 
 | Nhóm | Luồng chính và nhánh ngoại lệ |
 | --- | --- |
-| LOGIN.1–3, UC01, UC13 | Đăng ký có xác nhận mật khẩu, đăng nhập bằng tên đăng nhập hoặc email, sửa hồ sơ, đổi mật khẩu, khôi phục qua email khi đã cấu hình và đăng xuất. Dữ liệu trùng được báo lỗi. Đổi mật khẩu thu hồi các phiên cũ. |
+| LOGIN.1–3, UC01, UC13 | Đăng ký có xác nhận mật khẩu, đăng nhập bằng tên đăng nhập hoặc email, sửa hồ sơ, đổi mật khẩu, khôi phục bằng OTP email hoặc SMS khi đã cấu hình dịch vụ và đăng xuất. Dữ liệu trùng được báo lỗi. Đổi mật khẩu thu hồi các phiên cũ. |
 | UC02–03, UC05 | Quan sát và dự báo theo tuyến, chiều, thời điểm và nguồn. Thiếu mẫu, mẫu cũ hoặc mô hình chưa sẵn sàng có trạng thái riêng. Camera chỉ hiển thị từ nguồn được bật trong phạm vi quản lý. |
 | UC04, UC06 | Người gửi theo dõi phản ánh của mình. Quản lý đúng phạm vi mới có quyền tiếp nhận và xử lý. Lưu căn cứ, người thao tác, thời điểm và lịch sử. Cập nhật từ phiên bản cũ yêu cầu tải lại. |
 | UC07–08 | Cảnh báo qua xác minh rồi phát hành. Theo yêu cầu cập nhật, sửa và hủy áp dụng cho bản nháp. Bản đã phát hành chỉ để xem và tự kết thúc theo giờ đã đặt. Quy tắc cần thử trước khi bật và chỉ đề xuất bản nháp. Gửi lại thông báo giữ một bản cho mỗi người nhận và phiên bản. |
@@ -46,7 +46,7 @@ Dự báo theo giờ đối chiếu 100 ngày lịch, tách ngày làm việc v�
 
 Trong **Quản trị hệ thống → Người dùng → Phân quyền**, Admin có thể bỏ chọn từng quyền của một tài khoản Người dùng hoặc Quản lý. Ví dụ, giữ **Xem phản ánh của mình** và bỏ **Gửi phản ánh** để tài khoản chỉ xem được. Quyền thao tác của Quản lý còn phụ thuộc quyền xem nhóm chức năng, tuyến được phân công và trạng thái hồ sơ. Tài khoản đăng nhập lại sau khi quyền thay đổi.
 
-Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sách mật khẩu đang dùng và cho phép cấu hình các tham số nguồn, thời hạn dữ liệu, ngưỡng quy tắc. Đăng ký tạo tài khoản dùng được ngay. Khôi phục mật khẩu cần SMTP. Camera cần địa chỉ HTTPS được phép sử dụng, trả ảnh JPG/PNG/WebP hoặc clip MP4/WebM. Dịch vụ lấy số liệu thật cần địa chỉ nguồn và thông tin xác thực nếu nguồn yêu cầu. Nguồn mới dùng mã truy cập trong biến môi trường phải trỏ đến máy chủ HTTPS đã cấu hình trước bằng biến cùng tên thêm hậu tố `_HOST`, dùng cổng 443. Ví dụ mã `TRAFFIC_SOURCE_DEMO` có máy chủ cho phép tại `TRAFFIC_SOURCE_DEMO_HOST=traffic.example.org`. Giao diện chỉ chọn tên biến, không hiển thị giá trị mã.
+Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sách mật khẩu đang dùng và cho phép cấu hình các tham số nguồn, thời hạn dữ liệu, ngưỡng quy tắc. Đăng ký tạo tài khoản dùng được ngay. Khôi phục mật khẩu dùng mã OTP email hoặc SMS, cần cấu hình SMTP/Twilio. Camera cần địa chỉ HTTPS được phép sử dụng, trả ảnh JPG/PNG/WebP hoặc clip MP4/WebM. Dịch vụ lấy số liệu thật cần địa chỉ nguồn và thông tin xác thực nếu nguồn yêu cầu. Nguồn mới dùng mã truy cập trong biến môi trường phải trỏ đến máy chủ HTTPS đã cấu hình trước bằng biến cùng tên thêm hậu tố `_HOST`, dùng cổng 443. Ví dụ mã `TRAFFIC_SOURCE_DEMO` có máy chủ cho phép tại `TRAFFIC_SOURCE_DEMO_HOST=traffic.example.org`. Giao diện chỉ chọn tên biến, không hiển thị giá trị mã.
 
 
 ## UC14. Xem camera giao thông

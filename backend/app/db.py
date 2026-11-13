@@ -43,7 +43,7 @@ def _query(model, value):
 
 
 def initialize_database():
-    from .models import ALL_MODELS, LoginSession, ResetToken
+    from .models import ALL_MODELS, LoginSession, ResetToken, PasswordOTP
     from .mongo_schema import SCHEMAS
     from .business_models import BUSINESS_MODELS
     from .models import ALL_MODELS
@@ -89,7 +89,9 @@ def initialize_database():
     database.traffic_labels.create_index([('segment_id',1),('observed_at',1)],unique=True)
     database.forecast_runs.create_index('lock_key',unique=True,partialFilterExpression={'running':True},name='one_training_job')
     database.forecast_runs.create_index([('created_at',-1)])
-    for model in (LoginSession,ResetToken):
+    database.password_otps.create_index('challenge_hash',unique=True,name='unique_recovery_challenge')
+    database.password_otps.create_index('user_id')
+    for model in (LoginSession,ResetToken,PasswordOTP):
         database[model.collection].create_index('expires_on',expireAfterSeconds=0,name='expire_tokens')
     # Synchronize counters after a Compass JSON import. Never move a counter back.
     for model in models:

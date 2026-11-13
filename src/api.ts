@@ -1,4 +1,4 @@
-const publicAuthPaths = new Set(['/auth/login', '/auth/register', '/auth/me', '/auth/forgot-password', '/auth/reset-password']);
+const publicAuthPaths = new Set(['/auth/login', '/auth/register', '/auth/me', '/auth/forgot-password', '/auth/verify-reset-otp', '/auth/reset-password']);
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isForm = options.body instanceof FormData;

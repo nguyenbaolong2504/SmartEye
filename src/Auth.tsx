@@ -1,82 +1,10 @@
 import {can} from './permissions';
 import {useState} from 'react';
-import {LockKeyhole, LogOut} from 'lucide-react';
-import {api, json} from './api';
-import {Modal, Spinner} from './components';
-import {Feedback, useAction} from './business';
-import {type User, type Config} from './types';
-
-type Mode = 'login' | 'register' | 'forgot' | 'reset';
-
-export function AuthModal({onClose, onUser, config, resetToken}: {
-  onClose: () => void; onUser: (user: User | null) => void; config: Config; resetToken?: string;
-}) {
-  const [mode, setMode] = useState<Mode>(resetToken ? 'reset' : 'login');
-  const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
-  const [message, setMessage] = useState('');
-  const action = useAction();
-
-  function changeMode(next: Mode) {
-    setMode(next);
-    setPassword('');
-    setConfirmation('');
-    setMessage('');
-    action.setError('');
-  }
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    await action.run(async () => {
-      setMessage('');
-      if (mode === 'login') {
-        const user = await api<User>('/auth/login', json({email, password}));
-        onUser(user);
-        onClose();
-      } else if (mode === 'register') {
-        if (password !== confirmation) throw new Error('Mật khẩu và xác nhận không khớp.');
-        await api('/auth/register', json({name, username, email, phone, password, password_confirmation: confirmation}));
-        changeMode('login');
-        setMessage('Tạo tài khoản thành công. Vui lòng đăng nhập.');
-      } else if (mode === 'forgot') {
-        const result = await api<{message: string}>('/auth/forgot-password', json({email}));
-        setMessage(result.message);
-      } else {
-        const result = await api<{message: string}>('/auth/reset-password', json({token: resetToken, password}));
-        changeMode('login');
-        setMessage(result.message);
-        history.replaceState(null, '', location.pathname + location.hash);
-      }
-    });
-  }
-
-  const titles = {login: 'Chào mừng trở lại', register: 'Tạo tài khoản SmartEye', forgot: 'Khôi phục mật khẩu', reset: 'Chọn mật khẩu mới'};
-  const labels = {login: 'Đăng nhập', register: 'Tạo tài khoản', forgot: 'Gửi hướng dẫn', reset: 'Đặt lại mật khẩu'};
-  return <Modal title={titles[mode]} onClose={onClose}>
-    <Feedback error={action.error} success={message}/>
-    <form onSubmit={submit}>
-      {mode === 'register' && <>
-        <label className="field">Họ và tên<input value={name} onChange={e => setName(e.target.value)} required minLength={2} maxLength={100} autoComplete="name"/></label>
-        <label className="field">Tên đăng nhập<input aria-label="Tên đăng nhập" aria-describedby="signup-username-hint" value={username} onChange={e => setUsername(e.target.value)} required minLength={3} maxLength={40} autoComplete="username"/><small id="signup-username-hint">Dùng chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.</small></label>
-      </>}
-      {mode !== 'reset' && <label className="field">{mode === 'login' ? 'Email hoặc tên đăng nhập' : 'Email'}<input type={mode === 'login' ? 'text' : 'email'} autoComplete={mode === 'login' ? 'username' : 'email'} value={email} onChange={e => setEmail(e.target.value)} required maxLength={254}/></label>}
-      {mode === 'register' && <label className="field">Số điện thoại (không bắt buộc)<input type="tel" value={phone} onChange={e => setPhone(e.target.value)} maxLength={24} autoComplete="tel"/></label>}
-      {mode !== 'forgot' && <label className="field">Mật khẩu<input aria-label="Mật khẩu" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={mode === 'login' ? 1 : 10} maxLength={128}/>{mode !== 'login' && <small>Ít nhất 10 ký tự.</small>}</label>}
-      {mode === 'register' && <label className="field">Xác nhận mật khẩu<input type="password" autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} required minLength={10} maxLength={128}/></label>}
-      <button className="button primary full" disabled={action.busy}>{action.busy ? <Spinner/> : <LockKeyhole size={16}/>} {labels[mode]}</button>
-    </form>
-    <div className="auth-links">
-      {mode === 'login' ? <>
-        <button className="text-button" onClick={() => changeMode('register')}>Tạo tài khoản mới</button>
-        <button className="text-button" disabled={!config.password_reset_available} onClick={() => changeMode('forgot')} title={!config.password_reset_available ? 'Máy chủ chưa cấu hình email' : undefined}>Quên mật khẩu?</button>
-      </> : <button className="text-button" onClick={() => changeMode('login')}>Quay lại đăng nhập</button>}
-    </div>
-  </Modal>;
-}
+import {LogOut} from 'lucide-react';
+import {api,json} from './api';
+import {Feedback,useAction} from './business';
+import type {User} from './types';
+export {AuthModal} from './AuthDialog';
 
 export function ProfilePage({user, onUser}: {user: User; onUser: (user: User | null) => void}) {
   const [name, setName] = useState(user.name);

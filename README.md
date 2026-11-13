@@ -2,6 +2,8 @@
 
 Hệ thống chạy thử **dự báo ùn tắc và lựa chọn tuyến đường Hà Nội**, dùng React/TypeScript, FastAPI, MongoDB và XGBoost.
 
+**Tài khoản:** đăng nhập/đăng ký giao diện kính mờ, khôi phục mật khẩu bằng OTP email hoặc SMS. Cần điền dịch vụ SMTP/Twilio để gửi mã thật. [Luồng sử dụng và cấu hình gửi mã](docs/AUTH-OTP.md).
+
 ## Chọn ngày, giờ và tránh giờ cao điểm
 
 Giao diện đã bỏ thanh chọn nguồn dữ liệu phía trên và tên mô hình khỏi các màn hình người dùng. **Dự báo giao thông** mặc định xem ngày mai lúc 17:00: chọn tuyến/ngày/giờ, xem khung giờ nên tránh, số ngày phù hợp từng ùn tắc và các giờ có thể cân nhắc thay thế. **Tình trạng & thống kê** có một năm lịch sử, so sánh tháng và giờ cao điểm theo từng thứ. Khi tìm tuyến có thể bấm **So sánh giờ đi** để xem giờ đã chọn và một giờ trước/sau.
