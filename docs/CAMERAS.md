@@ -1,5 +1,7 @@
 # Camera đường phố và thống kê ngày/tháng
 
+> Luồng camera hiện tại: xem video → chọn 15 phút / 30 phút / 1 giờ → Phân tích → một kết quả, mở Vì sao? khi cần. Xem [hướng dẫn hiện tại](DEMO.md#video-camera-và-dự-báo-mật-độ). Các mục tải video cá nhân bên dưới lưu luồng cũ; tính năng này mặc định đã tắt.
+
 Phiên bản này dùng **video tải lên**, theo lựa chọn thử nghiệm của chủ dự án. Hình ảnh/video trên trang Camera được gắn thời điểm quay và quyền chia sẻ; không giả lập chúng thành nguồn LIVE. Chưa có URL camera trực tiếp để tích hợp.
 
 ![Giao diện thống kê tháng với dữ liệu E2E minh họa](previews/traffic-month-demo.png)

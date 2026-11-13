@@ -58,15 +58,15 @@ Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sác
 **Luồng chính**
 
 1. Người xem mở **Giao thông → Camera giao thông**.
-2. Hệ thống tải danh sách camera và ghim trên bản đồ, kèm tuyến, vị trí và trạng thái kết nối.
+2. Hệ thống tải bộ lọc và camera đầu tiên, kèm tuyến, vị trí và trạng thái kết nối. Bản đồ và danh sách đầy đủ chỉ mở khi chọn **Xem bản đồ camera**.
 3. Người xem chọn lần lượt tỉnh/thành phố, tuyến đường và vị trí camera. Đổi tỉnh/thành phố đặt lại bộ lọc tuyến và camera.
 4. Người xem chọn một dòng trong danh sách hoặc ghim trên bản đồ. Hệ thống hiển thị cùng camera trong khung quan sát.
 5. Ảnh nguồn được cập nhật theo chu kỳ đã cấu hình, có thể tạm dừng, tải lại và phóng to. Video MP4/WebM được phát bằng nút điều khiển. Hình ảnh lưu từ trước được ghi rõ loại và thời điểm ghi hình.
-6. Hệ thống hiển thị nguồn, thời điểm ghi hình khi có, thời điểm nhận ảnh và lần kiểm tra kết nối. Nguồn không cung cấp thời điểm ghi hình được ghi nhận rõ. Ghim theo đoạn đường có ghi chú về vị trí.
-7. Người xem chọn **Xem dự báo tuyến đường** nếu được cấp quyền dự báo. Hệ thống mở đúng tuyến và chiều của camera.
-8. Với camera có video mẫu đã phân tích, người xem phát/tua video hoặc nhấn cột thời gian để xem ô nhận diện, tên loại xe, số xe từng loại và mức mật độ đồng bộ từng khung hình. Có thể ẩn/hiện nhận diện và phóng to video. Nguồn và ghi chú video minh họa xuất hiện cùng kết quả. Nếu có quyền dự báo và lịch sử minh họa phù hợp, hệ thống hiển thị mật độ, khả năng ùn tắc chạy thử sau 15/30/60 phút. Nhấn **Vì sao?** để tạm dừng và xem căn cứ, phân bố các trạng thái, lịch sử cùng giờ/cùng thứ và giới hạn dữ liệu.
-9. Khi có theo dõi xe, hệ thống hiển thị riêng **Xe đã ghi nhận từ đầu video** và **Xe đang xuất hiện trong video**. Mã xe đã xác nhận được cộng một lần, số cộng dồn trả về đúng mốc khi tua lại. Không cộng lặp cùng xe đang đứng chờ ở mọi khung hình. Tình huống giờ cao điểm ghi rõ giờ giả định, nguồn video và giới hạn xác minh địa điểm.
-10. Khi camera có kích thước vùng đường, người xem thấy diện tích, sức chứa, số xe quy đổi theo loại và mức sử dụng. Mở **Xem cách tính** để đối chiếu đường rộng/hẹp và ngưỡng mật độ riêng. Hệ thống xét thêm dấu hiệu xe đứng/nhích chậm và thời gian chờ, phân biệt mật độ với kết luận ùn tắc. Mỗi camera demo dùng clip khác nhau. [Công thức và giới hạn](ROAD-CAPACITY.md).
+6. Mở **Thông tin camera và nguồn video** để xem nguồn, thời điểm ghi hình nếu có và lần kiểm tra kết nối. Nguồn không cung cấp thời điểm ghi hình được ghi nhận rõ. Ghim theo đoạn đường có ghi chú về vị trí.
+7. Trong phần thông tin, chọn **Xem dự báo tuyến đường** nếu được cấp quyền dự báo. Hệ thống mở đúng tuyến và chiều của camera.
+8. Với camera có video mẫu đã nhận diện, người xem phát/tua video, ẩn/hiện ô nhận diện hoặc phóng to video. Chọn **15 phút / 30 phút / 1 giờ**, nhấn **Phân tích**. Hệ thống tổng hợp tối đa 10 giây cuối video, đối chiếu lịch sử và điều kiện có thông tin, trả một kết quả cho mốc đã chọn.
+9. Kết quả hiển thị khả năng Thông thoáng, Di chuyển chậm và Ùn tắc. Trạng thái có tỷ lệ cao nhất từ 80% được làm nổi bật, kể cả thông thoáng. Nếu chưa trạng thái nào đạt 80%, ghi **Xu hướng chưa rõ**. Tua video không thay đổi kết quả đã phân tích; đổi mốc hoặc camera xóa kết quả cũ và yêu cầu phân tích lại.
+10. Nhấn **Vì sao?** để xem đoạn video đã xét, khung hình đại diện và số xe từng loại, sức chứa từng đường, chuyển động, lịch sử cùng giờ/cùng thứ, thời tiết, sự cố và công thức. Không dùng tổng xe cộng dồn thay cho mật độ. Các căn cứ được giữ theo đúng lượt phân tích. Nguồn video minh họa và giới hạn vị trí nằm trong phần thông tin. Mỗi camera demo dùng clip khác nhau. [Công thức và giới hạn](ROAD-CAPACITY.md).
 
 **Luồng ngoại lệ**
 
@@ -76,7 +76,7 @@ Tệp Chương IV dẫn chiếu Phụ lục B. Bản này áp dụng chính sác
 - Nguồn bị tắt hoặc thu hồi chia sẻ chặn ngay yêu cầu ảnh tiếp theo, kể cả khi ảnh đã nằm trong bộ nhớ đệm máy chủ.
 - Tài khoản bị bỏ quyền xem camera không được mở trang hoặc gọi API xem ảnh. Quyền dự báo được kiểm tra riêng.
 - Tuyến chưa đủ lịch sử mở trang dự báo với thông báo thiếu dữ liệu theo luồng dự báo hiện có.
-- Video mẫu đang xử lý hiển thị tiến độ, chưa có mô hình/lịch sử phù hợp vẫn hiển thị kết quả đếm xe nhưng báo chưa có dự báo. Đổi hiệu chỉnh làm kết quả cũ hết phù hợp. Admin/Quản lý có quyền quản lý camera đúng phạm vi có thể phân tích lại. Không cho gửi trùng tác vụ, giữ video cũ trong khi phân tích và có thể thử lại nếu thất bại.
+- Video mẫu đang xử lý hiển thị tiến độ; thiếu mô hình/lịch sử hiển thị lỗi phù hợp và cho thử lại. Đổi hiệu chỉnh hoặc đổi bản video làm kết quả cũ hết phù hợp. API kiểm tra mã lượt nhận diện trùng với video đang chia sẻ, từ chối lượt cũ bằng HTTP 409. Tỷ lệ thiếu/sai không được thay bằng 90% hoặc thông thoáng. Admin/Quản lý có quyền quản lý camera đúng phạm vi có thể nhận diện lại. Không cho gửi trùng tác vụ, giữ video cũ trong khi xử lý và có thể thử lại nếu thất bại.
 
 **Cấu hình để chạy thử**
 

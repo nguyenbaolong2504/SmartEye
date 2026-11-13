@@ -139,6 +139,9 @@ class ForecastConditions(BaseModel):
     weather:Literal['auto','dry','light','heavy','fog']='auto'
     road_condition:Literal['auto','normal','roadwork','obstruction','flood']='auto'
     incident:Literal['auto','none','accident']='auto'
+    horizon_minutes:Literal[15,30,60]|None=None
+    analysis_id:uuid.UUID|None=None
+    whole_video:bool=False
 
 
 @router.post('/api/traffic/cameras/recordings/{ident}/forecast',dependencies=[Depends(permit('cameras.view')),Depends(permit('forecast.view'))])
@@ -150,22 +153,36 @@ def refresh_forecast(ident:int,body:ForecastConditions,db=Depends(get_db)):
     camera,job=visible_analysis(db,ident)
     if not matches(camera,job) or job.status!='completed' or not job.result:
         raise HTTPException(409,'Cần chờ phân tích xong hoặc phân tích lại sau khi đổi cấu hình camera.')
+    if body.analysis_id and str(body.analysis_id)!=job.id:
+        raise HTTPException(409,'Video vừa có kết quả mới. Vui lòng chọn lại camera rồi phân tích.')
+    if body.whole_video and (not body.analysis_id or camera.preview_job_id!=job.id):
+        raise HTTPException(409,'Video đang được cập nhật. Vui lòng chọn lại camera rồi phân tích.')
     result=job.result
     reference=result.get('camera_forecast',{}).get('reference_at')
     issue=datetime.fromisoformat(reference) if reference else now()
     issue=issue.replace(minute=issue.minute//5*5,second=0,microsecond=0)
-    conditions=resolve(db.database,db.get(Segment,camera.segment_id),issue,body.model_dump())
+    conditions=resolve(db.database,db.get(Segment,camera.segment_id),issue,
+        body.model_dump(include={'weather','road_condition','incident'}))
     try:
         # A personal what-if preview: never changes shared analysis, warnings or observations.
-        return predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config,issue=issue,conditions=conditions)
+        samples=result.get('frames') or result['samples']
+        evidence=summary=None
+        if body.whole_video:
+            from .camera_summary import summarize_video
+            sample,evidence,summary=summarize_video(result)
+            samples=[sample]
+        options={'horizons':(body.horizon_minutes,)} if body.horizon_minutes is not None else {}
+        value=predict_samples(db.database,camera.segment_id,samples,job.camera_config,issue=issue,conditions=conditions,**options)
+        return {**value,'analysis_id':job.id,'basis':evidence,'summary':summary,
+            'road_geometry':result.get('road_geometry'),'scope':'video' if body.whole_video else 'frames'}
     except ValueError as error:raise HTTPException(409,str(error)) from error
 
 
 @router.get('/api/traffic/cameras/recordings/{ident}/analysis')
-def analysis(ident:int,user=Depends(permit('cameras.view')),db=Depends(get_db)):
+def analysis(ident:int,include_forecast:bool=True,user=Depends(permit('cameras.view')),db=Depends(get_db)):
     camera,job=visible_analysis(db,ident)
     base={'state':job.status,'progress':job.progress,'is_demo':True,'source':job.source_metadata,
-          'segment_id':camera.segment_id,'analyzed_at':job.created_at}
+          'segment_id':camera.segment_id,'analyzed_at':job.created_at,'analysis_id':job.id}
     if not matches(camera,job):return {**base,'state':'outdated','message':'Cấu hình camera đã thay đổi. Cần phân tích lại video.'}
     if job.status!='completed' or not job.result:
         return {**base,'message':job.error or 'Đang phân tích video. Vui lòng chờ trong giây lát.'}
@@ -178,6 +195,7 @@ def analysis(ident:int,user=Depends(permit('cameras.view')),db=Depends(get_db)):
             'vehicle_counts':{'car':counts['car'],'motorcycle':counts['motorcycle']+counts['motorbike'],
                               'bus':counts['bus'],'truck':counts['truck']}})
     forecast=result.get('camera_forecast') if can(user,'forecast.view') else None
+    if forecast and not include_forecast:forecast={key:value for key,value in forecast.items() if key!='timeline'}|{'timeline':[]}
     frames=result.get('frames',[])
     return {**base,'duration_seconds':result['duration_seconds'],'samples':samples,
         'counting_method':result.get('counting_method'),'counting_version':result.get('counting_version'),

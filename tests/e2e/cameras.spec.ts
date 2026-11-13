@@ -45,6 +45,7 @@ test('public cameras filter by city and road, show map and image, recover connec
     await page.getByRole('combobox',{name:'Tỉnh/thành phố',exact:true}).selectOption('Hà Nội');
     await expect(road).toHaveValue('');
     await position.selectOption(`source-${created[0].id}`);
+    await page.getByRole('button',{name:'Xem bản đồ camera',exact:true}).click();
     await page.getByRole('button',{name:`Xem Camera E2E 0 ${suffix}`,exact:true}).click();
     await expect(page.locator('.camera-details h2')).toHaveText(`Camera E2E 0 ${suffix}`);
     const failure=`**/api/traffic/cameras/sources/${created[0].id}/frame?*`;
@@ -56,6 +57,7 @@ test('public cameras filter by city and road, show map and image, recover connec
     await expect(page.getByText('Chưa lấy được hình ảnh mới. Vui lòng thử lại sau.')).toHaveCount(0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
     await page.screenshot({path:`test-results/camera-${info.project.name}.png`,fullPage:true});
+    await page.getByText('Thông tin camera và nguồn video',{exact:true}).click();
     await page.getByRole('button',{name:'Xem dự báo tuyến đường',exact:true}).click();
     await expect(page).toHaveURL(/#forecast$/);
     await expect(page.getByLabel('Chiều di chuyển')).toHaveValue('reverse');

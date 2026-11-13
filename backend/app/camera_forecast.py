@@ -159,7 +159,7 @@ def normalized_score(score,low,high):
     return min(1,.6+(score-high)/max(1-high,.001)*.4)
 
 
-def predict_samples(database,segment_id,samples,config,issue=None,conditions=None):
+def predict_samples(database,segment_id,samples,config,issue=None,conditions=None,horizons=HORIZONS):
     from xgboost import XGBClassifier
     active=require_active(database)
     if segment_id not in active['segment_ids']:raise ValueError('Tuyến chưa có lịch sử minh họa để chạy thử dự báo.')
@@ -189,7 +189,7 @@ def predict_samples(database,segment_id,samples,config,issue=None,conditions=Non
     raw=np.asarray(inputs,dtype=np.float32)
     evidence=history_evidence(database,active,segment_id,issue)
     output=[{'second':sample['second'],'predictions':[]} for sample in samples]
-    for horizon in HORIZONS:
+    for horizon in horizons:
       predictions=[{'horizon_minutes':horizon,'history':evidence[horizon]} for _ in samples]
       for target in CLASSES:
         info=metadata['horizons'][str(horizon)][target]
@@ -202,7 +202,7 @@ def predict_samples(database,segment_id,samples,config,issue=None,conditions=Non
             else:row.update(congestion_label=label,congestion_probability=distribution['JAM'],congestion_probabilities=distribution)
       for row,prediction in zip(output,predictions):row['predictions'].append(prediction)
     evaluation={str(h):{key:metadata['horizons'][str(h)]['congestion'][key] for key in
-        ('test','test_calibration_error','accuracy_target_met')} for h in HORIZONS}
+        ('test','test_calibration_error','accuracy_target_met')} for h in horizons}
     return {'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
         'reference_at':issue.isoformat(),'context_minutes':60,'synthetic_context_slots':11,
         'probability_kind':'calibrated_synthetic','real_world_validated':False,

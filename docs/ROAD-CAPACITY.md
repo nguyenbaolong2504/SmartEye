@@ -50,7 +50,7 @@ Mô hình camera v4 dùng tối đa 24 ngày đầy đủ gần nhất của l�
 
 Admin hoặc Quản lý được cấp quyền mở **Camera & hiệu chỉnh**, bật **Đánh giá theo kích thước vùng đường**, khai báo số làn, bề rộng, chiều dài và phần diện tích có thể dùng. Chọn nguồn kích thước là ước lượng hoặc đã đo. Lưu rồi phân tích lại video. Cấu hình cũ không được tiếp tục dùng cho kết quả mới.
 
-Người xem mở **Camera giao thông**, chọn camera, phát/tua video, xem phần **Đường rộng hay hẹp được xét thế nào?** và **Xem cách tính**. Dự báo 15/30/60 phút có nút **Vì sao?**, ghi cả kết quả kiểm tra trên dữ liệu minh họa. Thiếu chuyển động hoặc thời tiết được ghi rõ.
+Người xem mở **Camera giao thông**, chọn camera, xem video, chọn **15 phút / 30 phút / 1 giờ**, rồi nhấn **Phân tích**. Màn hình chỉ hiển thị một kết quả; mở **Vì sao?** để xem kích thước đường, số xe quy đổi, mức sử dụng và giới hạn dữ liệu. Dùng trung vị mật độ trong tối đa 10 giây cuối clip, không dùng tổng xe cộng dồn hay riêng khung đông nhất. Thiếu chuyển động hoặc thời tiết được ghi rõ. Trạng thái có tỷ lệ cao nhất từ 80% được làm nổi bật; không ép mô hình sinh 80–90%.
 
 ## Bảy camera và video khác nhau
 

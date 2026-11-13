@@ -144,6 +144,10 @@ def test_density_model_has_purged_time_splits_and_never_writes_real_observations
     assert output['is_demo'] and output['target']=='density_and_congestion' and output['synthetic_context_slots']==11
     assert output['probability_kind']=='calibrated_synthetic' and not output['real_world_validated']
     assert {item['horizon_minutes'] for item in output['timeline'][0]['predictions']}=={15,30,60}
+    selected=camera_forecast.predict_samples(database,1,[{'second':0,'count':4,'score':.1}],
+        {'low_threshold':.25,'high_threshold':.6},horizons=(30,))
+    assert list(selected['evaluation'])==['30']
+    assert [p['horizon_minutes'] for p in selected['timeline'][0]['predictions']]==[30]
     for frame in output['timeline']:
       for prediction in frame['predictions']:
         assert sum(prediction['congestion_probabilities'].values())==pytest.approx(1,abs=2e-6)

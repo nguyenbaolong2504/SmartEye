@@ -13,9 +13,11 @@ export type CameraConditions={weather:{known:boolean;rain_mm?:number|null;visibi
   road:{checked:boolean;accident?:boolean;roadwork?:boolean;obstruction?:boolean;flood?:boolean;wet_surface?:boolean;source:string;notice_count?:number;message?:string};
   reference_at?:string;location_note?:string;overrides?:{weather?:string;road_condition?:string;incident?:string}};
 export type CameraForecast={is_demo:boolean;reference_at?:string;message:string;probability_kind?:string;real_world_validated?:boolean;
+  analysis_id?:string;scope?:'video'|'frames';basis?:DetectionFrame|null;road_geometry?:RoadGeometry|null;
+  summary?:{start_second:number;end_second:number;observed_seconds:number;frames:number;median_count:number;median_score:number;median_load_ratio?:number;motion_known:boolean;stopped_share?:number|null;representative_second:number}|null;
   evaluation?:Record<string,{test:{accuracy:number;samples:number};test_calibration_error:number;accuracy_target_met:boolean}>;
   conditions?:CameraConditions;timeline:{second:number;predictions:CameraPrediction[]}[]};
-export type CameraAnalysisData={state:string;progress:number;message:string;is_demo:boolean;samples?:DetectionFrame[];frames?:DetectionFrame[];fps?:number;roi?:number[];capacity?:number;duration_seconds?:number;high_threshold?:number;
+export type CameraAnalysisData={state:string;progress:number;message:string;is_demo:boolean;analysis_id?:string;samples?:DetectionFrame[];frames?:DetectionFrame[];fps?:number;roi?:number[];capacity?:number;duration_seconds?:number;high_threshold?:number;
   road_geometry?:RoadGeometry|null;capacity_version?:number;
   average_count?:number;peak_count?:number;frame_url?:string;method?:string;detection_version?:number;
   counting_method?:string;total_unique_count?:number;
@@ -36,7 +38,8 @@ export function useCameraAnalysis(url?:string){
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;
     async function load(){
       try{
-        const data=await api<CameraAnalysisData>(url!.replace(/^\/api(?=\/)/,''),{signal:controller.signal});
+        const compactUrl=url!.replace(/^\/api(?=\/)/,'')+(url!.includes('?')?'&':'?')+'include_forecast=false';
+        const data=await api<CameraAnalysisData>(compactUrl,{signal:controller.signal});
         if(controller.signal.aborted)return;
         setValue({url,data,error:''});
         if(['queued','processing'].includes(data.state))timer=setTimeout(load,2500);
