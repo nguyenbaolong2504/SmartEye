@@ -1,7 +1,8 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Bike,Bus,Car,Clock3,ExternalLink,HelpCircle,Truck} from 'lucide-react';
 import {Modal,Notice,Spinner} from './components';
-import {atTime,type CameraAnalysisData,type CameraPrediction,type DetectionFrame} from './cameraAnalysisData';
+import {atTime,type CameraAnalysisData,type CameraForecast,type CameraPrediction,type DetectionFrame,type CameraConditions as Conditions} from './cameraAnalysisData';
+import CameraConditions,{ConditionsSummary} from './CameraConditions';
 import type {Density} from './types';
 
 const densityText:Record<Density,string>={LOW:'Thấp',NORMAL:'Vừa',HIGH:'Cao'};
@@ -9,16 +10,20 @@ const trafficText={FREE:'Thông thoáng',SLOW:'Di chuyển chậm',JAM:'Dễ ùn
 const timeText=(second:number)=>`${String(Math.floor(second/60)).padStart(2,'0')}:${String(Math.floor(second%60)).padStart(2,'0')}`;
 const percentage=(value:number)=>value<.01?'<1%':value>.99?'>99%':`${Math.round(value*100)}%`;
 
-export default function CameraAnalysis({view,second,onSeek,onExplain}:{view:{data:CameraAnalysisData;error:string;reload:()=>void};second:number;onSeek:(second:number)=>void;onExplain:()=>void}){
+export default function CameraAnalysis({view,second,onSeek,onExplain,forecastUrl}:{view:{data:CameraAnalysisData;error:string;reload:()=>void};second:number;onSeek:(second:number)=>void;onExplain:()=>void;forecastUrl?:string}){
   const [explaining,setExplaining]=useState<CameraPrediction|null>(null);
   const [explainFrame,setExplainFrame]=useState<DetectionFrame|null>(null);
+  const [preview,setPreview]=useState<CameraForecast|null>(null);
+  const [explainConditions,setExplainConditions]=useState<Conditions|undefined>();
   const data=view.data;
+  useEffect(()=>setPreview(null),[data.forecast]);
+  const forecast=preview||data.forecast;
   if(view.error)return <Notice kind="error">{view.error}<button className="text-button" onClick={view.reload}>Thử tải kết quả</button></Notice>;
   if(data.state!=='completed')return <section className="camera-analysis"><h3>Phân tích video</h3><p>{['queued','processing'].includes(data.state)&&<Spinner/>} {data.message}</p>{['queued','processing'].includes(data.state)&&<progress aria-label="Tiến độ phân tích" max={100} value={data.progress}/>}</section>;
   const sample=atTime(data.frames?.length?data.frames:data.samples||[],second);
   if(!sample)return null;
   const basis=explainFrame||sample;
-  const predictions=atTime(data.forecast?.timeline||[],sample.second)?.predictions||[];
+  const predictions=atTime(forecast?.timeline||[],sample.second)?.predictions||[];
   const high=data.high_threshold??.6;
   const level=sample.density==='HIGH'&&sample.score>=high+(1-high)*.65?'Rất cao':densityText[sample.density];
   const cumulative=sample.cumulative_vehicle_counts;
@@ -35,13 +40,14 @@ export default function CameraAnalysis({view,second,onSeek,onExplain}:{view:{dat
     <div className="camera-density-track"><span style={{width:`${Math.min(100,sample.score*100)}%`}}/></div>
     <div className="camera-video-timeline" aria-label="Mật độ theo thời gian video">{(data.samples||[]).map(row=><button key={row.second} type="button" className={`${row.density} ${Math.floor(row.second)===Math.floor(sample.second)?'selected':''}`} style={{height:`${12+row.score*44}px`}} aria-label={`Xem giây ${row.second}, mật độ ${densityText[row.density].toLowerCase()}`} title={`${timeText(row.second)} · ${row.count} xe`} onClick={()=>onSeek(row.second)}/>)}</div>
     <p className="micro">Video dài {timeText(data.duration_seconds||0)} · Trung bình {data.average_count} xe/khung hình · Nhiều nhất {data.peak_count} xe.</p>
-    {data.forecast&&<div className="camera-forecast"><h3><Clock3 size={18}/>Khả năng ùn tắc sắp tới <small>Chạy thử</small></h3><p>{data.forecast.message}</p>
-      {data.forecast.reference_at&&<p className="micro">Tính từ mốc chạy thử {new Date(data.forecast.reference_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}.</p>}
+    {forecast&&<CameraConditions value={forecast.conditions} url={forecastUrl} onResult={setPreview} onPause={onExplain}/>}
+    {forecast&&<div className="camera-forecast"><h3><Clock3 size={18}/>Khả năng ùn tắc sắp tới <small>Chạy thử</small></h3><p>{forecast.message}</p>
+      {forecast.reference_at&&<p className="micro">Tính từ mốc chạy thử {new Date(forecast.reference_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}.</p>}
       {predictions.length?<div className="camera-forecast-cards">{predictions.map(item=><article key={item.horizon_minutes} className={item.label}><span>Sau {item.horizon_minutes} phút</span>
-        {data.forecast?.reference_at&&<small>Khoảng {new Date(new Date(data.forecast.reference_at).getTime()+item.horizon_minutes*60000).toLocaleTimeString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'})}</small>}
+        {forecast.reference_at&&<small>Khoảng {new Date(new Date(forecast.reference_at).getTime()+item.horizon_minutes*60000).toLocaleTimeString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'})}</small>}
         <strong>{item.congestion_label?trafficText[item.congestion_label]:densityText[item.label]}</strong>
         {item.congestion_probability!=null?<><b className="camera-jam-probability">{percentage(item.congestion_probability)}</b><small>khả năng ùn tắc trong dữ liệu mẫu</small></>:<small>Chưa có xác suất phù hợp</small>}
-        <button type="button" className="text-button" aria-label={`Giải thích dự báo sau ${item.horizon_minutes} phút`} onClick={()=>{setExplainFrame(sample);onExplain();setExplaining(item);}}><HelpCircle size={14}/>Vì sao?</button>
+        <button type="button" className="text-button" aria-label={`Giải thích dự báo sau ${item.horizon_minutes} phút`} onClick={()=>{setExplainFrame(sample);setExplainConditions(forecast.conditions);onExplain();setExplaining(item);}}><HelpCircle size={14}/>Vì sao?</button>
       </article>)}</div>:<p>Chưa có dự báo cho thời điểm này.</p>}
       <p className="micro">Tỷ lệ được tính từ mô hình trên lịch sử minh họa, chưa được kiểm chứng ngoài đường. Mật độ cao chưa đủ để kết luận đang ùn tắc.</p>
     </div>}
@@ -57,6 +63,7 @@ export default function CameraAnalysis({view,second,onSeek,onExplain}:{view:{dat
         <h3>Căn cứ hệ thống đã xem</h3><ul><li>Khung hình lúc {timeText(basis.second)} có {basis.count} xe, gồm {basis.vehicle_counts.car} ô tô, {basis.vehicle_counts.motorcycle} xe máy, {basis.vehicle_counts.bus} xe buýt và {basis.vehicle_counts.truck} xe tải.</li>
           <li>Xe chiếm khoảng {Math.round(basis.occupancy*100)}% vùng quan sát. Sức chứa chạy thử của vùng này là {data.capacity??'chưa thiết lập'} xe.</li>
           <li>Đối chiếu lịch sử cùng giờ, cùng thứ trong tuần và diễn biến trước thời điểm dự báo.</li></ul>
+        <ConditionsSummary value={explainConditions}/>
         {basis.cumulative_count!=null&&<p>Đã ghi nhận cộng dồn {basis.cumulative_count} mã xe đến thời điểm này. Số cộng dồn không được dùng thay số xe hiện tại; một tuyến đông xe qua lại nhưng vẫn chạy nhanh chưa chắc bị ùn tắc.</p>}
         {explaining.history&&<p>Trong {explaining.history.lookback_days} ngày minh họa gần nhất, có {explaining.history.matching_days} ngày cùng thứ có dữ liệu lúc {explaining.history.hour}; {explaining.history.jam_days} ngày được gắn nhãn ùn tắc. Đây là tần suất lịch sử, không phải chính tỷ lệ dự báo.</p>}
         {explaining.congestion_probabilities&&<div className="camera-probability-breakdown">{(['FREE','SLOW','JAM'] as const).map(state=><div key={state}><span>{trafficText[state]}</span><progress max={1} value={explaining.congestion_probabilities![state]}/><b>{percentage(explaining.congestion_probabilities![state])}</b></div>)}</div>}

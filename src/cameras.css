@@ -103,12 +103,29 @@
 .camera-video-credit p {margin:7px 0}
 .camera-video-credit>div {display:flex;gap:15px;flex-wrap:wrap}
 .camera-video-credit a {display:inline-flex;align-items:center;gap:5px;color:#177e77}
+.camera-conditions {padding:18px 0;border-top:1px solid #e1ebef;margin-top:20px}
+.camera-conditions>h3 {display:flex;align-items:center;gap:8px;font-size:16px}
+.camera-condition-summary {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;color:#486775}
+.camera-condition-summary article {background:#f3f8f8;padding:16px;border-radius:10px;min-width:0}
+.camera-condition-summary h4 {display:flex;align-items:center;gap:7px;margin:0 0 12px;font-size:13px}
+.camera-condition-summary b {font-size:14px;line-height:1.6}
+.camera-condition-summary p {font-size:12px;line-height:1.8;margin:8px 0}
+.camera-condition-summary small {display:block;font-size:11px;margin-top:7px}
+.camera-condition-summary a {color:#147e77}
+.camera-condition-summary>.micro {grid-column:1/-1;margin:0}
+.camera-conditions summary {cursor:pointer;color:#147e77;font-size:13px;padding:10px 0}
+.camera-conditions details>p {font-size:12px;color:#6b818e;line-height:1.7}
+.camera-condition-inputs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:15px 0}
+.camera-condition-inputs .field {min-width:0}
+.camera-condition-inputs select {width:100%;min-width:0}
+.camera-condition-inputs button {grid-column:1/-1;justify-self:start}
 @media(max-width:1100px) {
   .camera-workspace {grid-template-columns:minmax(220px,270px) minmax(0,1fr);gap:16px}
   .camera-details {padding:18px}
   .camera-viewer-toolbar .button span {display:none}
 }
 @media(max-width:760px) {
+  .camera-condition-summary,.camera-condition-inputs {grid-template-columns:1fr}
   .camera-filters {grid-template-columns:1fr;gap:14px}
   .camera-workspace {grid-template-columns:1fr}
   .camera-directory-list {display:flex;align-items:flex-start;max-height:none;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity}

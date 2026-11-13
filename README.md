@@ -85,8 +85,8 @@ Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle,
 
 [Dữ liệu demo](docs/DEMO.md) · [Bản đồ](docs/MAPS.md) · [Pipeline XGBoost/GRU trên dữ liệu thực](docs/FORECASTING.md) · [API](docs/api.md) · [Kiểm thử](docs/validation.md).
 
-**Video camera mẫu:** chạy `docker compose exec backend python scripts/download_model.py` rồi `docker compose exec backend python scripts/setup_camera_videos.py`. Mở **Camera giao thông** để xem ô nhận diện và số ô tô/xe máy/xe buýt/xe tải đồng bộ từng khung hình, dự báo chạy thử sau 15/30/60 phút kèm tỷ lệ ùn tắc và nút **Vì sao?**. Tỷ lệ được tính trên lịch sử minh họa, chưa được kiểm chứng ngoài đường. [Nguồn video, cách cài và giới hạn dự báo](docs/DEMO.md#video-camera-và-dự-báo-mật-độ).
+**Video camera mẫu:** chạy `docker compose exec backend python scripts/download_model.py` rồi `docker compose exec backend python scripts/setup_camera_videos.py --rush-hour`. Mở **Camera giao thông** để xem clip góc cao, ô nhận diện và số ô tô/xe máy/xe buýt/xe tải đồng bộ từng khung hình. Dự báo chạy thử 15/30/60 phút xét thêm thời tiết, sự cố đã công bố và điều kiện đường, có tỷ lệ và nút **Vì sao?**, cho thử mưa lớn/tai nạn/ngập. Mô hình học trên lịch sử/điều kiện minh họa, chưa được kiểm chứng ngoài đường. [Nguồn video, cách cài và giới hạn](docs/DEMO.md#video-camera-và-dự-báo-mật-độ).
 
-Thêm `--rush-hour` vào lệnh chuẩn bị video để có **Ngã Tư Sở · Tình huống 17:00**. Trang tách số xe cộng dồn bằng ByteTrack và số xe đang xuất hiện; có nút xem đoạn đông xe nhất và dự báo cho 17:15/17:30. Đây là tình huống minh họa với clip giao lộ Việt Nam, chưa xác minh video quay tại Ngã Tư Sở hoặc lúc 17:00.
+Thêm `--rush-hour` vào lệnh chuẩn bị video để có **Ngã Tư Sở · Tình huống 17:00**. Trang tách số xe cộng dồn bằng ByteTrack và số xe đang xuất hiện; có nút xem đoạn đông xe nhất và dự báo cho 17:15/17:30. Đây là tình huống minh họa, chưa xác minh video quay tại Ngã Tư Sở hoặc lúc 17:00.
 
 `src/`: frontend · `backend/app/`: API/PyMongo/mô hình · `backend/tests/`: Pytest · `tests/e2e/`: Playwright · `scripts/`: khởi tạo và dữ liệu mẫu · `deploy/`: Nginx/Mongo init.

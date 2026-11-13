@@ -23,6 +23,7 @@ test('video playback, density timeline and three forecast horizons stay synchron
       {second:3,count:18,score:.95,occupancy:.6,density:'HIGH',vehicle_counts:{car:3,motorcycle:15,bus:0,truck:0}}],
     duration_seconds:6,average_count:10,peak_count:18,high_threshold:.6,
     forecast:{is_demo:true,message:'Kết hợp mật độ trong video với lịch sử minh họa của tuyến đường.',
+      conditions:{weather:{known:false,source:'Open-Meteo'},road:{checked:true,source:'published_warnings'},location_note:'Điều kiện theo tuyến chạy thử.'},
       timeline:[{second:0,predictions:[15,30,60].map(h=>({horizon_minutes:h,label:'LOW',congestion_label:'FREE',
           congestion_probability:.1,congestion_probabilities:{FREE:.7,SLOW:.2,JAM:.1}}))},
         {second:3,predictions:[15,30,60].map(h=>({horizon_minutes:h,label:'HIGH',congestion_label:'JAM',
@@ -32,6 +33,17 @@ test('video playback, density timeline and three forecast horizons stay synchron
       license:'Pexels License',license_url:'https://www.pexels.com/license/',published_date:'2025-05-01',
       location_note:'Video minh họa. Chưa xác minh tuyến đường thực tế.'}
   }}));
+  let conditionRequests=0;
+  await page.route('**/api/traffic/cameras/recordings/1/forecast',async route=>{
+    conditionRequests++;
+    expect(route.request().postDataJSON()).toEqual({weather:'heavy',road_condition:'flood',incident:'accident'});
+    await route.fulfill({json:{is_demo:true,message:'Dự báo có xét điều kiện bạn chọn.',conditions:{
+      weather:{known:true,rain_mm:12,visibility_km:2,wind_kmh:10,source:'demo_override',at:'2026-11-12T17:00:00+07:00'},
+      road:{checked:true,accident:true,flood:true,wet_surface:true,source:'published_warnings_and_demo_override',
+        message:'Giả định để so sánh, không phải cảnh báo công bố.'},location_note:'Điều kiện theo tuyến chạy thử.'},
+      timeline:[{second:0,predictions:[15,30,60].map(h=>({horizon_minutes:h,label:'HIGH',congestion_label:'JAM',
+        congestion_probability:.8,congestion_probabilities:{FREE:.05,SLOW:.15,JAM:.8}}))}]}});
+  });
   await page.goto('/#cameras');
   await expect(page.getByRole('heading',{name:'Xe đang xuất hiện trong video',exact:true})).toBeVisible();
   await expect(page.locator('.camera-current-counts article').first().locator('b')).toHaveText('2');
@@ -69,6 +81,20 @@ test('video playback, density timeline and three forecast horizons stay synchron
   await expect(page.getByText('Video minh họa. Chưa xác minh tuyến đường thực tế.')).toBeVisible();
   await page.locator('video').evaluate(v=>{v.currentTime=.1;});
   await expect(page.locator('.camera-cumulative .camera-counts article b')).toHaveText(['2','2','0','0','0']);
+  await page.getByText('Thử thay đổi thời tiết hoặc tình trạng đường',{exact:true}).click();
+  await page.getByLabel('Thời tiết',{exact:true}).selectOption('heavy');
+  await page.getByLabel('Mặt đường',{exact:true}).selectOption('flood');
+  await page.getByLabel('Sự cố',{exact:true}).selectOption('accident');
+  await page.getByRole('button',{name:'Cập nhật dự báo',exact:true}).click();
+  await expect(page.locator('.camera-jam-probability')).toHaveText(['80%','80%','80%']);
+  await expect(page.locator('.camera-condition-summary').first()).toContainText('Mưa lớn');
+  await expect(page.locator('.camera-condition-summary').first()).toContainText('Tai nạn');
+  await expect(page.locator('.camera-condition-summary').first()).toContainText('Ngập đường');
+  expect(conditionRequests).toBe(1);
+  await page.getByRole('button',{name:'Giải thích dự báo sau 15 phút',exact:true}).click();
+  await expect(page.getByRole('dialog')).toContainText('Mưa lớn');
+  await expect(page.getByRole('dialog')).toContainText('Ngập đường');
+  await page.keyboard.press('Escape');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:`test-results/camera-analysis-${info.project.name}.png`,fullPage:true});
 });

@@ -70,7 +70,7 @@ function CameraExperience({camera}:{camera:TrafficCamera}){
     else{player.addEventListener('loadedmetadata',move,{once:true});player.load();}
   }
   return <><CameraViewer camera={camera} videoRef={videoRef} onTime={setSecond} analysis={view.data}/>
-    {camera.analysis_url&&<CameraAnalysis view={view} second={second} onSeek={seek} onExplain={()=>videoRef.current?.pause()}/>}</>;
+    {camera.analysis_url&&<CameraAnalysis view={view} second={second} onSeek={seek} onExplain={()=>videoRef.current?.pause()} forecastUrl={camera.analysis_url.replace(/\/analysis(?:\?.*)?$/,'/forecast')}/>}</>;
 }
 
 function CameraViewer({camera,videoRef,onTime,analysis}:{camera:TrafficCamera;videoRef:React.RefObject<HTMLVideoElement|null>;onTime:(second:number)=>void;analysis:CameraAnalysisData}){

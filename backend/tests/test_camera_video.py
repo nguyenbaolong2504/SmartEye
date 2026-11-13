@@ -130,6 +130,8 @@ def test_density_model_has_purged_time_splits_and_never_writes_real_observations
     protected=('observations','traffic_samples','traffic_labels','forecast_runs','forecast_registry')
     before={name:list(database[name].find()) for name in protected}
     report=camera_forecast.prepare_models(database,estimators=5)
+    assert 'rain_mm' in report['condition_features'] and 'accident' in report['condition_features']
+    assert report['condition_training']=='synthetic_not_real_world_validated'
     for horizon,targets in report['horizons'].items():
       for metrics in targets.values():
         assert metrics['train_label_end']<metrics['validation_issue_start']

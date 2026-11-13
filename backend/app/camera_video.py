@@ -4,6 +4,8 @@ import shutil
 import uuid
 from collections import Counter
 from pathlib import Path
+from typing import Literal
+from pydantic import BaseModel,ConfigDict
 from fastapi import APIRouter,Depends,HTTPException
 from fastapi.responses import FileResponse
 from .business_common import check_segment_scope
@@ -44,7 +46,13 @@ def finish_analysis(ident):
                 from .history import LOCAL
                 hour,minute=map(int,job.source_metadata['scenario_hour'].split(':'))
                 reference=(now().astimezone(LOCAL)-timedelta(days=1)).replace(hour=hour,minute=minute,second=0,microsecond=0)
-            result['camera_forecast']=predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config,issue=reference)
+            from .camera_context import resolve
+            from .db import now
+            segment=db.get(Segment,camera.segment_id)
+            reference=reference or now()
+            reference=reference.replace(minute=reference.minute//5*5,second=0,microsecond=0)
+            conditions=resolve(db.database,segment,reference)
+            result['camera_forecast']=predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config,issue=reference,conditions=conditions)
         except Exception:
             logger.exception('Camera forecast unavailable for %s',ident)
             result['camera_forecast']={'state':'unavailable','is_demo':True,'timeline':[],
@@ -121,6 +129,33 @@ def visible_analysis(db,ident):
     if not job or job.camera_id!=ident or not job.source_metadata.get('is_demo'):
         raise HTTPException(404,'Chưa có phân tích video cho camera này.')
     return camera,job
+
+
+class ForecastConditions(BaseModel):
+    model_config=ConfigDict(extra='forbid')
+    weather:Literal['auto','dry','light','heavy','fog']='auto'
+    road_condition:Literal['auto','normal','roadwork','obstruction','flood']='auto'
+    incident:Literal['auto','none','accident']='auto'
+
+
+@router.post('/api/traffic/cameras/recordings/{ident}/forecast',dependencies=[Depends(permit('cameras.view')),Depends(permit('forecast.view'))])
+def refresh_forecast(ident:int,body:ForecastConditions,db=Depends(get_db)):
+    from datetime import datetime
+    from .camera_context import resolve
+    from .camera_forecast import predict_samples
+    from .db import now
+    camera,job=visible_analysis(db,ident)
+    if not matches(camera,job) or job.status!='completed' or not job.result:
+        raise HTTPException(409,'Cần chờ phân tích xong hoặc phân tích lại sau khi đổi cấu hình camera.')
+    result=job.result
+    reference=result.get('camera_forecast',{}).get('reference_at')
+    issue=datetime.fromisoformat(reference) if reference else now()
+    issue=issue.replace(minute=issue.minute//5*5,second=0,microsecond=0)
+    conditions=resolve(db.database,db.get(Segment,camera.segment_id),issue,body.model_dump())
+    try:
+        # A personal what-if preview: never changes shared analysis, warnings or observations.
+        return predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config,issue=issue,conditions=conditions)
+    except ValueError as error:raise HTTPException(409,str(error)) from error
 
 
 @router.get('/api/traffic/cameras/recordings/{ident}/analysis')

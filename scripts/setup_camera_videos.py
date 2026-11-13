@@ -77,6 +77,9 @@ def setup(ids=None,refresh=False,rush_hour=False):
             if not prepare_demo(get_database(),days=current.get('history_days') or 365):
                 raise ValueError('Đang có lượt chuẩn bị lịch sử khác. Vui lòng đợi rồi chạy lại.')
     manifest=json.loads((ROOT/'database'/'camera-video-sources.json').read_text(encoding='utf-8'))
+    # Prefer stable overhead footage for detection; the exact real road remains unverified.
+    overhead=[source for source in manifest if source.get('viewpoint')=='overhead']
+    if overhead:manifest=overhead
     assets=[]
     for source in manifest:
         if source.get('scenario') and not rush_hour:continue
@@ -95,9 +98,13 @@ def setup(ids=None,refresh=False,rush_hour=False):
         for camera in cameras:
             segment=db.get(Segment,camera.segment_id)
             if not segment or not segment.active:continue
-            source,path,digest=next(item for item in assets if item[0].get('scenario')) if camera.id==scenario_id else ordinary[(camera.id-1)%len(ordinary)]
+            source,path,digest=ordinary[(camera.id-1)%len(ordinary)]
             previous=db.get(VideoJob,camera.analysis_job_id) if camera.analysis_job_id else None
-            if not previous and camera.roi==[0,0,1,1] and camera.capacity==30:
+            old_defaults=previous and previous.source_metadata.get('is_demo') and previous.source_metadata.get('roi')==camera.roi and previous.source_metadata.get('capacity')==camera.capacity
+            if (not previous and camera.roi==[0,0,1,1] and camera.capacity==30) or old_defaults:
+                db.update(Camera,camera.id,{'roi':source['roi'],'capacity':source['capacity']})
+                camera.roi=source['roi'];camera.capacity=source['capacity']
+            elif not previous and camera.id==scenario_id and camera.roi==[0,.63,1,1] and camera.capacity==20:
                 db.update(Camera,camera.id,{'roi':source['roi'],'capacity':source['capacity']})
                 camera.roi=source['roi'];camera.capacity=source['capacity']
             if (not refresh and previous and previous.status=='completed' and previous.source_metadata.get('sha256')==digest
@@ -111,6 +118,9 @@ def setup(ids=None,refresh=False,rush_hour=False):
                 print(f'Đã có kết quả cho {camera.name}',flush=True)
                 continue
             metadata={key:value for key,value in source.items() if key!='download_url'}
+            if camera.id==scenario_id:
+                metadata.update(scenario='nga-tu-so-rush-hour',scenario_hour='17:00',
+                    scenario_note='Giả định lúc 17:00 để thử dự báo 17:15 và 17:30, không phải địa điểm hay giờ quay thực của clip.')
             metadata.update(is_demo=True,sha256=digest,transformation='Nén H.264, tối đa 960px, 15fps, bỏ âm thanh',
                 calibration_note='Vùng mặt đường và sức chứa được ước lượng để chạy thử, cần hiệu chỉnh bằng dữ liệu thực tế.',
                 location_note=source.get('location_note','Video minh họa từ Hà Nội. Chưa xác minh video quay tại tuyến đang chọn.'))

@@ -9,9 +9,10 @@ from .demo_data import require_active,rows_for,feature_row
 from .forecast_data import CLASSES,examples,features,split_indices,STEP
 from .history import LOCAL
 from .traffic import classify
+from .camera_context import FEATURES,training_row,vector
 
 HORIZONS=(15,30,60)
-VERSION=2
+VERSION=3
 FOLDER=DATA/'camera-density'
 _models={}
 
@@ -54,16 +55,20 @@ def prepare_models(database,estimators=80):
     today=now().astimezone(LOCAL).date()
     query={'dataset_id':active['run_id'],'segment_id':{'$in':active['segment_ids']},
            'date':{'$gte':(today-timedelta(days=8)).isoformat(),'$lt':today.isoformat()}}
-    series={sid:{} for sid in active['segment_ids']};labels={}
+    series={sid:{} for sid in active['segment_ids']};labels={};conditions={}
     for doc in database.demo_profiles.find(query):
         day=datetime.fromisoformat(doc['date']).date()
         for slot in doc['slots']:
-            row=density_row(feature_row(day,slot))
-            series[doc['segment_id']][row['at']]=row
-            labels[(doc['segment_id'],row['at'])]=slot['state']
+            sid=doc['segment_id']
+            adjusted,label,context=training_row(feature_row(day,slot),sid)
+            row=density_row(adjusted)
+            series[sid][row['at']]=row
+            labels[(sid,row['at'])]=label
+            conditions[(sid,row['at'])]=vector(context)
     folder.mkdir(parents=True,exist_ok=True)
     report={'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
-            'segment_ids':active['segment_ids'],'created_at':stamp(),'horizons':{}}
+            'segment_ids':active['segment_ids'],'created_at':stamp(),'horizons':{},
+            'condition_features':list(FEATURES),'condition_training':'synthetic_not_real_world_validated'}
     for horizon in HORIZONS:
       report['horizons'][str(horizon)]={}
       for target in CLASSES:
@@ -73,7 +78,9 @@ def prepare_models(database,estimators=80):
         early=validation[data['times'][validation]+horizon*60<midpoint]
         calibration=validation[data['times'][validation]>=midpoint]
         if min(len(early),len(calibration))<25:raise ValueError('Chưa đủ dữ liệu riêng cho hiệu chỉnh xác suất.')
-        raw=data['x'].reshape(len(data['x']),-1)
+        extra=np.asarray([conditions[(int(sid),datetime.fromtimestamp(at,LOCAL))]
+                          for sid,at in zip(data['roads'],data['times'])],dtype=np.float32)
+        raw=np.concatenate([data['x'].reshape(len(data['x']),-1),extra],axis=1)
         mean=raw[train].mean(axis=0)
         std=np.maximum(raw[train].std(axis=0),.001)
         x=((raw-mean)/std).astype(np.float32)
@@ -123,7 +130,7 @@ def normalized_score(score,low,high):
     return min(1,.6+(score-high)/max(1-high,.001)*.4)
 
 
-def predict_samples(database,segment_id,samples,config,issue=None):
+def predict_samples(database,segment_id,samples,config,issue=None,conditions=None):
     from xgboost import XGBClassifier
     active=require_active(database)
     if segment_id not in active['segment_ids']:raise ValueError('Tuyến chưa có lịch sử minh họa để chạy thử dự báo.')
@@ -140,14 +147,16 @@ def predict_samples(database,segment_id,samples,config,issue=None):
     metadata,models=_models[active['run_id']]
     issue=(issue or now()).astimezone(LOCAL)
     issue=issue.replace(minute=issue.minute//5*5,second=0,microsecond=0)
-    rows=[density_row(row) for row in rows_for(database,active,segment_id,issue-timedelta(hours=2),issue)][-12:]
+    rows=[density_row(training_row(row,segment_id)[0]) for row in rows_for(database,active,segment_id,issue-timedelta(hours=2),issue)][-12:]
     if len(rows)!=12 or any(rows[i]['at']-rows[i-1]['at']!=STEP for i in range(1,12)):
         raise ValueError('Chưa đủ lịch sử minh họa cho thời điểm chạy thử.')
+    # Production facts are supplied by the resolver; missing data stays explicitly unknown.
+    conditions=conditions or {'weather':{'known':False},'road':{'checked':False},'is_demo':True}
     inputs=[]
     for sample in samples:
         last=dict(rows[-1],score=normalized_score(sample['score'],config['low_threshold'],config['high_threshold']),count=sample['count'])
         context=rows[:-1]+[density_row(last)]
-        inputs.append(features(context,active['segment_ids'],segment_id).reshape(-1))
+        inputs.append(np.concatenate([features(context,active['segment_ids'],segment_id).reshape(-1),vector(conditions)]))
     raw=np.asarray(inputs,dtype=np.float32)
     evidence=history_evidence(database,active,segment_id,issue)
     output=[{'second':sample['second'],'predictions':[]} for sample in samples]
@@ -166,4 +175,5 @@ def predict_samples(database,segment_id,samples,config,issue=None):
     return {'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
         'reference_at':issue.isoformat(),'context_minutes':60,'synthetic_context_slots':11,
         'probability_kind':'calibrated_synthetic','real_world_validated':False,
-        'message':'Kết hợp lượng xe trong video với lịch sử minh họa cùng giờ và ngày trong tuần.','timeline':output}
+        'conditions':conditions,
+        'message':'Xét lượng xe, lịch sử cùng giờ, sự cố, điều kiện đường và thời tiết có thông tin.','timeline':output}
