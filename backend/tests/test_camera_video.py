@@ -187,6 +187,10 @@ def test_camera_detection_processes_every_frame_and_counts_exactly_the_displayed
     assert calls[0][0]==(156,320,3) and calls[0][1]['agnostic_nms']
     again=camera_detection.detect_clip(path,{**config,'capacity':50},lambda _:None)
     assert len(calls)==4 and again['frames'][0]['count']==2
+    full=camera_detection.detect_clip(path,{**config,'detect_full_frame':True},lambda _:None)
+    assert len(calls)==8 and calls[-1][0]==(240,400,3)
+    assert full['frames'][0]['count']==1
+    assert full['frames'][0]['boxes'][0]['box']==[150,80,170,100]
 
 
 def test_probability_temperature_outputs_distribution_without_forcing_ninety_percent():

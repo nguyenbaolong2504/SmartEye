@@ -12,9 +12,31 @@ from .traffic import classify
 from .camera_context import FEATURES,training_row,vector
 
 HORIZONS=(15,30,60)
-VERSION=3
+VERSION=4
 FOLDER=DATA/'camera-density'
 _models={}
+MOTION_FEATURES=('stopped_share','motion_known','load_ratio')
+
+
+def motion_vector(row):
+    known=bool(row.get('motion_known'))
+    return [float(row.get('stopped_share') or 0) if known else 0.,float(known),
+            min(3.,float(row.get('load_ratio',row['score'])))]
+
+
+def model_row(row):
+    # Use a fixed reference count to avoid learning that a wide road's larger raw
+    # count is automatically congested. Physical size has already normalized score.
+    return density_row(dict(row,count=row['score']*30))
+
+
+def calibration_error(labels,prob,bins=10):
+    confidence=prob.max(axis=1);correct=prob.argmax(axis=1)==labels
+    total=0.
+    for index in range(bins):
+        mask=(confidence>=index/bins)&(confidence<((index+1)/bins) if index<bins-1 else confidence<=1)
+        if mask.any():total+=float(mask.mean()*abs(correct[mask].mean()-confidence[mask].mean()))
+    return total
 
 
 def density_row(row):
@@ -45,7 +67,7 @@ def fit_temperature(y,p):
         bounds=(.2,5.),method='bounded').x)
 
 
-def prepare_models(database,estimators=80):
+def prepare_models(database,estimators=160):
     from xgboost import XGBClassifier
     from .forecast_ml import metrics
     active=require_active(database)
@@ -54,21 +76,26 @@ def prepare_models(database,estimators=80):
         return json.loads((folder/'metadata.json').read_text(encoding='utf-8'))
     today=now().astimezone(LOCAL).date()
     query={'dataset_id':active['run_id'],'segment_id':{'$in':active['segment_ids']},
-           'date':{'$gte':(today-timedelta(days=8)).isoformat(),'$lt':today.isoformat()}}
+           'date':{'$gte':(today-timedelta(days=24)).isoformat(),'$lt':today.isoformat()}}
     series={sid:{} for sid in active['segment_ids']};labels={};conditions={}
     for doc in database.demo_profiles.find(query):
         day=datetime.fromisoformat(doc['date']).date()
         for slot in doc['slots']:
             sid=doc['segment_id']
             adjusted,label,context=training_row(feature_row(day,slot),sid)
-            row=density_row(adjusted)
+            row=model_row(adjusted)
             series[sid][row['at']]=row
             labels[(sid,row['at'])]=label
-            conditions[(sid,row['at'])]=vector(context)
+            ratio=adjusted['speed_kmh']/(32+sid%4*3)
+            known=(row['at'].hour+sid)%5!=0
+            motion={'score':row['score'],'load_ratio':row['score'],'motion_known':known,
+                    'stopped_share':max(0.,min(1.,1-ratio/.35))}
+            conditions[(sid,row['at'])]=vector(context)+motion_vector(motion)
     folder.mkdir(parents=True,exist_ok=True)
     report={'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
             'segment_ids':active['segment_ids'],'created_at':stamp(),'horizons':{},
-            'condition_features':list(FEATURES),'condition_training':'synthetic_not_real_world_validated'}
+            'condition_features':list(FEATURES)+list(MOTION_FEATURES),'condition_training':'synthetic_not_real_world_validated',
+            'normalization':'camera_specific_equivalent_vehicles_per_storage','accuracy_target':.8}
     for horizon in HORIZONS:
       report['horizons'][str(horizon)]={}
       for target in CLASSES:
@@ -84,7 +111,7 @@ def prepare_models(database,estimators=80):
         mean=raw[train].mean(axis=0)
         std=np.maximum(raw[train].std(axis=0),.001)
         x=((raw-mean)/std).astype(np.float32)
-        model=XGBClassifier(n_estimators=estimators,max_depth=4,learning_rate=.08,subsample=.9,
+        model=XGBClassifier(n_estimators=estimators,max_depth=5,learning_rate=.06,subsample=.9,
             colsample_bytree=.9,objective='multi:softprob',num_class=3,tree_method='hist',
             n_jobs=1,random_state=42,eval_metric='mlogloss',early_stopping_rounds=10)
         model.fit(x[train],data['y'][train],eval_set=[(x[early],data['y'][early])],verbose=False)
@@ -98,6 +125,8 @@ def prepare_models(database,estimators=80):
             'baseline':metrics(data['y'][test],data['baseline'][test]),
             'test_log_loss':negative_log_loss(data['y'][test],test_prob),
             'test_high_brier':float(np.mean((test_prob[:,2]-(data['y'][test]==2))**2)),
+            'test_calibration_error':calibration_error(data['y'][test],test_prob),
+            'accuracy_target_met':bool(np.mean(test_prob.argmax(axis=1)==data['y'][test])>=.8),
             'train_label_end':float((data['times'][train]+horizon*60).max()),
             'validation_issue_start':float(data['times'][early].min()),
             'validation_label_end':float((data['times'][early]+horizon*60).max()),
@@ -147,16 +176,16 @@ def predict_samples(database,segment_id,samples,config,issue=None,conditions=Non
     metadata,models=_models[active['run_id']]
     issue=(issue or now()).astimezone(LOCAL)
     issue=issue.replace(minute=issue.minute//5*5,second=0,microsecond=0)
-    rows=[density_row(training_row(row,segment_id)[0]) for row in rows_for(database,active,segment_id,issue-timedelta(hours=2),issue)][-12:]
+    rows=[model_row(training_row(row,segment_id)[0]) for row in rows_for(database,active,segment_id,issue-timedelta(hours=2),issue)][-12:]
     if len(rows)!=12 or any(rows[i]['at']-rows[i-1]['at']!=STEP for i in range(1,12)):
         raise ValueError('Chưa đủ lịch sử minh họa cho thời điểm chạy thử.')
     # Production facts are supplied by the resolver; missing data stays explicitly unknown.
     conditions=conditions or {'weather':{'known':False},'road':{'checked':False},'is_demo':True}
     inputs=[]
     for sample in samples:
-        last=dict(rows[-1],score=normalized_score(sample['score'],config['low_threshold'],config['high_threshold']),count=sample['count'])
-        context=rows[:-1]+[density_row(last)]
-        inputs.append(np.concatenate([features(context,active['segment_ids'],segment_id).reshape(-1),vector(conditions)]))
+        last=dict(rows[-1],score=normalized_score(sample['score'],config['low_threshold'],config['high_threshold']))
+        context=rows[:-1]+[model_row(last)]
+        inputs.append(np.concatenate([features(context,active['segment_ids'],segment_id).reshape(-1),vector(conditions)+motion_vector(sample)]))
     raw=np.asarray(inputs,dtype=np.float32)
     evidence=history_evidence(database,active,segment_id,issue)
     output=[{'second':sample['second'],'predictions':[]} for sample in samples]
@@ -172,8 +201,11 @@ def predict_samples(database,segment_id,samples,config,issue=None,conditions=Non
             if target=='density':row.update(label=label,probabilities=distribution)
             else:row.update(congestion_label=label,congestion_probability=distribution['JAM'],congestion_probabilities=distribution)
       for row,prediction in zip(output,predictions):row['predictions'].append(prediction)
+    evaluation={str(h):{key:metadata['horizons'][str(h)]['congestion'][key] for key in
+        ('test','test_calibration_error','accuracy_target_met')} for h in HORIZONS}
     return {'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
         'reference_at':issue.isoformat(),'context_minutes':60,'synthetic_context_slots':11,
         'probability_kind':'calibrated_synthetic','real_world_validated':False,
         'conditions':conditions,
+        'evaluation':evaluation,'accuracy_target':.8,
         'message':'Xét lượng xe, lịch sử cùng giờ, sự cố, điều kiện đường và thời tiết có thông tin.','timeline':output}

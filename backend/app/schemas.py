@@ -48,6 +48,14 @@ class Login(BaseModel):
         if not value.strip():raise ValueError('Vui lòng nhập tên đăng nhập hoặc email')
         return value.strip().lower()
 
+class RoadProfile(BaseModel):
+    lanes: int = Field(default=2,ge=1,le=12)
+    road_width_m: float = Field(default=7,ge=2,le=60,allow_inf_nan=False)
+    observed_length_m: float = Field(default=70,ge=5,le=500,allow_inf_nan=False)
+    usable_fraction: float = Field(default=.85,ge=.1,le=1,allow_inf_nan=False)
+    calibration: Literal['estimated','measured']='estimated'
+
+
 class CameraInput(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     segment_id: int
@@ -56,6 +64,7 @@ class CameraInput(BaseModel):
     low_threshold: float = Field(default=.25, ge=.01, le=.95)
     high_threshold: float = Field(default=.6, ge=.02, le=1)
     roi: list[float] = Field(default=[0, 0, 1, 1], min_length=4, max_length=4)
+    road_profile: RoadProfile | None = None
     @model_validator(mode='after')
     def coherent(self):
         if self.low_threshold >= self.high_threshold:

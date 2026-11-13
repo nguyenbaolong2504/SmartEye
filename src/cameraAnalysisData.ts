@@ -1,18 +1,22 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from './api';
-import type {Density} from './types';
+import type {Density,RoadProfile} from './types';
 
 export type VehicleCounts={car:number;motorcycle:number;bus:number;truck:number};
 export type DetectionBox={box:[number,number,number,number];label:keyof VehicleCounts;confidence:number;track_id?:number|null;counted_as?:string|null};
-export type DetectionFrame={second:number;frame_index?:number;count:number;score:number;occupancy:number;density:Density;vehicle_counts:VehicleCounts;boxes?:DetectionBox[];width?:number;height?:number;cumulative_count?:number;cumulative_vehicle_counts?:VehicleCounts};
+export type DetectionFrame={second:number;frame_index?:number;count:number;score:number;occupancy:number;density:Density;vehicle_counts:VehicleCounts;boxes?:DetectionBox[];width?:number;height?:number;cumulative_count?:number;cumulative_vehicle_counts?:VehicleCounts;
+  equivalent_count?:number;capacity_pcu?:number;load_ratio?:number;motion_known?:boolean;stopped_share?:number|null;motion_samples?:number;motion_coverage?:number;queue_seconds?:number;persistent_queue?:boolean};
+export type RoadGeometry=RoadProfile&{usable_area_m2:number;capacity_pcu:number;car_space_m2:number;equivalents:VehicleCounts;high_density_pcu:number;calibration_note:string};
 export type CameraPrediction={horizon_minutes:number;label:Density;congestion_label?:'FREE'|'SLOW'|'JAM';congestion_probability?:number;
   congestion_probabilities?:Record<'FREE'|'SLOW'|'JAM',number>;history?:{lookback_days:number;matching_days:number;jam_days:number;hour:string;is_demo:boolean}};
 export type CameraConditions={weather:{known:boolean;rain_mm?:number|null;visibility_km?:number|null;wind_kmh?:number|null;source:string;source_url?:string;at?:string|null;message?:string};
   road:{checked:boolean;accident?:boolean;roadwork?:boolean;obstruction?:boolean;flood?:boolean;wet_surface?:boolean;source:string;notice_count?:number;message?:string};
   reference_at?:string;location_note?:string;overrides?:{weather?:string;road_condition?:string;incident?:string}};
 export type CameraForecast={is_demo:boolean;reference_at?:string;message:string;probability_kind?:string;real_world_validated?:boolean;
+  evaluation?:Record<string,{test:{accuracy:number;samples:number};test_calibration_error:number;accuracy_target_met:boolean}>;
   conditions?:CameraConditions;timeline:{second:number;predictions:CameraPrediction[]}[]};
 export type CameraAnalysisData={state:string;progress:number;message:string;is_demo:boolean;samples?:DetectionFrame[];frames?:DetectionFrame[];fps?:number;roi?:number[];capacity?:number;duration_seconds?:number;high_threshold?:number;
+  road_geometry?:RoadGeometry|null;capacity_version?:number;
   average_count?:number;peak_count?:number;frame_url?:string;method?:string;detection_version?:number;
   counting_method?:string;total_unique_count?:number;
   source?:{title:string;author:string;page_url:string;license:string;license_url:string;published_date:string;location_note:string;scenario_hour?:string;scenario_note?:string;reference_url?:string};

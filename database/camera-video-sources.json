@@ -16,26 +16,103 @@
       1,
       1
     ],
-    "capacity": 24
+    "capacity": 24,
+    "camera_slot": 1,
+    "viewpoint": "overhead",
+    "road_profile": {
+      "lanes": 3,
+      "road_width_m": 10.5,
+      "observed_length_m": 90,
+      "usable_fraction": 0.9,
+      "calibration": "estimated"
+    }
   },
   {
-    "id": "hanoi-street-35369134",
-    "title": "Busy Urban Traffic Scene in Hanoi",
-    "author": "Sandeep Kumar",
-    "page_url": "https://www.pexels.com/video/busy-urban-traffic-scene-in-hanoi-35369134/",
-    "download_url": "https://videos.pexels.com/video-files/35369134/14985878_3840_2160_60fps.mp4",
     "license": "Pexels License",
     "license_url": "https://www.pexels.com/license/",
-    "published_date": "2025-12-25",
-    "location": "Hà Nội theo mô tả của tác giả",
     "location_verified": false,
+    "viewpoint": "overhead",
+    "capacity": 30,
+    "location_note": "Video góc cao dùng minh họa cho khu vực được chọn; chưa xác minh cùng tuyến đường hoặc thời điểm thực tế.",
+    "camera_slot": 2,
+    "id": "road-3078540",
+    "title": "High Angle Footage Of The Road With Traffic",
+    "author": "mostafa meraji",
+    "page_url": "https://www.pexels.com/video/high-angle-footage-of-the-road-with-traffic-3078540/",
+    "download_url": "https://videos.pexels.com/video-files/3078540/3078540-hd_1920_1080_30fps.mp4",
+    "published_date": "2019-10-14",
     "roi": [
-      0,
-      0.2,
-      0.88,
+      0.5,
+      0.53,
+      1,
+      0.98
+    ],
+    "road_profile": {
+      "lanes": 2,
+      "road_width_m": 7,
+      "observed_length_m": 100,
+      "usable_fraction": 0.85,
+      "calibration": "estimated"
+    },
+    "location": "Đường phố có nhà thờ Hồi giáo, chưa xác minh tuyến cụ thể"
+  },
+  {
+    "license": "Pexels License",
+    "license_url": "https://www.pexels.com/license/",
+    "location_verified": false,
+    "viewpoint": "overhead",
+    "capacity": 30,
+    "location_note": "Video góc cao dùng minh họa cho khu vực được chọn; chưa xác minh cùng tuyến đường hoặc thời điểm thực tế.",
+    "camera_slot": 3,
+    "id": "highway-18553054",
+    "title": "A view of traffic on a highway with cars",
+    "author": "Sururi Ballıdağ Director",
+    "page_url": "https://www.pexels.com/video/a-view-of-traffic-on-a-highway-with-cars-18553054/",
+    "download_url": "https://videos.pexels.com/video-files/18553054/18553054-uhd_3840_2160_30fps.mp4",
+    "published_date": "",
+    "roi": [
+      0.05,
+      0.3,
+      0.98,
       1
     ],
-    "capacity": 20
+    "road_profile": {
+      "lanes": 6,
+      "road_width_m": 21,
+      "observed_length_m": 120,
+      "usable_fraction": 0.85,
+      "calibration": "estimated"
+    },
+    "location": "Đường đô thị nhìn từ trên cao, chưa xác minh cùng tuyến minh họa"
+  },
+  {
+    "license": "Pexels License",
+    "license_url": "https://www.pexels.com/license/",
+    "location_verified": false,
+    "viewpoint": "overhead",
+    "capacity": 30,
+    "location_note": "Video góc cao dùng minh họa cho khu vực được chọn; chưa xác minh cùng tuyến đường hoặc thời điểm thực tế.",
+    "camera_slot": 4,
+    "id": "highway-29519571",
+    "title": "Urban Traffic Flow on Busy City Highway",
+    "author": "David Lomax",
+    "page_url": "https://www.pexels.com/video/urban-traffic-flow-on-busy-city-highway-29519571/",
+    "download_url": "https://videos.pexels.com/video-files/29519571/12706912_1080_1920_60fps.mp4",
+    "published_date": "",
+    "roi": [
+      0.08,
+      0.25,
+      1,
+      1
+    ],
+    "road_profile": {
+      "lanes": 3,
+      "road_width_m": 10,
+      "observed_length_m": 100,
+      "usable_fraction": 0.85,
+      "calibration": "estimated"
+    },
+    "location": "Đường đô thị nhìn từ trên cao, chưa xác minh cùng tuyến minh họa"
   },
   {
     "id": "high-angle-3696011",
@@ -56,6 +133,76 @@
       0.99,
       0.98
     ],
-    "capacity": 60
+    "capacity": 60,
+    "camera_slot": 5,
+    "road_profile": {
+      "lanes": 4,
+      "road_width_m": 14,
+      "observed_length_m": 65,
+      "usable_fraction": 0.7,
+      "calibration": "estimated"
+    }
+  },
+  {
+    "license": "Pexels License",
+    "license_url": "https://www.pexels.com/license/",
+    "location_verified": false,
+    "viewpoint": "overhead",
+    "capacity": 30,
+    "location_note": "Video góc cao dùng minh họa cho khu vực được chọn; chưa xác minh cùng tuyến đường hoặc thời điểm thực tế.",
+    "camera_slot": 6,
+    "id": "city-32176022",
+    "title": "Aerial View of Busy City Intersection with Cars",
+    "author": "K",
+    "page_url": "https://www.pexels.com/video/aerial-view-of-busy-city-intersection-with-cars-32176022/",
+    "download_url": "https://videos.pexels.com/video-files/32176022/13721314_3840_2160_24fps.mp4",
+    "published_date": "2025-05-20",
+    "roi": [
+      0.08,
+      0.05,
+      0.91,
+      0.95
+    ],
+    "road_profile": {
+      "lanes": 4,
+      "road_width_m": 14,
+      "observed_length_m": 60,
+      "usable_fraction": 0.7,
+      "calibration": "estimated"
+    },
+    "location": "Giao lộ với vạch dừng và làn rẽ, chưa xác minh tuyến cụ thể",
+    "detector_model": "yolo11s",
+    "detect_full_frame": true
+  },
+  {
+    "license": "Pexels License",
+    "license_url": "https://www.pexels.com/license/",
+    "location_verified": false,
+    "viewpoint": "overhead",
+    "capacity": 30,
+    "location_note": "Video góc cao dùng minh họa cho khu vực được chọn; chưa xác minh cùng tuyến đường hoặc thời điểm thực tế.",
+    "camera_slot": 7,
+    "id": "overhead-31843333",
+    "title": "Aerial View of Busy Urban Traffic Intersection",
+    "author": "Marc Espejo",
+    "page_url": "https://www.pexels.com/video/aerial-view-of-busy-urban-traffic-intersection-31843333/",
+    "download_url": "https://videos.pexels.com/video-files/31843333/13565786_3840_2160_30fps.mp4",
+    "published_date": "2025-04-29",
+    "roi": [
+      0,
+      0,
+      1,
+      0.36
+    ],
+    "road_profile": {
+      "lanes": 4,
+      "road_width_m": 14,
+      "observed_length_m": 130,
+      "usable_fraction": 0.9,
+      "calibration": "estimated"
+    },
+    "location": "Đường lớn nhìn từ trên cao, chưa xác minh tuyến cụ thể",
+    "detector_model": "yolo11s",
+    "detect_full_frame": true
   }
 ]

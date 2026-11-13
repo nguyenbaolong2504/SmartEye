@@ -104,6 +104,11 @@
 .camera-video-credit>div {display:flex;gap:15px;flex-wrap:wrap}
 .camera-video-credit a {display:inline-flex;align-items:center;gap:5px;color:#177e77}
 .camera-conditions {padding:18px 0;border-top:1px solid #e1ebef;margin-top:20px}
+.camera-road-assessment {margin:22px 0;padding:18px 0;border-top:1px solid #e1ebef}
+.camera-road-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:15px 0}
+.camera-road-metrics article {display:grid;gap:9px;padding:14px;border:1px solid #dfebed;border-radius:10px;min-width:0}
+.camera-road-metrics span,.camera-road-metrics small {font-size:11px;line-height:1.7;color:#5d7b87}
+.camera-road-metrics b {font-size:18px;color:#157f74;overflow-wrap:anywhere}
 .camera-conditions>h3 {display:flex;align-items:center;gap:8px;font-size:16px}
 .camera-condition-summary {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;color:#486775}
 .camera-condition-summary article {background:#f3f8f8;padding:16px;border-radius:10px;min-width:0}
@@ -126,6 +131,7 @@
 }
 @media(max-width:760px) {
   .camera-condition-summary,.camera-condition-inputs {grid-template-columns:1fr}
+  .camera-road-metrics {grid-template-columns:1fr}
   .camera-filters {grid-template-columns:1fr;gap:14px}
   .camera-workspace {grid-template-columns:1fr}
   .camera-directory-list {display:flex;align-items:flex-start;max-height:none;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity}

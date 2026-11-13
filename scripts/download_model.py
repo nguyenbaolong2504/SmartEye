@@ -7,6 +7,22 @@ root=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root))
 from backend.app.config import MODEL_PATH
 
+
+def download_model(path,variant='n'):
+    if variant not in ('n','s'):raise ValueError('Unsupported detector variant')
+    path.parent.mkdir(parents=True,exist_ok=True)
+    if path.is_file():return path
+    temporary=path.with_suffix('.download')
+    try:
+        urllib.request.urlretrieve(f'https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11{variant}.pt',temporary)
+        temporary.replace(path)
+        from ultralytics import YOLO
+        model=YOLO(str(path))
+        if not {'car','bus','truck'}<=set(model.names.values()):
+            path.unlink();raise RuntimeError('Downloaded model does not include vehicle classes')
+    finally:temporary.unlink(missing_ok=True)
+    return path
+
 if __name__ == '__main__':
     MODEL_PATH.parent.mkdir(parents=True,exist_ok=True)
     if MODEL_PATH.exists():

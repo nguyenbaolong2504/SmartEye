@@ -133,7 +133,7 @@ def item(db, model, ident):
     return row
 
 def camera_dict(c):
-    return {k:getattr(c,k) for k in ('id','name','segment_id','active','capacity','low_threshold','high_threshold','roi','analysis_job_id')}
+    return {k:getattr(c,k) for k in ('id','name','segment_id','active','capacity','low_threshold','high_threshold','roi','road_profile','analysis_job_id')}
 
 def own(row, user):
     if row.user_id != user.id: raise HTTPException(403,'Bạn không có quyền truy cập dữ liệu này.')

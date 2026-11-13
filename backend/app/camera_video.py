@@ -16,7 +16,7 @@ from .security import can,permit,audit
 from .monitoring import share_media
 
 router=APIRouter()
-CALIBRATION=('segment_id','capacity','low_threshold','high_threshold','roi')
+CALIBRATION=('segment_id','capacity','low_threshold','high_threshold','roi','road_profile')
 logger=logging.getLogger('smarteye.camera_video')
 
 
@@ -80,8 +80,11 @@ def queue_video(db,camera,user_id,path,metadata):
     try:
         shutil.copyfile(path,destination)
         filename=Path(path).name if Path(path).suffix.lower()=='.mp4' else 'camera.mp4'
+        config=camera_config(camera)
+        if metadata.get('detector_model')=='yolo11s':config['detector_model']='yolo11s'
+        if metadata.get('detect_full_frame'):config['detect_full_frame']=True
         job=VideoJob(id=ident,user_id=user_id,camera_id=camera.id,filename=filename,
-            camera_config=camera_config(camera),retain_video=True,source_metadata={**metadata,'detection_version':2})
+            camera_config=config,retain_video=True,source_metadata={**metadata,'detection_version':2})
         db.add(job);db.commit()
         condition={'analysis_job_id':camera.analysis_job_id,'active':camera.active,
                    **{key:getattr(camera,key) for key in CALIBRATION}}
@@ -182,6 +185,7 @@ def analysis(ident:int,user=Depends(permit('cameras.view')),db=Depends(get_db)):
         'total_unique_vehicle_counts':result.get('total_unique_vehicle_counts'),
         'frames':frames,'fps':result.get('fps',1),'roi':job.camera_config['roi'],
         'detection_version':result.get('detection_version',1),'capacity':job.camera_config['capacity'],
+        'road_geometry':result.get('road_geometry'),'capacity_version':result.get('capacity_version'),
         'average_count':result['average_count'],'peak_count':result['peak_count'],
         'low_threshold':job.camera_config['low_threshold'],'high_threshold':job.camera_config['high_threshold'],
         'frame_url':f'/api/traffic/cameras/recordings/{ident}/analysis-frame?v={job.id}',

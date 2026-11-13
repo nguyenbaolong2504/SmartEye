@@ -90,6 +90,7 @@ class Camera(Document):
     low_threshold: float = .25
     high_threshold: float = .6
     roi: list = field(default_factory=lambda:[0,0,1,1])
+    road_profile: dict | None = None
     preview_public: bool = False
     preview_at: str | None = None
     preview_source: str | None = None

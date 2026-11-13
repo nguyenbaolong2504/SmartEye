@@ -6,6 +6,8 @@ test('video playback, density timeline and three forecast horizons stay synchron
     const boxes=Array.from({length:count},(_,i)=>({label:i<3?'car':'motorcycle',confidence:.88,
       box:[20+i%6*95+index,70+Math.floor(i/6)*75,80+i%6*95+index,120+Math.floor(i/6)*75]}));
     return {second:index/2,frame_index:index,width:640,height:360,count,score:count/20,occupancy:.2,
+      equivalent_count:Math.min(count,3)+Math.max(count-3,0)*.25,
+      load_ratio:(Math.min(count,3)+Math.max(count-3,0)*.25)/7.5,motion_known:false,
       cumulative_count:index<1?2:index<6?3:21,
       cumulative_vehicle_counts:{car:index<1?2:index<6?3:6,motorcycle:index>=6?15:0,bus:0,truck:0},
       density:count>10?'HIGH':'LOW',boxes,vehicle_counts:{car:Math.min(count,3),motorcycle:Math.max(count-3,0),bus:0,truck:0}};
@@ -18,6 +20,9 @@ test('video playback, density timeline and three forecast horizons stay synchron
   await page.route('**/api/traffic/cameras',route=>route.fulfill({json:{cameras:[camera],generated_at:new Date().toISOString()}}));
   await page.route(url=>url.pathname==='/api/traffic/cameras/recordings/1/analysis',route=>route.fulfill({json:{
     state:'completed',progress:100,is_demo:true,method:'YOLO11',message:'Phân tích chạy thử',
+    road_geometry:{lanes:1,road_width_m:3.5,observed_length_m:45,usable_fraction:1,calibration:'estimated',
+      usable_area_m2:157.5,capacity_pcu:7.5,car_space_m2:21,high_density_pcu:4.5,
+      equivalents:{car:1,motorcycle:.25,bus:3,truck:2.5},calibration_note:'Kích thước minh họa, cần kiểm tra tại đường thực tế.'},
     frames:Array.from({length:12},(_,i)=>frame(i)),fps:2,roi:[0,0,1,1],capacity:20,
     samples:[{second:0,count:2,score:.1,occupancy:.1,density:'LOW',vehicle_counts:{car:2,motorcycle:0,bus:0,truck:0}},
       {second:3,count:18,score:.95,occupancy:.6,density:'HIGH',vehicle_counts:{car:3,motorcycle:15,bus:0,truck:0}}],
@@ -60,6 +65,12 @@ test('video playback, density timeline and three forecast horizons stay synchron
   await expect(page.locator('.camera-forecast-cards strong')).toHaveText(['Dễ ùn tắc','Dễ ùn tắc','Dễ ùn tắc']);
   await expect(page.locator('canvas.camera-detection-overlay')).toHaveAttribute('data-box-count','18');
   await expect(page.locator('.camera-current-counts article b')).toHaveText(['18','3','15','0','0']);
+  await expect(page.getByRole('region',{name:'Đánh giá theo kích thước đường'})).toContainText('3.5 m');
+  await page.getByRole('button',{name:'Xem cách tính',exact:true}).click();
+  await expect(page.getByRole('dialog')).toContainText('6.75');
+  await expect(page.getByRole('dialog')).toContainText('90%');
+  await expect(page.getByRole('dialog')).toContainText('chưa đủ để gọi là ùn tắc');
+  await page.keyboard.press('Escape');
   await expect(page.locator('.camera-cumulative .camera-counts article b')).toHaveText(['21','6','15','0','0']);
   const hasPaint=()=>page.locator('canvas.camera-detection-overlay').evaluate(c=>{
     const canvas=c as HTMLCanvasElement;return canvas.getContext('2d')!.getImageData(0,0,canvas.width,canvas.height).data.some((v,i)=>i%4===3&&v>0);
