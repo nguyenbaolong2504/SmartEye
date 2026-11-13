@@ -53,6 +53,12 @@
 .camera-map-pin svg {width:21px;height:21px}
 .camera-analysis {margin-top:24px;padding-top:22px;border-top:1px solid #e1e9ee}
 .camera-analysis h3 {margin:0;font-size:17px;color:#20495c}
+.camera-cumulative {padding:18px;border:1px solid #cde7df;border-radius:12px;background:#f2faf6;margin-bottom:25px}
+.camera-cumulative>p {font-size:12px;color:#6e8491;line-height:1.7}
+.camera-cumulative .camera-counts {margin-top:14px}
+.camera-cumulative .camera-counts article {background:white}
+.camera-scenario-note {padding:12px 15px;border-radius:8px;background:#fff5df;color:#866326;font-size:12px;line-height:1.7}
+.camera-scenario-note p {margin:0 0 10px}
 .camera-analysis-heading {display:flex;justify-content:space-between;gap:14px;align-items:center}
 .camera-analysis-heading p {font-size:11px;color:#748b96;margin:7px 0 0}
 .camera-density {font-size:24px;white-space:nowrap;color:#18896c}

@@ -32,7 +32,7 @@ export default function CameraDetectionOverlay({videoRef,data,visible,onTime}:{v
           ctx.strokeRect(left+a*frame.width*scale,top+b*frame.height*scale,(c-a)*frame.width*scale,(d-b)*frame.height*scale);ctx.setLineDash([]);
         }
         for(const box of frame.boxes||[]){
-          const [a,b,c,d]=box.box,color=colors[box.label]||'#24edaa',label=names[box.label]||'Xe';
+          const [a,b,c,d]=box.box,color=colors[box.label]||'#24edaa',label=`${names[box.label]||'Xe'}${box.track_id!=null?` #${box.track_id}`:''}`;
           const x=left+a*scale,y=top+b*scale,w=(c-a)*scale,h=(d-b)*scale;
           ctx.strokeStyle=color;ctx.strokeRect(x,y,w,h);
           const textWidth=ctx.measureText(label).width+7,textX=Math.min(Math.max(left,x),left+frame.width*scale-textWidth);

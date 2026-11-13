@@ -75,6 +75,7 @@ Thông tin công khai chỉ dành cho demo. Script giữ password/quyền của 
 | Dijkstra | Thuật toán tham chiếu và chuẩn hóa chi phí; có API đối chiếu, không cần lựa chọn trên giao diện |
 | OSRM | Dịch vụ cung cấp nhanh các tuyến ô tô trên OSM. SmartEye xếp hạng các tuyến được trả về; không tuyên bố chạy A* trên đồ thị nội bộ của dịch vụ |
 | YOLO11 | Đếm xe và đo mức chiếm vùng quan sát trong video tại trang Camera giao thông. Video mẫu có nguồn và giấy phép riêng; màn hình tải video cá nhân vẫn được gỡ |
+| ByteTrack | Theo dõi mã xe qua các khung hình để đếm cộng dồn, tránh cộng lại cùng xe đang đứng chờ; có thể sai khi mất dấu hoặc camera chuyển động |
 
 Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle, yêu cầu loại cao tốc và kiểm tra kết quả trả về; không dùng tuyến ô tô/xe đạp thay thế. Cache chỉ giữ ứng viên hình học/ETA tham chiếu; ưu tiên và tình trạng giao thông được tính lại mỗi lần. Thời gian/khoảng cách là ước tính, chưa phải dẫn đường thời gian thực. Phần đường không có dữ liệu không được coi là thông thoáng. Các dịch vụ công cộng có thể gián đoạn; dùng máy chủ riêng khi cần tải lớn. [Chi tiết định tuyến và giới hạn](docs/MAPS.md).
 
@@ -85,5 +86,7 @@ Nguồn OSRM mặc định hỗ trợ ô tô. Xe máy dùng Valhalla motorcycle,
 [Dữ liệu demo](docs/DEMO.md) · [Bản đồ](docs/MAPS.md) · [Pipeline XGBoost/GRU trên dữ liệu thực](docs/FORECASTING.md) · [API](docs/api.md) · [Kiểm thử](docs/validation.md).
 
 **Video camera mẫu:** chạy `docker compose exec backend python scripts/download_model.py` rồi `docker compose exec backend python scripts/setup_camera_videos.py`. Mở **Camera giao thông** để xem ô nhận diện và số ô tô/xe máy/xe buýt/xe tải đồng bộ từng khung hình, dự báo chạy thử sau 15/30/60 phút kèm tỷ lệ ùn tắc và nút **Vì sao?**. Tỷ lệ được tính trên lịch sử minh họa, chưa được kiểm chứng ngoài đường. [Nguồn video, cách cài và giới hạn dự báo](docs/DEMO.md#video-camera-và-dự-báo-mật-độ).
+
+Thêm `--rush-hour` vào lệnh chuẩn bị video để có **Ngã Tư Sở · Tình huống 17:00**. Trang tách số xe cộng dồn bằng ByteTrack và số xe đang xuất hiện; có nút xem đoạn đông xe nhất và dự báo cho 17:15/17:30. Đây là tình huống minh họa với clip giao lộ Việt Nam, chưa xác minh video quay tại Ngã Tư Sở hoặc lúc 17:00.
 
 `src/`: frontend · `backend/app/`: API/PyMongo/mô hình · `backend/tests/`: Pytest · `tests/e2e/`: Playwright · `scripts/`: khởi tạo và dữ liệu mẫu · `deploy/`: Nginx/Mongo init.

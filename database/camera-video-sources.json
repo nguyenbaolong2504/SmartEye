@@ -36,5 +36,24 @@
       1
     ],
     "capacity": 20
+  },
+  {
+    "id": "vietnam-intersection-dusk-36077788",
+    "title": "Busy Vietnamese City Intersection at Dusk",
+    "author": "J-Steve Pham",
+    "page_url": "https://www.pexels.com/video/busy-vietnamese-city-intersection-at-dusk-36077788/",
+    "download_url": "https://videos.pexels.com/video-files/36077788/15300802_3840_2160_60fps.mp4",
+    "license": "Pexels License",
+    "license_url": "https://www.pexels.com/license/",
+    "published_date": "2026-02-09",
+    "location": "Giao lộ ở Việt Nam theo tác giả, không xác minh là Hà Nội hoặc Ngã Tư Sở",
+    "location_verified": false,
+    "location_note": "Clip giao lộ Việt Nam dùng minh họa cho tình huống Ngã Tư Sở; không phải camera tại Ngã Tư Sở. Chưa xác minh giờ quay.",
+    "roi": [0, 0.63, 1, 1],
+    "capacity": 20,
+    "scenario": "nga-tu-so-rush-hour",
+    "scenario_hour": "17:00",
+    "scenario_note": "Giả định lúc 17:00 để thử dự báo 17:15 và 17:30, không phải giờ quay thực của clip.",
+    "reference_url": "https://dantri.com.vn/thoi-su/duong-vanh-dai-2-tren-cao-un-tac-dai-gan-3km-tu-nga-tu-vong-ve-nga-tu-so-20230111184108866.htm"
   }
 ]

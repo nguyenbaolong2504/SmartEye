@@ -37,7 +37,14 @@ def finish_analysis(ident):
         if not camera or camera.analysis_job_id!=ident or not matches(camera,job):return
         result=dict(job.result)
         try:
-            result['camera_forecast']=predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config)
+            reference=None
+            if job.source_metadata.get('scenario_hour'):
+                from datetime import timedelta
+                from .db import now
+                from .history import LOCAL
+                hour,minute=map(int,job.source_metadata['scenario_hour'].split(':'))
+                reference=(now().astimezone(LOCAL)-timedelta(days=1)).replace(hour=hour,minute=minute,second=0,microsecond=0)
+            result['camera_forecast']=predict_samples(db.database,camera.segment_id,result.get('frames',result['samples']),job.camera_config,issue=reference)
         except Exception:
             logger.exception('Camera forecast unavailable for %s',ident)
             result['camera_forecast']={'state':'unavailable','is_demo':True,'timeline':[],
@@ -135,6 +142,9 @@ def analysis(ident:int,user=Depends(permit('cameras.view')),db=Depends(get_db)):
     forecast=result.get('camera_forecast') if can(user,'forecast.view') else None
     frames=result.get('frames',[])
     return {**base,'duration_seconds':result['duration_seconds'],'samples':samples,
+        'counting_method':result.get('counting_method'),'counting_version':result.get('counting_version'),
+        'total_unique_count':result.get('total_unique_count'),
+        'total_unique_vehicle_counts':result.get('total_unique_vehicle_counts'),
         'frames':frames,'fps':result.get('fps',1),'roi':job.camera_config['roi'],
         'detection_version':result.get('detection_version',1),'capacity':job.camera_config['capacity'],
         'average_count':result['average_count'],'peak_count':result['peak_count'],

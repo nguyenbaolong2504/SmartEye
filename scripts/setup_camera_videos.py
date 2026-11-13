@@ -48,13 +48,38 @@ def sample_video(source):
     return target,hashlib.sha256(target.read_bytes()).hexdigest()
 
 
-def setup(ids=None,refresh=False):
+def rush_hour_camera():
+    """One separately named synthetic location; do not rename an existing road."""
+    with SessionLocal() as db:
+        road=db.find_one(Segment,{'start_node':'demo-ngatuso-north','end_node':'demo-ngatuso-south','is_demo':True})
+        if not road:
+            road=Segment(name='Ngã Tư Sở (minh họa)',start_node='demo-ngatuso-north',end_node='demo-ngatuso-south',
+                distance_km=.35,geometry=[[21.0052,105.8205],[21.0035,105.8216],[21.0019,105.8230]],is_demo=True)
+            db.add(road);db.commit()
+        camera=db.find_one(Camera,{'segment_id':road.id})
+        if not camera:
+            camera=Camera(name='Ngã Tư Sở · Tình huống 17:00',segment_id=road.id,roi=[0,.63,1,1],capacity=20)
+            db.add(camera);db.commit()
+        return camera.id,road.id
+
+
+def setup(ids=None,refresh=False,rush_hour=False):
     from backend.app.camera_forecast import prepare_models
     initialize_database()
     if not MODEL_PATH.is_file():raise ValueError('Cần tải mô hình bằng python scripts/download_model.py trước.')
+    scenario_id=None
+    if rush_hour:
+        from backend.app.demo_data import prepare_demo,status
+        scenario_id,segment_id=rush_hour_camera()
+        current=status(get_database())
+        if segment_id not in current['segment_ids']:
+            print('Bổ sung lịch sử minh họa một năm cho tuyến mới và huấn luyện lại bộ mẫu',flush=True)
+            if not prepare_demo(get_database(),days=current.get('history_days') or 365):
+                raise ValueError('Đang có lượt chuẩn bị lịch sử khác. Vui lòng đợi rồi chạy lại.')
     manifest=json.loads((ROOT/'database'/'camera-video-sources.json').read_text(encoding='utf-8'))
     assets=[]
     for source in manifest:
+        if source.get('scenario') and not rush_hour:continue
         print(f'Chuẩn bị video {source["title"]}',flush=True)
         path,digest=sample_video(source)
         assets.append((source,path,digest))
@@ -63,11 +88,14 @@ def setup(ids=None,refresh=False):
     with SessionLocal() as db:
         owner=db.find_one(User,{'role':'admin','active':True})
         if not owner:raise ValueError('Cần ít nhất một tài khoản Admin hoạt động.')
-        cameras=db.find(Camera,{'id':{'$in':ids}} if ids else {'id':{'$in':[1,2,3,4]}},sort=[('id',1)])
+        wanted=list(ids) if ids else [1,2,3,4]
+        if scenario_id and scenario_id not in wanted:wanted.append(scenario_id)
+        cameras=db.find(Camera,{'id':{'$in':wanted}},sort=[('id',1)])
+        ordinary=[item for item in assets if not item[0].get('scenario')]
         for camera in cameras:
             segment=db.get(Segment,camera.segment_id)
             if not segment or not segment.active:continue
-            source,path,digest=assets[(camera.id-1)%len(assets)]
+            source,path,digest=next(item for item in assets if item[0].get('scenario')) if camera.id==scenario_id else ordinary[(camera.id-1)%len(ordinary)]
             previous=db.get(VideoJob,camera.analysis_job_id) if camera.analysis_job_id else None
             if not previous and camera.roi==[0,0,1,1] and camera.capacity==30:
                 db.update(Camera,camera.id,{'roi':source['roi'],'capacity':source['capacity']})
@@ -75,6 +103,7 @@ def setup(ids=None,refresh=False):
             if (not refresh and previous and previous.status=='completed' and previous.source_metadata.get('sha256')==digest
                 and all(previous.camera_config.get(key)==getattr(camera,key) for key in ('segment_id','roi','capacity','low_threshold','high_threshold'))
                 and previous.result and previous.result.get('detection_version')==2
+                and previous.result.get('counting_version')==1
                 and previous.result.get('camera_forecast',{}).get('version')==report.get('version')
                 and previous.result.get('camera_forecast',{}).get('run_id')==report['run_id']
                 and (UPLOADS/f'{previous.id}.retained').is_file() and camera.preview_public and camera.preview_job_id==previous.id):
@@ -84,7 +113,7 @@ def setup(ids=None,refresh=False):
             metadata={key:value for key,value in source.items() if key!='download_url'}
             metadata.update(is_demo=True,sha256=digest,transformation='Nén H.264, tối đa 960px, 15fps, bỏ âm thanh',
                 calibration_note='Vùng mặt đường và sức chứa được ước lượng để chạy thử, cần hiệu chỉnh bằng dữ liệu thực tế.',
-                location_note='Video minh họa từ Hà Nội. Chưa xác minh video quay tại tuyến đang chọn.')
+                location_note=source.get('location_note','Video minh họa từ Hà Nội. Chưa xác minh video quay tại tuyến đang chọn.'))
             db.update(Camera,camera.id,{'active':True});camera.active=True
             job=queue_video(db,camera,owner.id,path,metadata)
             print(f'Phân tích {camera.name} · {job.id}',flush=True)
@@ -99,5 +128,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--camera-id',type=int,action='append',dest='ids')
     parser.add_argument('--refresh',action='store_true')
+    parser.add_argument('--rush-hour',action='store_true',help='Thêm tình huống Ngã Tư Sở lúc 17:00 với clip giao lộ minh họa')
     args=parser.parse_args()
-    setup(args.ids,args.refresh)
+    setup(args.ids,args.refresh,args.rush_hour)

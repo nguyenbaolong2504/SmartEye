@@ -180,6 +180,8 @@ def test_camera_detection_processes_every_frame_and_counts_exactly_the_displayed
         assert frame['count']==len(frame['boxes'])==sum(frame['vehicle_counts'].values())==2
         assert frame['vehicle_counts']=={'car':1,'motorcycle':1,'bus':0,'truck':0}
         assert frame['boxes'][0]['box']==[50,70,130,150]
+        assert frame['cumulative_count']==2
+        assert sum(frame['cumulative_vehicle_counts'].values())==2
     assert calls[0][0]==(156,320,3) and calls[0][1]['agnostic_nms']
     again=camera_detection.detect_clip(path,{**config,'capacity':50},lambda _:None)
     assert len(calls)==4 and again['frames'][0]['count']==2
@@ -190,6 +192,32 @@ def test_probability_temperature_outputs_distribution_without_forcing_ninety_per
     values=camera_forecast.probabilities(np.array([[.1,.2,.7],[.6,.3,.1]]),2.)
     assert values.sum(axis=1)==pytest.approx([1,1])
     assert 0<values[0,2]<.7 and values[1,2]!=values[0,2]
+
+
+def test_cumulative_tracking_does_not_add_the_same_stopped_or_briefly_hidden_car_again():
+    from backend.app.camera_counting import cumulative_tracks
+    first={'box':[20,30,100,100],'label':'car','confidence':.95}
+    second={'box':[180,40,220,100],'label':'motorcycle','confidence':.95}
+    sequence=[[first],[first],[first],[],[first],[first,second],[first,second],[first,second]]
+    frames=[{'second':i/15,'frame_index':i,'width':400,'height':240,'boxes':boxes} for i,boxes in enumerate(sequence)]
+    output=cumulative_tracks(frames,15)
+    assert [row['cumulative_count'] for row in output[:5]]==[1]*5
+    assert output[-1]['cumulative_count']==2
+    assert output[-1]['cumulative_vehicle_counts']=={'car':1,'motorcycle':1,'bus':0,'truck':0}
+    car_ids=[box['track_id'] for row in output for box in row['boxes'] if box['label']=='car' and box['track_id']]
+    assert len(set(car_ids))==1
+
+
+def test_rush_hour_setup_is_idempotent_and_preserves_existing_roads_and_cameras(client):
+    from scripts.setup_camera_videos import rush_hour_camera
+    with SessionLocal() as db:
+        roads=list(db.database.segments.find());cameras=list(db.database.cameras.find())
+    first=rush_hour_camera();second=rush_hour_camera()
+    assert first==second
+    with SessionLocal() as db:
+        assert db.get(Segment,first[1]).is_demo and db.get(Camera,first[0]).capacity==20
+        assert all(db.database.segments.find_one({'_id':row['_id']})==row for row in roads)
+        assert all(db.database.cameras.find_one({'_id':row['_id']})==row for row in cameras)
 
 
 @pytest.mark.parametrize('status,suffix',[('completed','retained'),('processing','video')])

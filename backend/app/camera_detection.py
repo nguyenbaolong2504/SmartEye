@@ -73,6 +73,8 @@ def detect_clip(path,config,checkpoint):
             'occupancy':round(occupancy,4),'score':round(score,4),
             'density':classify(score,config['low_threshold'],config['high_threshold'])})
     if not output:raise ValueError('Chưa có khung hình hợp lệ.')
+    from .camera_counting import cumulative_tracks,VERSION as COUNTING_VERSION
+    output=cumulative_tracks(output,raw['fps'])
     # Keep one sample per second for existing archive APIs; the viewer uses all frames.
     samples=[];last_second=-1
     for frame in output:
@@ -80,13 +82,16 @@ def detect_clip(path,config,checkpoint):
         if second!=last_second:samples.append({**frame,'second':second});last_second=second
     score=float(np.median([frame['score'] for frame in output]))
     return {'detection_version':VERSION,'frames':output,'samples':samples,'fps':raw['fps'],
+        'counting_version':COUNTING_VERSION,'counting_method':'ByteTrack',
+        'total_unique_count':output[-1]['cumulative_count'],
+        'total_unique_vehicle_counts':output[-1]['cumulative_vehicle_counts'],
         'sample_rate':raw['fps'],'duration_seconds':round(raw['duration_seconds'],6),
         'average_count':round(float(np.mean([frame['count'] for frame in output])),1),
         'peak_count':max(frame['count'] for frame in output),'score':round(score,4),
         'density':classify(score,config['low_threshold'],config['high_threshold']),
         'distribution':{label:sum(frame['density']==label for frame in output) for label in ('LOW','NORMAL','HIGH')},
         'model':MODEL_PATH.name,'parameters':PARAMETERS,'roi':config['roi'],
-        'note':'Số xe trong từng khung hình bằng số ô nhận diện trong vùng quan sát; không phải số xe duy nhất qua đường.'}
+        'note':'Đang xuất hiện là số ô trong khung hình; cộng dồn là số mã xe đã được ByteTrack xác nhận từ đầu clip, không cộng lại từng khung hình. Mất dấu có thể làm đổi mã.'}
 
 
 def analyze_camera(ident):
