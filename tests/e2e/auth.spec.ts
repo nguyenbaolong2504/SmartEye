@@ -36,6 +36,33 @@ test('glass sign-in and registration create an account and sign in with the exis
   await expect(page.getByRole('button',{name:'Hồ sơ Người kiểm thử giao diện',exact:true})).toBeVisible();
 });
 
+test('username rejects an email before sending registration and accepts permitted punctuation',async({page})=>{
+  const errors:string[]=[];page.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text());});
+  const dialog=await open(page);let requests=0;
+  await page.route('**/api/auth/register',route=>{
+    requests++;expect(route.request().postDataJSON().username).toBe('User.Name_2026-Test');
+    return route.fulfill({status:201,json:{id:900001}});
+  });
+  await dialog.getByRole('button',{name:'Tạo tài khoản mới',exact:true}).click();
+  await dialog.getByLabel('Họ và tên',{exact:true}).fill('Người kiểm thử tên đăng nhập');
+  const username=dialog.getByLabel('Tên đăng nhập',{exact:true});
+  await username.fill('student@example.invalid');
+  await dialog.getByLabel('Email',{exact:true}).fill('student@example.invalid');
+  await dialog.getByLabel('Mật khẩu',{exact:true}).fill('test-signup-password-2026');
+  await dialog.getByLabel('Xác nhận mật khẩu',{exact:true}).fill('test-signup-password-2026');
+  await dialog.getByRole('button',{name:'Tạo tài khoản',exact:true}).click();
+  expect(requests).toBe(0);await expect(username).toBeFocused();
+  await expect(dialog.locator('#auth-username-error')).toContainText('Tên đăng nhập không dùng địa chỉ email');
+  expect(await username.evaluate((input:HTMLInputElement)=>input.validity.patternMismatch)).toBe(true);
+  await username.fill(' User.Name_2026-Test ');await username.blur();
+  await expect(username).toHaveValue('User.Name_2026-Test');
+  await expect(username).toHaveAttribute('aria-invalid','false');
+  expect(await username.evaluate((input:HTMLInputElement)=>input.checkValidity())).toBe(true);
+  await dialog.getByRole('button',{name:'Tạo tài khoản',exact:true}).click();
+  await expect(dialog).toContainText('Tạo tài khoản thành công.');expect(requests).toBe(1);
+  expect(errors.filter(message=>/pattern|regular expression|SyntaxError/i.test(message))).toEqual([]);
+});
+
 for(const delivery of ['email','sms'] as const){
   test(`password recovery via ${delivery} requires OTP, handles expiry and resend, then sets a new password`,async({page},info)=>{
     await page.clock.install();const dialog=await open(page,true);

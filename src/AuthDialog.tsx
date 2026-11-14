@@ -11,10 +11,18 @@ type Delivery='email'|'sms';
 type Challenge={challenge:string;expires_in:number;resend_after:number;delivery:Delivery;message:string};
 const titles={login:'Chào mừng trở lại',register:'Tạo tài khoản SmartEye',forgot:'Khôi phục mật khẩu',otp:'Nhập mã xác nhận',reset:'Chọn mật khẩu mới'};
 const labels={login:'Đăng nhập',register:'Tạo tài khoản',forgot:'Gửi mã OTP',otp:'Xác nhận mã',reset:'Đặt lại mật khẩu'};
+function usernameMessage(value:string){
+  const name=value.trim();
+  if(!name)return 'Vui lòng nhập tên đăng nhập.';
+  if(name.includes('@'))return 'Tên đăng nhập không dùng địa chỉ email. Ví dụ: smarteye2026. Nhập email vào ô Email.';
+  if(name.length<3||name.length>40)return 'Tên đăng nhập cần từ 3 đến 40 ký tự.';
+  return /^[A-Za-z0-9_.-]+$/.test(name)?'':'Chỉ dùng chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.';
+}
 
 export function AuthModal({onClose,onUser,config,resetToken}:{onClose:()=>void;onUser:(user:User|null)=>void;config:Config;resetToken?:string}){
   const [mode,setMode]=useState<Mode>(resetToken?'reset':'login');
   const [name,setName]=useState(''),[username,setUsername]=useState(''),[email,setEmail]=useState(''),[phone,setPhone]=useState('');
+  const [usernameError,setUsernameError]=useState('');
   const [password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[showPassword,setShowPassword]=useState(false);
   const [identifier,setIdentifier]=useState(''),[delivery,setDelivery]=useState<Delivery>('email'),[code,setCode]=useState('');
   const [challenge,setChallenge]=useState<Challenge|null>(null),[verifiedToken,setVerifiedToken]=useState(resetToken||'');
@@ -35,7 +43,7 @@ export function AuthModal({onClose,onUser,config,resetToken}:{onClose:()=>void;o
   function close(){request.current?.abort();onClose();}
   function changeMode(next:Mode){
     if(action.busy)return;
-    request.current?.abort();setMode(next);setPassword('');setConfirmation('');setShowPassword(false);setMessage('');action.setError('');setCode('');setVerifiedToken('');
+    request.current?.abort();setMode(next);setPassword('');setConfirmation('');setShowPassword(false);setMessage('');action.setError('');setUsernameError('');setCode('');setVerifiedToken('');
     if(next==='forgot'){
       const method=config.password_reset_channels?.email===false&&config.password_reset_channels?.sms?'sms':'email';
       setDelivery(method);setIdentifier(method==='email'&&email.includes('@')?email:'');setChallenge(null);
@@ -59,8 +67,10 @@ export function AuthModal({onClose,onUser,config,resetToken}:{onClose:()=>void;o
       if(mode==='login'){
         const user=await call<User>('/auth/login',{email,password});onUser(user);close();
       }else if(mode==='register'){
+        const invalid=usernameMessage(username);
+        if(invalid){setUsernameError(invalid);throw new Error(invalid);}
         if(password!==confirmation)throw new Error('Mật khẩu và xác nhận không khớp.');
-        await call('/auth/register',{name,username,email,phone,password,password_confirmation:confirmation});
+        await call('/auth/register',{name,username:username.trim(),email,phone,password,password_confirmation:confirmation});
         setMode('login');setPassword('');setConfirmation('');setShowPassword(false);setMessage('Tạo tài khoản thành công. Bạn có thể đăng nhập ngay.');
       }else if(mode==='forgot')await sendOTP();
       else if(mode==='otp'){
@@ -88,7 +98,7 @@ export function AuthModal({onClose,onUser,config,resetToken}:{onClose:()=>void;o
       {recovery&&<ol className="auth-steps" aria-label="Các bước khôi phục">{['Thông tin','Mã OTP','Mật khẩu mới'].map((text,index)=>{const step=mode==='forgot'?0:mode==='otp'?1:2;return <li key={text} className={index<=step?'active':''} aria-current={index===step?'step':undefined}><span>{index<step?<Check size={12}/>:index+1}</span>{text}</li>;})}</ol>}
       <Feedback error={action.error} success={message}/>
       <form onSubmit={submit} className="auth-form">
-        {mode==='register'&&<div className="auth-form-pair"><label className="field">Họ và tên<div className="auth-input"><UserRound size={16}/><input aria-label="Họ và tên" value={name} onChange={e=>setName(e.target.value)} required minLength={2} maxLength={100} autoComplete="name" placeholder="Tên của bạn"/></div></label><label className="field">Tên đăng nhập<div className="auth-input"><UserRound size={16}/><input aria-label="Tên đăng nhập" value={username} onChange={e=>setUsername(e.target.value)} required minLength={3} maxLength={40} pattern="[A-Za-z0-9_.-]+" autoComplete="username" placeholder="ten_dang_nhap"/></div></label><p className="auth-field-note">Tên đăng nhập dùng chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.</p></div>}
+        {mode==='register'&&<div className="auth-form-pair"><label className="field">Họ và tên<div className="auth-input"><UserRound size={16}/><input aria-label="Họ và tên" value={name} onChange={e=>setName(e.target.value)} required minLength={2} maxLength={100} autoComplete="name" placeholder="Tên của bạn"/></div></label><label className="field">Tên đăng nhập<div className="auth-input"><UserRound size={16}/><input id="auth-username" aria-label="Tên đăng nhập" aria-invalid={!!usernameError} aria-describedby={usernameError?'auth-username-hint auth-username-error':'auth-username-hint'} value={username} onChange={e=>{const value=e.target.value;e.currentTarget.setCustomValidity('');setUsername(value);if(usernameError||value.includes('@'))setUsernameError(value?usernameMessage(value):'');action.setError('');}} onBlur={e=>{const value=e.currentTarget.value.trim();e.currentTarget.setCustomValidity('');setUsername(value);setUsernameError(value?usernameMessage(value):'');}} onInvalid={e=>{const message=usernameMessage(e.currentTarget.value);e.currentTarget.setCustomValidity(message);setUsernameError(message);}} required minLength={3} maxLength={40} pattern="(?:[A-Za-z0-9_.]|-){3,40}" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="Ví dụ: smarteye2026"/></div>{usernameError&&<small id="auth-username-error" className="auth-field-error" role="alert">{usernameError}</small>}</label><p id="auth-username-hint" className="auth-field-note">Tên đăng nhập khác email. Ví dụ: smarteye2026 hoặc smarteye_2026.</p></div>}
         {['login','register'].includes(mode)&&<label className="field">{mode==='login'?'Email hoặc tên đăng nhập':'Email'}<div className="auth-input"><Mail size={16}/><input aria-label={mode==='login'?'Email hoặc tên đăng nhập':'Email'} type={mode==='login'?'text':'email'} autoComplete={mode==='login'?'username':'email'} value={email} onChange={e=>setEmail(e.target.value)} required maxLength={254} placeholder={mode==='login'?'Nhập email hoặc tên đăng nhập':'ban@example.com'}/></div></label>}
         {mode==='register'&&<label className="field">Số điện thoại (không bắt buộc)<div className="auth-input"><Phone size={16}/><input aria-label="Số điện thoại (không bắt buộc)" type="tel" value={phone} onChange={e=>setPhone(e.target.value)} maxLength={24} autoComplete="tel" placeholder="09xx xxx xxx"/></div><small>Thêm số điện thoại để có thể khôi phục tài khoản qua SMS.</small></label>}
         {mode==='forgot'&&<><div className="auth-delivery" role="group" aria-label="Cách nhận mã OTP">{(['email','sms'] as const).map(value=><button key={value} type="button" aria-pressed={delivery===value} disabled={action.busy} onClick={()=>{setDelivery(value);setIdentifier('');action.setError('');}}>{value==='email'?<Mail size={17}/>:<Phone size={17}/>}Qua {value==='email'?'email':'SMS'}</button>)}</div>

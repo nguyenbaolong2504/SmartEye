@@ -11,9 +11,16 @@ class Register(BaseModel):
     username: str = Field(min_length=3,max_length=40,pattern=r'^[A-Za-z0-9_.-]+$')
     password_confirmation: str = Field(min_length=10,max_length=128)
     phone: str | None = None
-    @field_validator('username')
+    @field_validator('username',mode='before')
     @classmethod
-    def username_valid(cls,value):return value.strip().lower()
+    def username_valid(cls,value):
+        if not isinstance(value,str):return value
+        value=value.strip().lower()
+        if not 3<=len(value)<=40:raise ValueError('Tên đăng nhập cần từ 3 đến 40 ký tự')
+        if '@' in value:raise ValueError('Tên đăng nhập không dùng địa chỉ email. Ví dụ: smarteye2026. Nhập email vào ô Email')
+        if not re.fullmatch(r'[a-z0-9_.-]+',value):
+            raise ValueError('Tên đăng nhập chỉ dùng chữ không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang')
+        return value
     @field_validator('phone')
     @classmethod
     def phone_valid(cls,value):
