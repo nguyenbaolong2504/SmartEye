@@ -8,7 +8,11 @@ Phiên bản này dùng **video tải lên**, theo lựa chọn thử nghiệm c
 
 Ảnh trên dùng dữ liệu tổng hợp trong database kiểm thử riêng để kiểm tra biểu đồ và điều kiện lặp lại; không phải kết luận giao thông thực tế của đường trong ảnh.
 
-## Thử một camera từ video
+## Camera video hiện tại
+
+Mở **Camera giao thông**, chọn vị trí, chọn **15 phút / 30 phút / 1 giờ** rồi bấm **Phân tích**. Màn hình giữ một kết quả; nút **Vì sao?** chứa vạch đếm, công thức, phép đo và dự báo tốc độ/CI riêng với xác suất. [Hướng dẫn đầy đủ và cách hiệu chuẩn, huấn luyện từ quan trắc thật](TRAFFIC-PIPELINE.md).
+
+## Luồng tải video cũ (API tương thích; không còn là menu cho người dùng)
 
 1. Đăng nhập Admin hoặc Quản lý (role `analyst`). Trong **Quản trị → Đoạn đường / Camera**, tạo hoặc chọn đúng đoạn đường và camera. Có thể dùng đường minh họa để thử; muốn sử dụng Hoàng Quốc Việt thực tế cần nhập đúng hình học và hiệu chỉnh camera tại vị trí đó.
 2. Mở **Camera & giao thông**, chọn **Tải video** trên camera muốn thử. Hoặc mở Nhận dạng video và chọn camera.

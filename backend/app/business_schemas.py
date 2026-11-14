@@ -87,6 +87,15 @@ class Toggle(Revision):
         return self
 
 
+class TrafficSourceProfile(Input):
+    observed_length_m:float=Field(ge=5,le=5000)
+    lanes:int=Field(ge=1,le=12)
+    free_flow_speed_kmh:float=Field(gt=0,le=160)
+    length_verified:bool=False
+    training_allowed:bool=False
+    interval_averages:bool=False
+
+
 class SourceInput(Input):
     name: str = Field(min_length=3,max_length=120)
     kind: Literal['file','api','camera']
@@ -104,6 +113,7 @@ class SourceInput(Input):
     speed_verified: bool = False
     state_verified: bool = False
     count_method: Literal['occupancy','crossings'] = 'occupancy'
+    traffic_profile:TrafficSourceProfile|None=None
     @field_validator('position')
     @classmethod
     def camera_position(cls,value):
@@ -135,7 +145,8 @@ class MappingInput(Revision):
     @field_validator('mapping')
     @classmethod
     def mapping_valid(cls,value):
-        supported={'observed_at','segment_id','direction','count','speed_kmh','score','density','state','interval_seconds'}
+        supported={'observed_at','segment_id','direction','count','speed_kmh','score','density','state','interval_seconds',
+                   'present_count','crossing_count','rain_mm','visibility_km'}
         if not {'observed_at','segment_id','direction'}<=set(value) or set(value)-supported:raise ValueError('Ánh xạ cần thời gian, tuyến, chiều và chỉ số được hỗ trợ')
         if len(set(value.values()))!=len(value) or any(not v or len(v)>80 for v in value.values()):raise ValueError('Mỗi trường nguồn chỉ được ánh xạ một lần')
         return value

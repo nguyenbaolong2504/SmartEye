@@ -157,7 +157,8 @@ def refresh_forecast(ident:int,body:ForecastConditions,db=Depends(get_db)):
         raise HTTPException(409,'Video vừa có kết quả mới. Vui lòng chọn lại camera rồi phân tích.')
     if body.whole_video and (not body.analysis_id or camera.preview_job_id!=job.id):
         raise HTTPException(409,'Video đang được cập nhật. Vui lòng chọn lại camera rồi phân tích.')
-    result=job.result
+    from .camera_measurements import attach
+    result=attach(job.result,job.camera_config)
     reference=result.get('camera_forecast',{}).get('reference_at')
     issue=datetime.fromisoformat(reference) if reference else now()
     issue=issue.replace(minute=issue.minute//5*5,second=0,microsecond=0)
@@ -174,7 +175,8 @@ def refresh_forecast(ident:int,body:ForecastConditions,db=Depends(get_db)):
         options={'horizons':(body.horizon_minutes,)} if body.horizon_minutes is not None else {}
         value=predict_samples(db.database,camera.segment_id,samples,job.camera_config,issue=issue,conditions=conditions,**options)
         return {**value,'analysis_id':job.id,'basis':evidence,'summary':summary,
-            'road_geometry':result.get('road_geometry'),'scope':'video' if body.whole_video else 'frames'}
+            'road_geometry':result.get('road_geometry'),'measurements':result.get('measurements'),
+            'scope':'video' if body.whole_video else 'frames'}
     except ValueError as error:raise HTTPException(409,str(error)) from error
 
 
@@ -186,7 +188,8 @@ def analysis(ident:int,include_forecast:bool=True,user=Depends(permit('cameras.v
     if not matches(camera,job):return {**base,'state':'outdated','message':'Cấu hình camera đã thay đổi. Cần phân tích lại video.'}
     if job.status!='completed' or not job.result:
         return {**base,'message':job.error or 'Đang phân tích video. Vui lòng chờ trong giây lát.'}
-    result=job.result
+    from .camera_measurements import attach
+    result=attach(job.result,job.camera_config)
     if 'camera_forecast' not in result:return {**base,'state':'processing','progress':99,'message':'Đang đối chiếu lịch sử để dự báo.'}
     samples=[]
     for row in result['samples']:
@@ -202,6 +205,7 @@ def analysis(ident:int,include_forecast:bool=True,user=Depends(permit('cameras.v
         'total_unique_count':result.get('total_unique_count'),
         'total_unique_vehicle_counts':result.get('total_unique_vehicle_counts'),
         'frames':frames,'fps':result.get('fps',1),'roi':job.camera_config['roi'],
+        'measurements':result.get('measurements'),'measurement_version':result.get('measurement_version'),
         'detection_version':result.get('detection_version',1),'capacity':job.camera_config['capacity'],
         'road_geometry':result.get('road_geometry'),'capacity_version':result.get('capacity_version'),
         'average_count':result['average_count'],'peak_count':result['peak_count'],

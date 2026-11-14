@@ -21,8 +21,23 @@ def summarize_video(result):
     movement=[row for row in window if row.get('motion_known') and row.get('stopped_share') is not None]
     sample['motion_known']=len(movement)>=max(1,len(window)*.3)
     sample['stopped_share']=sum(row['stopped_share'] for row in movement)/len(movement) if sample['motion_known'] else None
+    if any(row.get('traffic_metrics') for row in window):
+        from .traffic_metrics import quantities
+        speed=[row['traffic_metrics']['avg_speed_kmh'] for row in window if row.get('traffic_metrics',{}).get('avg_speed_kmh') is not None]
+        last=window[-1].get('traffic_metrics',{})
+        known=len(speed)>=len(window)*.5
+        m=quantities(speed_kmh=float(median(speed)) if known else None,speed_verified=known,
+                     free_flow_speed_kmh=last.get('free_flow_speed_kmh'))
+        for key in ('density_veh_per_km','density_veh_per_km_per_lane'):
+            values=[row['traffic_metrics'][key] for row in window if row.get('traffic_metrics',{}).get(key) is not None]
+            m[key]=float(median(values)) if len(values)>=len(window)*.5 else None
+        # Flow is based on crossings over its actual observation duration. Do not
+        # average successive cumulative rates or extrapolate IDs into crossings.
+        for key in ('flow_veh_per_hour','flow_veh_per_hour_per_lane'):m[key]=last.get(key)
+        m['quality']={**last.get('quality',{}),'speed_calibrated':known}
+        sample['traffic_metrics']=m
     keys=('second','frame_index','count','score','occupancy','density','vehicle_counts','equivalent_count',
-          'capacity_pcu','load_ratio','motion_known','stopped_share','cumulative_count','cumulative_vehicle_counts')
+          'capacity_pcu','load_ratio','motion_known','stopped_share','cumulative_count','cumulative_vehicle_counts','traffic_metrics','crossing_count')
     evidence={key:basis[key] for key in keys if key in basis}
     if 'vehicle_counts' not in evidence:
         counts=Counter(box['label'] for box in basis.get('boxes',[]))
@@ -31,4 +46,5 @@ def summarize_video(result):
     return sample,evidence,{'start_second':round(start,3),'end_second':round(end,3),
         'observed_seconds':round(end-start,3),'frames':len(window),'median_count':float(median(row['count'] for row in window)),
         'median_score':score,'median_load_ratio':sample.get('load_ratio'),'motion_known':sample['motion_known'],
-        'stopped_share':sample['stopped_share'],'representative_second':basis['second']}
+        'stopped_share':sample['stopped_share'],'representative_second':basis['second'],
+        'traffic_metrics':sample.get('traffic_metrics')}

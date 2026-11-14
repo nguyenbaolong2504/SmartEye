@@ -21,7 +21,7 @@ from .forecast_data import prepare, CLASSES, DataNotReady, STEP
 from . import forecast_ml
 
 router=APIRouter()
-Target=Literal['density','congestion']
+Target=Literal['density','congestion','traffic']
 
 
 class TrainInput(BaseModel):
@@ -30,6 +30,7 @@ class TrainInput(BaseModel):
     start_at:datetime
     end_at:datetime
     epochs:int=Field(default=25,ge=5,le=80)
+    direction:Literal['forward','reverse']='forward'
     @model_validator(mode='after')
     def valid(self):
         if not self.start_at.tzinfo or not self.end_at.tzinfo: raise ValueError('Thời gian cần múi giờ.')
@@ -62,7 +63,7 @@ def valid_segments(db,ids,user=None):
 
 
 def public_run(run):
-    return {key:run[key] for key in ('status','progress','message','target','segment_ids','start_at','end_at','created_at','report','finished_at') if key in run}|{'id':run['_id']}
+    return {key:run[key] for key in ('status','progress','message','target','direction','segment_ids','start_at','end_at','created_at','report','finished_at') if key in run}|{'id':run['_id']}
 
 
 @router.get('/api/forecast/status')
@@ -72,16 +73,20 @@ def status(db=Depends(get_db),user=Depends(optional_user)):
     active=[]
     for registry in db.database.forecast_registry.find():
         run=db.database.forecast_runs.find_one({'_id':registry['run_id'],'status':'completed'})
-        if run: active.append({'target':registry['_id'],'run_id':run['_id'],'segment_ids':sorted({sid for info in run['report'].get('horizons',{}).values() if info.get('deployable') for sid in info.get('supported_segment_ids',[])}),
+        if run: active.append({'target':run['target'],'direction':run.get('direction','forward'),'run_id':run['_id'],'segment_ids':sorted({sid for info in run['report'].get('horizons',{}).values() if info.get('deployable') for sid in info.get('supported_segment_ids',[])}),
             'trained_until':run['end_at'],'activated_at':registry['activated_at']})
     return {'active':active,'classes':CLASSES,'slot_minutes':5,'lookback_minutes':60,
-        'horizons':[15,30],'notice':'Dự báo mật độ và dự báo ùn tắc là hai mục tiêu riêng.'}
+        'horizons':[15,30],'traffic_horizons':[15,30,60],'notice':'Dự báo mật độ và dự báo ùn tắc là hai mục tiêu riêng.'}
 
 
 @router.get('/api/forecast/predict',dependencies=[Depends(permit('forecast.view'))])
-def predict(segment_id:int,target:Target='density',db=Depends(get_db)):
+def predict(segment_id:int,target:Target='density',direction:Literal['forward','reverse']='forward',db=Depends(get_db)):
     valid_segments(db,[segment_id])
-    try: return forecast_ml.forecast(db.database,segment_id,target)
+    try:
+        if target=='traffic':
+            from .traffic_forecast import predict as traffic_predict
+            return traffic_predict(db.database,segment_id,direction)
+        return forecast_ml.forecast(db.database,segment_id,target)
     except Exception:
         logging.getLogger('smarteye.forecast').exception('Forecast inference unavailable')
         return {'state':'unavailable','segment_id':segment_id,'target':target,'predictions':[],
@@ -91,9 +96,13 @@ def predict(segment_id:int,target:Target='density',db=Depends(get_db)):
 @router.post('/api/forecast/readiness')
 def readiness(body:TrainInput,user=Depends(permit('models.manage')),db=Depends(get_db)):
     valid_segments(db,body.segment_ids,user)
-    try: result,_=prepare(db.database,body.segment_ids,body.start_at,body.end_at,body.target)
+    try:
+        if body.target=='traffic':
+            from .traffic_forecast import prepare as physical_prepare
+            result,_=physical_prepare(db.database,body.segment_ids,body.start_at,body.end_at,body.direction)
+        else:result,_=prepare(db.database,body.segment_ids,body.start_at,body.end_at,body.target)
     except DataNotReady as exc: raise HTTPException(422,str(exc))
-    result['dependencies']={name:importlib.util.find_spec(name) is not None for name in ('xgboost','sklearn','torch')}
+    result['dependencies']={name:importlib.util.find_spec(name) is not None for name in (('xgboost','sklearn') if body.target=='traffic' else ('xgboost','sklearn','torch'))}
     return result
 
 
@@ -108,10 +117,14 @@ def runs(user=Depends(permit('models.manage')),db=Depends(get_db)):
 @router.post('/api/forecast/runs',status_code=202)
 def start_training(body:TrainInput,user=Depends(permit('models.manage')),db=Depends(get_db)):
     valid_segments(db,body.segment_ids,user)
-    if any(importlib.util.find_spec(name) is None for name in ('xgboost','sklearn','torch')):
+    if body.target=='traffic' and db.database.__class__.__module__.startswith('pymongo'):
+        validator=db.database.forecast_runs.options().get('validator',{}).get('$jsonSchema',{})
+        if 'traffic' not in validator.get('properties',{}).get('target',{}).get('enum',[]):
+            raise HTTPException(503,'Cần cập nhật cấu trúc dự báo: chạy python scripts/migrate_traffic_schema.py trong backend Docker rồi thử lại.')
+    if any(importlib.util.find_spec(name) is None for name in (('xgboost','sklearn') if body.target=='traffic' else ('xgboost','sklearn','torch'))):
         raise HTTPException(503,'Thiếu thư viện dự báo. Cài backend/requirements.txt và PyTorch CPU hoặc build lại backend Docker.')
     row=ForecastRun(id=str(uuid.uuid4()),user_id=user.id,target=body.target,segment_ids=body.segment_ids,
-        start_at=body.start_at.isoformat(),end_at=body.end_at.isoformat(),epochs=body.epochs)
+        start_at=body.start_at.isoformat(),end_at=body.end_at.isoformat(),epochs=body.epochs,direction=body.direction)
     if db.database.forecast_runs.find_one({'running':True}): raise HTTPException(409,'Đang có tác vụ huấn luyện. Chờ hoàn tất hoặc hủy tác vụ trước.')
     db.add(row);audit(db,user.id,'forecast_training_started',row.id);db.commit()
     forecast_ml.executor.submit(forecast_ml.train_run,row.id)
@@ -139,18 +152,21 @@ def activate(run_id:uuid.UUID,user=Depends(permit('models.manage')),db=Depends(g
     folder=forecast_ml.artifact_folder(str(run_id))
     required=['metadata.json']
     for horizon,info in run['report']['horizons'].items():
-        if info.get('deployable'): required.extend([f'xgb-{horizon}.json',f'gru-{horizon}.pt'])
+        if info.get('deployable'):
+            required.extend([f'traffic-{horizon}.json',f'speed-{horizon}.json'] if run['target']=='traffic' else [f'xgb-{horizon}.json',f'gru-{horizon}.pt'])
     if any(not (folder/name).is_file() for name in required): raise HTTPException(409,'Thiếu tệp mô hình trên máy chủ.')
-    db.database.forecast_registry.replace_one({'_id':run['target']},{'_id':run['target'],'run_id':str(run_id),
+    registry_key=f"traffic:{run.get('direction','forward')}" if run['target']=='traffic' else run['target']
+    db.database.forecast_registry.replace_one({'_id':registry_key},{'_id':registry_key,'run_id':str(run_id),
         'activated_by':user.id,'activated_at':stamp()},upsert=True)
     audit(db,user.id,'forecast_model_activated',str(run_id));db.commit()
     return {'message':'Đã kích hoạt các mốc dự báo đạt điều kiện.'}
 
 
 @router.delete('/api/forecast/active/{target}')
-def deactivate(target:Target,user=Depends(permit('models.manage')),db=Depends(get_db)):
+def deactivate(target:Target,direction:Literal['forward','reverse']='forward',user=Depends(permit('models.manage')),db=Depends(get_db)):
     require_global_scope(user)
-    db.database.forecast_registry.delete_one({'_id':target});audit(db,user.id,'forecast_model_deactivated',target);db.commit()
+    registry_key=f'traffic:{direction}' if target=='traffic' else target
+    db.database.forecast_registry.delete_one({'_id':registry_key});audit(db,user.id,'forecast_model_deactivated',registry_key);db.commit()
     return {'message':'Đã ngừng phục vụ mô hình. Dữ liệu và báo cáo được giữ lại.'}
 
 
@@ -220,8 +236,11 @@ async def import_data(file:UploadFile=File(...),dry_run:bool=True,user=Depends(p
 
 
 @router.get('/api/forecast/templates/{kind}.csv',dependencies=[Depends(permit('models.manage'))])
-def template(kind:Literal['observations','labels']):
+def template(kind:Literal['observations','labels','traffic']):
     header='segment_id,observed_at,score,count,density' if kind=='observations' else 'segment_id,observed_at,state,note'
+    if kind=='traffic':
+        from .traffic_windows import WindowInput
+        header=','.join(WindowInput.model_fields)
     return Response(header+'\r\n',media_type='text/csv',headers={'Content-Disposition':f'attachment; filename=traffic-{kind}.csv'})
 
 

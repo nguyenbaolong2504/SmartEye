@@ -103,6 +103,7 @@ class DataSource(Document):
     speed_verified: bool = False
     state_verified: bool = False
     count_method: str = 'occupancy'
+    traffic_profile: dict | None = None
     mapping: dict = field(default_factory=dict)
     units: dict = field(default_factory=dict)
     active: bool = False

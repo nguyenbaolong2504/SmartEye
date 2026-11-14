@@ -31,6 +31,12 @@ export default function CameraDetectionOverlay({videoRef,data,visible,onTime}:{v
           const [a,b,c,d]=data.roi;ctx.strokeStyle='#ffffffaa';ctx.setLineDash([5,4]);
           ctx.strokeRect(left+a*frame.width*scale,top+b*frame.height*scale,(c-a)*frame.width*scale,(d-b)*frame.height*scale);ctx.setLineDash([]);
         }
+        if(data.measurements?.count_line?.length===2){
+          const [a,b]=data.measurements.count_line;ctx.strokeStyle='#ffe46b';ctx.lineWidth=2;
+          ctx.beginPath();ctx.moveTo(left+a[0]*frame.width*scale,top+a[1]*frame.height*scale);
+          ctx.lineTo(left+b[0]*frame.width*scale,top+b[1]*frame.height*scale);ctx.stroke();
+          ctx.fillStyle='#ffe46b';ctx.fillText('Vạch đếm xe',left+a[0]*frame.width*scale+5,Math.max(14,top+a[1]*frame.height*scale-6));ctx.lineWidth=1.5;
+        }
         for(const box of frame.boxes||[]){
           const [a,b,c,d]=box.box,color=colors[box.label]||'#24edaa',label=`${names[box.label]||'Xe'}${box.track_id!=null?` #${box.track_id}`:''}`;
           const x=left+a*scale,y=top+b*scale,w=(c-a)*scale,h=(d-b)*scale;

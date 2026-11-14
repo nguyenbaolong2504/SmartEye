@@ -522,6 +522,8 @@ from .camera_video import router as camera_video_router
 app.include_router(camera_video_router)
 from .forecast_api import router as forecast_router
 app.include_router(forecast_router)
+from .traffic_metrics_api import router as traffic_metrics_router
+app.include_router(traffic_metrics_router)
 from .incidents import router as incidents_router
 from .warnings import router as warnings_router
 from .managed_rules import router as rules_router

@@ -38,6 +38,31 @@ function forecast(horizon:number,p:{FREE:number;SLOW:number;JAM:number}){
       history:{lookback_days:100,matching_days:14,jam_days:12,hour:'17:00',is_demo:true}}]}]};
 }
 
+test('explanation separates measured flow, density, speed loss and forecast probability',async({page})=>{
+  await setup(page);
+  await page.route('**/recordings/1/forecast',route=>{
+    const base=forecast(route.request().postDataJSON().horizon_minutes,{FREE:.02,SLOW:.08,JAM:.9});
+    return route.fulfill({json:{...base,
+      measurements:{count_line:[[0,.5],[1,.5]],crossings:150,count_line_verified:true,speed_calibration_available:true},
+      summary:{...base.summary,traffic_metrics:{flow_veh_per_hour:1800,density_veh_per_km:160,density_veh_per_km_per_lane:80,
+        avg_speed_kmh:20,free_flow_speed_kmh:40,congestion_index:.5,travel_time_index:2,quality:{speed_calibrated:true}}},
+      timeline:[{second:5.5,predictions:[{...base.timeline[0].predictions[0],predicted_speed_kmh:14,predicted_congestion_index:.65,
+        predicted_travel_time_index:2.857,free_flow_speed_kmh:40,numeric_prediction_source:'synthetic_speed_regression'}]}]}});
+  });
+  await page.goto('/#cameras');await page.getByRole('button',{name:'Phân tích',exact:true}).click();
+  await expect(page.locator('.camera-result-percentage')).toHaveText('90%');
+  await expect(page.getByRole('table')).toHaveCount(0);
+  await page.getByRole('button',{name:'Vì sao?',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('row').filter({hasText:'Lưu lượng quy đổi'})).toContainText('1.800 xe/giờ');
+  await expect(dialog.getByRole('row').filter({hasText:'Mật độ trên đoạn đường'})).toContainText('160 xe/km');
+  await expect(dialog.getByRole('row').filter({hasText:'Tốc độ đang quan sát'})).toContainText('20 km/h');
+  await expect(dialog.getByRole('row').filter({hasText:'Mức giảm tốc'})).toContainText('50%');
+  await expect(dialog).toContainText('mức giảm tốc không phải xác suất ùn tắc 90%');
+  await expect(dialog).toContainText('14 km/h');await expect(dialog).toContainText('65%');
+  await page.keyboard.press('Escape');await expect(page.locator('.camera-result-percentage')).toHaveText('90%');
+});
+
 test('one requested result highlights free, jam and slow equally; explanation and video remain usable',async({page},info)=>{
   await setup(page);const requests:number[]=[];
   await page.route('**/recordings/1/forecast',route=>{

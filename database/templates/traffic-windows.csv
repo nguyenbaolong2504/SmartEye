@@ -1,0 +1,1 @@
+segment_id,direction,window_end,present_count,crossing_count,avg_speed_kmh,free_flow_speed_kmh,observed_length_m,lanes,coverage_seconds,speed_calibrated,length_verified,verified_state,verification_note,source,training_allowed,rain_mm,visibility_km,accident,roadwork,obstruction,flood

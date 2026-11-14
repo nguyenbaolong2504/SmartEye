@@ -99,6 +99,8 @@ def demo_routes(db, req):
     if req.origin.node==req.destination.node:
         raise HTTPException(422,'Điểm đi và điểm đến phải khác nhau.')
     latest=route_evidence(db,req,segments)
+    from .traffic_forecast import route_values
+    physical=route_values(db.database,req,segments)
     speeds={'LOW':35 if req.mode=='DRIVE' else 30,'NORMAL':22 if req.mode=='DRIVE' else 24,'HIGH':9 if req.mode=='DRIVE' else 12,None:25}
     risks={'LOW':.05,'NORMAL':.35,'HIGH':1.,None:.5}
     positions={p['node']:[p['lat'],p['lng']] for p in PLACES}
@@ -109,7 +111,10 @@ def demo_routes(db, req):
         positions.setdefault(segment.start_node,segment.geometry[0]);positions.setdefault(segment.end_node,segment.geometry[-1])
         for reverse in ((False,) if segment.one_way else (False,True)):
             a,b=(segment.end_node,segment.start_node) if reverse else (segment.start_node,segment.end_node)
-            edge=Edge((segment.id,reverse),a,b,seconds,segment.distance_km,segment.distance_km*risks[density])
+            measured=physical.get((segment.id,'reverse' if reverse else 'forward'))
+            travel_seconds=segment.distance_km/measured['speed']*3600 if measured else seconds
+            exposure=measured['risk'] if measured else risks[density]
+            edge=Edge((segment.id,reverse),a,b,travel_seconds,segment.distance_km,segment.distance_km*exposure)
             edges.append(edge);details[edge.key]=(segment,reverse)
     def adjacency(items):
         graph={}
@@ -149,7 +154,8 @@ def demo_routes(db, req):
             unknown_km+=edge.distance_km if density is None else 0
             items.append({'id':segment.id,'name':segment.name,'distance_km':edge.distance_km,'density':density,
                 'source':ob.source if ob else None,'geometry':points,'one_way':segment.one_way,
-                'evidence_days':getattr(ob,'evidence_days',None)})
+                'evidence_days':getattr(ob,'evidence_days',None),
+                'traffic_prediction':physical.get((segment.id,'reverse' if reverse else 'forward'))})
         routes.append({'id':f'demo-{index}','name':' → '.join(item['name'] for item in items),
             'duration_seconds':round(seconds),'distance_km':round(distance,2),'risk':round(exposure/distance,3),
             'risk_exposure_km':exposure,'optimization_cost':cost,'raw_criteria':(seconds,distance,exposure),

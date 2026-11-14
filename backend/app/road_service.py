@@ -60,6 +60,17 @@ def current(db,segment_id,direction='forward',data_mode='observed'):
             label=db.database.traffic_labels.find_one({'segment_id':segment_id,'observed_at':{'$gte':(now()-timedelta(minutes=TTL_MINUTES)).isoformat(),'$lte':stamp()}},sort=[('observed_at',-1)])
             if label and label['state'] in ('FREE','SLOW','JAM'):
                 result.update(state=label['state'],text=STATE_TEXT[label['state']],fresh=True,observed_at=label['observed_at'],source_name='Quan sát đã xác nhận',reason='')
+    measured=db.database.traffic_windows.find_one({'segment_id':segment_id,'direction':direction,'is_demo':False,'usable':True,
+        'window_end':{'$gte':(now()-timedelta(minutes=10)).isoformat(),'$lte':stamp()}},sort=[('window_end',-1)])
+    if measured and (not result['observed_at'] or measured['window_end']>=result['observed_at']):
+        at=measured['window_end'];metrics=measured['metrics'];source=measured.get('source','Quan trắc đã xác minh')
+        state=measured.get('verified_state')
+        result.update(fresh=True,observed_at=at,source_name=source,state=state,text=STATE_TEXT.get(state,'Chưa xác định'),
+            reason='Tổng hợp từ quan trắc 5 phút đã đạt chất lượng. Trạng thái được xác minh riêng với chỉ số giảm tốc.')
+        for field,key,unit,factor in (('count','present_count','xe đang hiện diện',1),('speed_kmh','avg_speed_kmh','km/h',1),
+            ('flow_per_minute','flow_veh_per_hour','xe/phút',1/60),('density_veh_per_km','density_veh_per_km','xe/km',1),
+            ('congestion_index','congestion_index','%',100)):
+            if metrics.get(key) is not None:result['metrics'][field]={'value':metrics[key]*factor,'unit':unit,'observed_at':at,'source':source}
     if result['state'] is None and result['fresh']:result['reason']='Có một phần chỉ số. Chưa đủ căn cứ xác định tình trạng ùn tắc.'
     return result
 
@@ -82,17 +93,18 @@ def recorded_history(segment_id:int,start:str,end:str,direction:Literal['forward
 @router.get('/api/traffic/forecast-options',dependencies=[Depends(permit('forecast.view'))])
 def forecast_options(segment_id:int,direction:Literal['forward','reverse']='forward',data_mode:Literal['demo','observed']='demo',db=Depends(get_db)):
     road(db,segment_id,direction)
-    if direction!='forward':return {'ready':False,'horizons':[],'message':'Chưa có mô hình cho chiều đường đã chọn.'}
     if data_mode=='demo':
+        if direction!='forward':return {'ready':False,'horizons':[],'message':'Chưa có mô hình cho chiều đường đã chọn.'}
         from .demo_data import require_active,FOLDER
         active=require_active(db.database)
         return {'ready':segment_id in active['segment_ids'] and (FOLDER/active['run_id']/'outlook.json').is_file(),
                 'max_days':7,'resolution_minutes':60,'hours':list(range(24)),'model':'XGBoost','model_version':active['run_id'],'is_demo':True}
-    registry=db.database.forecast_registry.find_one({'_id':'congestion'})
+    registry=db.database.forecast_registry.find_one({'_id':f'traffic:{direction}'})
+    if not registry and direction=='forward':registry=db.database.forecast_registry.find_one({'_id':'congestion'})
     run=db.database.forecast_runs.find_one({'_id':registry['run_id'],'status':'completed'}) if registry else None
     horizons=sorted(int(h) for h,info in (run or {}).get('report',{}).get('horizons',{}).items()
                     if info.get('deployable') and segment_id in info.get('supported_segment_ids',[]))
-    return {'ready':bool(horizons),'horizons':horizons,'model_version':(run or {}).get('_id'),
+    return {'ready':bool(horizons),'horizons':horizons,'target':(run or {}).get('target'),'model_version':(run or {}).get('_id'),
             'message':'Chưa có mốc dự báo được hỗ trợ.' if not horizons else '', 'is_demo':False}
 
 
@@ -101,7 +113,11 @@ def real_forecast(segment_id:int,horizon:int,direction:Literal['forward','revers
     options=forecast_options(segment_id,direction,'observed',db)
     if horizon not in options['horizons']:raise HTTPException(422,'Mốc hoặc chiều dự báo chưa được mô hình hỗ trợ.')
     from .forecast_ml import forecast
-    try:result=forecast(db.database,segment_id,'congestion')
+    try:
+        if options.get('target')=='traffic':
+            from .traffic_forecast import predict
+            result=predict(db.database,segment_id,direction)
+        else:result=forecast(db.database,segment_id,'congestion')
     except Exception:raise HTTPException(503,'Không thể lấy kết quả dự báo. Vui lòng thử lại.') from None
     if result['state']!='ready':return {**result,'direction':direction,'comparison':None,'model_version':options['model_version']}
     predictions=result.get('predictions',[])
@@ -130,7 +146,9 @@ def monitor(segment_id:int,direction:Literal['forward','reverse']='forward',user
     except Exception:warnings=[];errors['warnings']='Chưa tải được cảnh báo.'
     try:
         from .forecast_ml import forecast
-        predictions=forecast(db.database,segment_id,'congestion') if direction=='forward' and can(user,'forecast.view') else {'state':'unavailable','predictions':[],'message':'Chưa có mô hình cho chiều này.'}
+        from .traffic_forecast import predict
+        predictions=predict(db.database,segment_id,direction) if can(user,'forecast.view') else {'state':'unavailable','predictions':[]}
+        if predictions['state']=='no_model' and direction=='forward' and can(user,'forecast.view'):predictions=forecast(db.database,segment_id,'congestion')
     except Exception:predictions={'state':'unavailable','predictions':[]};errors['forecast']='Chưa tải được dự báo.'
     camera_sources=db.find(DataSource,{'segment_id':segment_id,'direction':direction,'kind':'camera','active':True,'tested':True}) if can(user,'monitor.camera') else []
     # Browser media requests are direct, public HTTPS only, without secrets.

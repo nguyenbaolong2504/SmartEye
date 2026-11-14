@@ -70,3 +70,17 @@ Giao diện mặc định dùng `provider=auto`: `DRIVE` lấy các tuyến OSRM
 - Phân tích có thêm `counting_method=ByteTrack`, `counting_version`, `total_unique_count` và `total_unique_vehicle_counts` cho kết quả cuối clip. Mỗi `frames[]` có `cumulative_count`, `cumulative_vehicle_counts` và `tracked_count`; bbox có `track_id` (có thể null khi chưa xác nhận), `counted_as`. Số cộng dồn tính theo ID đã xác nhận, không cộng tất cả `count` của mọi frame. Client hiển thị số cộng dồn của frame đang phát, không lấy tổng cuối clip để gắn vào giây đầu. `scenario_hour`/`scenario_note` trong nguồn chỉ là giờ giả định của ví dụ, không phải `captured_at`.
 - `POST /api/cameras/{id}/analyze-video` yêu cầu `network.manage` và đúng tuyến phụ trách. Chỉ phân tích lại video mẫu cục bộ đã được chuẩn bị bằng script, không nhận URL tùy ý. Trả 202 với mã tác vụ. Camera/tuyến tắt, tác vụ đang xử lý, cấu hình vừa thay đổi hoặc thiếu tệp trả 409; hàng đợi đầy trả 429. Giữ video đang chia sẻ đến khi kết quả mới hoàn tất. Các yêu cầu đồng thời cho cùng camera chỉ giữ một tác vụ. Lượt xử lý thất bại có thể thử lại từ video được chia sẻ trước đó.
 - Cấu hình nguồn camera nhận thêm `public_preview` (mặc định false), `location_name` và `position` theo thứ tự vĩ độ, kinh độ. Các nguồn cũ vẫn dùng được và mặc định giữ riêng tư. Đổi cấu hình yêu cầu kiểm tra và bật lại theo luồng nguồn hiện có.
+## Phần mở rộng quan trắc giao thông theo ô 5 phút
+
+Xem [công thức, chất lượng dữ liệu và luồng huấn luyện](TRAFFIC-PIPELINE.md). Các API huấn luyện/đăng ký/kích hoạt hiện có nhận thêm `target=traffic`, `direction=forward|reverse`. Mỗi chiều có registry riêng; không tự kích hoạt.
+
+| API | Quyền | Nội dung |
+|---|---|---|
+| `POST /api/forecast/traffic/windows` | `models.manage` + phạm vi đường | Nhập một ô 5 phút có đơn vị, nguồn và nhãn độc lập |
+| `POST /api/forecast/traffic/import?dry_run=true` | `models.manage` + phạm vi đường | Kiểm tra CSV; `dry_run=false` xác nhận ghi/thay thế |
+| `GET /api/forecast/templates/traffic.csv` | `models.manage` | Mẫu CSV phù hợp kiểu dữ liệu hiện tại |
+| `GET /api/forecast/traffic/windows?segment_id=...&direction=...` | `models.manage` + phạm vi đường | 50 ô gần nhất |
+| `GET /api/forecast/predict?target=traffic&segment_id=...&direction=...` | `forecast.view` | 15/30/60 phút đủ điều kiện; xác suất từng trạng thái, tốc độ và CI nếu hồi quy đạt kiểm tra |
+| `GET /api/forecast/traffic/outcomes?segment_id=...&direction=...` | `models.manage` + phạm vi đường | Kết quả đối chiếu với quan trắc độc lập |
+
+Camera demo vẫn dùng endpoint analysis/forecast hiện có. Phần giải thích trả thêm `summary.traffic_metrics`, `measurements` và dự tính tốc độ/CI riêng với xác suất. Clip ngắn không tự tạo quan trắc thật. Thiếu hiệu chuẩn trả `null` cho phép đo cần khoảng cách thực; không thay bằng 0.

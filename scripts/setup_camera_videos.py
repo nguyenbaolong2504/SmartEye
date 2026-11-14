@@ -98,6 +98,7 @@ def assign_sources(cameras,assets,slots):
 
 def setup(ids=None,refresh=False,rush_hour=False,regions=False):
     from backend.app.camera_forecast import prepare_models
+    from backend.app.camera_measurements import VERSION as MEASUREMENT_VERSION
     initialize_database()
     if not MODEL_PATH.is_file():raise ValueError('Cần tải mô hình bằng python scripts/download_model.py trước.')
     scenario_id=None;extra=region_cameras() if regions else []
@@ -159,6 +160,7 @@ def setup(ids=None,refresh=False,rush_hour=False,regions=False):
                 and previous.result and previous.result.get('detection_version')==2
                 and previous.result.get('counting_version')==1
                 and previous.result.get('capacity_version')==1
+                and previous.result.get('measurement_version')==MEASUREMENT_VERSION
                 and previous.result.get('camera_forecast',{}).get('version')==report.get('version')
                 and previous.result.get('camera_forecast',{}).get('run_id')==report['run_id']
                 and (UPLOADS/f'{previous.id}.retained').is_file() and camera.preview_public and camera.preview_job_id==previous.id):

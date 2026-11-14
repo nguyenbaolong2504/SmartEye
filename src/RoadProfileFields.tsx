@@ -1,5 +1,8 @@
-import type {RoadProfile} from './types';
+import type {CameraMeasurement,RoadProfile} from './types';
 export default function RoadProfileFields({value,onChange}:{value:RoadProfile|null;onChange:(value:RoadProfile|null)=>void}){
+  const base:CameraMeasurement={count_line:[[0,.5],[1,.5]],crossing_direction:'both',free_flow_speed_kmh:40,verified:false,note:''};
+  const measurement=value?.measurement;
+  const update=(changes:Partial<CameraMeasurement>)=>value&&onChange({...value,measurement:{...(measurement||base),...changes}});
   return <div className="camera-profile-fields"><label className="check"><input type="checkbox" checked={Boolean(value)} onChange={e=>onChange(e.target.checked?{lanes:2,road_width_m:7,observed_length_m:70,usable_fraction:.85,calibration:'estimated'}:null)}/>Đánh giá theo kích thước vùng đường</label>
     {value&&<><div className="two-columns"><label className="field">Số làn trong vùng quan sát<input type="number" required min={1} max={12} value={value.lanes} onChange={e=>onChange({...value,lanes:Number(e.target.value)})}/></label>
       <label className="field">Tổng bề rộng mặt đường (m)<input type="number" required min={2} max={60} step="0.1" value={value.road_width_m} onChange={e=>onChange({...value,road_width_m:Number(e.target.value)})}/></label>
@@ -7,5 +10,19 @@ export default function RoadProfileFields({value,onChange}:{value:RoadProfile|nu
       <label className="field">Phần diện tích có thể sử dụng (%)<input type="number" required min={10} max={100} value={Math.round(value.usable_fraction*100)} onChange={e=>onChange({...value,usable_fraction:Number(e.target.value)/100})}/></label></div>
       <label className="field">Nguồn kích thước<select value={value.calibration} onChange={e=>onChange({...value,calibration:e.target.value as RoadProfile['calibration']})}><option value="estimated">Ước lượng để chạy thử</option><option value="measured">Đã đo tại vùng đường này</option></select></label>
       <p className="micro">Chỉ khai báo phần mặt đường trong vùng quan sát; loại vỉa hè, dải phân cách và phần bị che. Sức chứa được tính theo diện tích sử dụng và loại xe, thay cho số xe cố định. Thay kích thước cần phân tích lại video.</p></>}
+    {value&&<details className="help-details"><summary>Vạch đếm và hiệu chuẩn tốc độ</summary>
+      <label className="check"><input type="checkbox" checked={!!measurement} onChange={e=>onChange({...value,measurement:e.target.checked?base:null})}/>Khai báo phép đo của camera này</label>
+      {measurement&&<><label className="field">Tốc độ thông thoáng tham chiếu (km/h)<input type="number" min={1} max={160} value={measurement.free_flow_speed_kmh??''} onChange={e=>update({free_flow_speed_kmh:e.target.value?Number(e.target.value):null})}/></label>
+        <p className="micro">Điểm ảnh tính theo % chiều rộng và chiều cao video; gốc ở góc trên bên trái.</p>
+        {(measurement.count_line||base.count_line)!.map((point,index)=><div className="two-columns" key={index}>{['X','Y'].map((label,axis)=><label className="field" key={axis}>Vạch đếm · điểm {index+1} · {label} (%)<input type="number" required min={0} max={100} step="0.1" value={Number((point[axis]*100).toFixed(1))} onChange={e=>update({count_line:(measurement.count_line||base.count_line)!.map((p,i)=>i===index?p.map((v,a)=>a===axis?Number(e.target.value)/100:v):p)})}/></label>)}</div>)}
+        <label className="field">Chiều xe qua vạch<select value={measurement.crossing_direction||'both'} onChange={e=>update({crossing_direction:e.target.value as CameraMeasurement['crossing_direction']})}><option value="both">Cả hai chiều (tổng qua vạch)</option><option value="positive">Từ phía âm sang phía dương của vạch</option><option value="negative">Từ phía dương sang phía âm của vạch</option></select></label>
+        <label className="check"><input type="checkbox" checked={!!measurement.image_points} onChange={e=>update({image_points:e.target.checked?[[.1,.1],[.9,.1],[.9,.9],[.1,.9]]:null,ground_points:e.target.checked?[[0,0],[value.road_width_m,0],[value.road_width_m,value.observed_length_m],[0,value.observed_length_m]]:null,verified:false})}/>Đo tốc độ bằng bốn mốc trên mặt đường</label>
+        {measurement.image_points&&<><p className="micro">Đo bốn mốc thực địa, theo thứ tự quanh vùng đường. Nhập vị trí của từng mốc trong ảnh và tọa độ mặt đất tương ứng (mét). Camera phải cố định. Không xác nhận các điểm mẫu là số đo thật.</p>
+          {measurement.image_points.map((point,index)=><fieldset key={index}><legend>Mốc {index+1}</legend><div className="two-columns">{['Ảnh X (%)','Ảnh Y (%)','Mặt đất X (m)','Mặt đất Y (m)'].map((label,col)=><label className="field" key={col}>{label}<input type="number" required step="0.1" min={col<2?0:-1000} max={col<2?100:1000} value={col<2?Number((point[col]*100).toFixed(1)):measurement.ground_points?.[index][col-2]??0} onChange={e=>{const key=col<2?'image_points':'ground_points',axis=col%2;update({[key]:measurement[key]!.map((p,i)=>i===index?p.map((v,a)=>a===axis?Number(e.target.value)/(col<2?100:1):v):p),verified:false});}}/></label>)}</div></fieldset>)}
+          <label className="field">Căn cứ đo và kiểm tra sai số<textarea minLength={10} maxLength={400} required value={measurement.note} onChange={e=>update({note:e.target.value})}/></label>
+          <label className="check"><input type="checkbox" required checked={measurement.verified} onChange={e=>update({verified:e.target.checked})}/>Đã đo thực địa, chọn nguồn kích thước “Đã đo” và kiểm tra hiệu chuẩn</label>
+        </>}
+      </>}
+    </details>}
   </div>;
 }

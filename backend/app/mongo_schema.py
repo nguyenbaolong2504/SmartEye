@@ -25,7 +25,7 @@ SCHEMAS={
     'source_receipts':validator(['source_id','source_version','accepted','rejected','received_at'],{
         'source_id':INTEGER,'source_version':INTEGER,'accepted':INTEGER,'rejected':INTEGER,'received_at':TEXT}),
     'forecast_runs':validator(['user_id','target','segment_ids','status','running'],{
-        '_id':TEXT,'user_id':INTEGER,'target':{'enum':['density','congestion']},
+        '_id':TEXT,'user_id':INTEGER,'target':{'enum':['density','congestion','traffic']},
         'segment_ids':{'bsonType':'array'},'status':{'enum':['queued','training','completed','failed','cancelled']},'running':BOOL}),
     'traffic_labels':validator(['segment_id','observed_at','state','reviewer_id','note'],{
         'segment_id':INTEGER,'observed_at':TEXT,'state':{'enum':['FREE','SLOW','JAM']},'reviewer_id':INTEGER,'note':TEXT}),
@@ -34,6 +34,12 @@ SCHEMAS={
         'sample_key':TEXT,'segment_id':INTEGER,'observed_at':TEXT,
         'score':{**NUMBER,'minimum':0,'maximum':1},'count':{**INTEGER,'minimum':0},
         'density':{'enum':['LOW','NORMAL','HIGH']},'source':TEXT}),
+    'traffic_windows':validator(['segment_id','direction','window_end','metrics','is_demo','usable'],{
+        '_id':TEXT,'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},'window_end':TEXT,
+        'metrics':{'bsonType':'object'},'is_demo':{'enum':[False]},'usable':BOOL}),
+    'traffic_forecast_outcomes':validator(['segment_id','direction','issue_at','predicted_at','evaluated','run_id'],{
+        '_id':TEXT,'segment_id':INTEGER,'direction':{'enum':['forward','reverse']},'issue_at':TEXT,
+        'predicted_at':TEXT,'evaluated':BOOL,'run_id':TEXT}),
     'users':validator(['email','name','password','role','active','created_at'],{
         'email':TEXT,'name':TEXT,'password':TEXT,'role':{'enum':['user','analyst','admin']},'active':BOOL,'auth_version':INTEGER,'created_at':TEXT}),
     'segments':validator(['name','start_node','end_node','distance_km','geometry','active','is_demo'],{

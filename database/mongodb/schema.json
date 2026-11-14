@@ -1,4 +1,338 @@
 {
+  "incidents": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "user_id",
+        "segment_id",
+        "direction",
+        "status",
+        "revision",
+        "history"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "verifying",
+            "processing",
+            "resolved",
+            "rejected"
+          ]
+        },
+        "revision": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "history": {
+          "bsonType": "array"
+        }
+      }
+    }
+  },
+  "traffic_warnings": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "segment_id",
+        "direction",
+        "status",
+        "revision",
+        "content_version",
+        "history"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "revision": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "content_version": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending_verification",
+            "pending_publication",
+            "published",
+            "ended",
+            "cancelled"
+          ]
+        },
+        "history": {
+          "bsonType": "array"
+        }
+      }
+    }
+  },
+  "managed_alert_rules": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "name",
+        "segment_id",
+        "direction",
+        "active",
+        "tested",
+        "deleted",
+        "revision"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "name": {
+          "bsonType": "string"
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "active": {
+          "bsonType": "bool"
+        },
+        "tested": {
+          "bsonType": "bool"
+        },
+        "deleted": {
+          "bsonType": "bool"
+        },
+        "revision": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        }
+      }
+    }
+  },
+  "data_sources": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "name",
+        "kind",
+        "segment_id",
+        "direction",
+        "active",
+        "tested",
+        "authorized",
+        "version",
+        "revision"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "name": {
+          "bsonType": "string"
+        },
+        "kind": {
+          "enum": [
+            "file",
+            "api",
+            "camera"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "active": {
+          "bsonType": "bool"
+        },
+        "tested": {
+          "bsonType": "bool"
+        },
+        "authorized": {
+          "bsonType": "bool"
+        },
+        "version": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "revision": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        }
+      }
+    }
+  },
+  "road_readings": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "sample_key",
+        "source_id",
+        "segment_id",
+        "direction",
+        "observed_at",
+        "metrics"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "sample_key": {
+          "bsonType": "string"
+        },
+        "source_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "observed_at": {
+          "bsonType": "string"
+        },
+        "metrics": {
+          "bsonType": "object"
+        }
+      }
+    }
+  },
+  "source_receipts": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "source_id",
+        "source_version",
+        "accepted",
+        "rejected",
+        "received_at"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "source_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "source_version": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "accepted": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "rejected": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "received_at": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
   "forecast_runs": {
     "$jsonSchema": {
       "bsonType": "object",
@@ -23,7 +357,8 @@
         "target": {
           "enum": [
             "density",
-            "congestion"
+            "congestion",
+            "traffic"
           ]
         },
         "segment_ids": {
@@ -175,6 +510,94 @@
           ]
         },
         "source": {
+          "bsonType": "string"
+        }
+      }
+    }
+  },
+  "traffic_windows": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "segment_id",
+        "direction",
+        "window_end",
+        "metrics",
+        "is_demo",
+        "usable"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "window_end": {
+          "bsonType": "string"
+        },
+        "metrics": {
+          "bsonType": "object"
+        },
+        "is_demo": {
+          "enum": [
+            false
+          ]
+        },
+        "usable": {
+          "bsonType": "bool"
+        }
+      }
+    }
+  },
+  "traffic_forecast_outcomes": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "segment_id",
+        "direction",
+        "issue_at",
+        "predicted_at",
+        "evaluated",
+        "run_id"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "segment_id": {
+          "bsonType": [
+            "int",
+            "long"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ]
+        },
+        "issue_at": {
+          "bsonType": "string"
+        },
+        "predicted_at": {
+          "bsonType": "string"
+        },
+        "evaluated": {
+          "bsonType": "bool"
+        },
+        "run_id": {
           "bsonType": "string"
         }
       }
@@ -516,6 +939,80 @@
       }
     }
   },
+  "password_otps": {
+    "$jsonSchema": {
+      "bsonType": "object",
+      "required": [
+        "_id",
+        "challenge_hash",
+        "otp_hash",
+        "delivery",
+        "requested_at",
+        "expires_at",
+        "attempts",
+        "verified",
+        "sent"
+      ],
+      "properties": {
+        "_id": {
+          "bsonType": "string"
+        },
+        "challenge_hash": {
+          "bsonType": "string"
+        },
+        "otp_hash": {
+          "bsonType": "string"
+        },
+        "delivery": {
+          "enum": [
+            "email",
+            "sms"
+          ]
+        },
+        "user_id": {
+          "bsonType": [
+            "int",
+            "long",
+            "null"
+          ]
+        },
+        "email": {
+          "bsonType": [
+            "string",
+            "null"
+          ]
+        },
+        "phone": {
+          "bsonType": [
+            "string",
+            "null"
+          ]
+        },
+        "attempts": {
+          "bsonType": [
+            "int",
+            "long"
+          ],
+          "minimum": 0
+        },
+        "verified": {
+          "bsonType": "bool"
+        },
+        "sent": {
+          "bsonType": "bool"
+        },
+        "requested_at": {
+          "bsonType": "string"
+        },
+        "expires_at": {
+          "bsonType": "string"
+        },
+        "expires_on": {
+          "bsonType": "date"
+        }
+      }
+    }
+  },
   "favorites": {
     "$jsonSchema": {
       "bsonType": "object",
@@ -644,80 +1141,6 @@
         },
         "created_at": {
           "bsonType": "string"
-        }
-      }
-    }
-  },
-  "password_otps": {
-    "$jsonSchema": {
-      "bsonType": "object",
-      "required": [
-        "_id",
-        "challenge_hash",
-        "otp_hash",
-        "delivery",
-        "requested_at",
-        "expires_at",
-        "attempts",
-        "verified",
-        "sent"
-      ],
-      "properties": {
-        "_id": {
-          "bsonType": "string"
-        },
-        "challenge_hash": {
-          "bsonType": "string"
-        },
-        "otp_hash": {
-          "bsonType": "string"
-        },
-        "delivery": {
-          "enum": [
-            "email",
-            "sms"
-          ]
-        },
-        "user_id": {
-          "bsonType": [
-            "int",
-            "long",
-            "null"
-          ]
-        },
-        "email": {
-          "bsonType": [
-            "string",
-            "null"
-          ]
-        },
-        "phone": {
-          "bsonType": [
-            "string",
-            "null"
-          ]
-        },
-        "attempts": {
-          "bsonType": [
-            "int",
-            "long"
-          ],
-          "minimum": 0
-        },
-        "verified": {
-          "bsonType": "bool"
-        },
-        "sent": {
-          "bsonType": "bool"
-        },
-        "requested_at": {
-          "bsonType": "string"
-        },
-        "expires_at": {
-          "bsonType": "string"
-        },
-        "expires_on": {
-          "bsonType": "date"
         }
       }
     }

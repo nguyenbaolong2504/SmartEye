@@ -1,5 +1,7 @@
 # Pipeline XGBoost / GRU trên dữ liệu quan sát thực
 
+**Luồng mới có tốc độ, lưu lượng, mật độ theo chiều dài, CI, xác suất và đối chiếu kết quả:** xem [quy trình sáu bước và hướng dẫn huấn luyện](TRAFFIC-PIPELINE.md). Trong Dữ liệu & mô hình chọn **Tình trạng, xác suất và tốc độ từ quan trắc 5 phút**. Luồng này bổ sung mốc 60 phút, hiệu chỉnh xác suất trên tập riêng và hồi quy tốc độ; phần XGBoost/GRU bên dưới giữ cho hai mục tiêu cũ.
+
 Admin mở **Quản trị hệ thống → Dữ liệu & mô hình**. Quản lý mở **Giám sát & xử lý → Dữ liệu & thiết lập → Dữ liệu & mô hình** khi được cấp quyền. Các tuyến và thao tác của Quản lý giới hạn theo phạm vi được giao. Bản chạy thử có mô hình XGBoost học từ dữ liệu minh họa được lưu riêng. [Dữ liệu minh họa](DEMO.md)
 
 ![Trang Tổng quan](previews/overview-redesign.png)

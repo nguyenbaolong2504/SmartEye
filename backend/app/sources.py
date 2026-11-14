@@ -153,7 +153,7 @@ def mapped_reading(source,raw):
     if at>now():raise ValueError('Thời gian quan sát nằm ở tương lai')
     if int(data['segment_id'])!=source.segment_id or data['direction']!=source.direction:raise ValueError('Dữ liệu khác tuyến hoặc chiều đường')
     metrics={}
-    for field,maximum in (('count',100000),('speed_kmh',200),('score',1)):
+    for field,maximum in (('count',100000),('speed_kmh',200),('score',1),('present_count',10000),('crossing_count',10000),('rain_mm',300),('visibility_km',100)):
         if field not in data:continue
         value=float(data[field])
         if field=='speed_kmh':
@@ -164,6 +164,7 @@ def mapped_reading(source,raw):
         if field=='count' and value!=int(value):raise ValueError('Số phương tiện phải là số nguyên')
         if field=='speed_kmh' and not source.speed_verified:continue
         metrics[field]=int(value) if field=='count' else value
+    if metrics.get('crossing_count') is not None and metrics['crossing_count']!=int(metrics['crossing_count']):raise ValueError('Số xe qua vạch phải là số nguyên')
     if 'state' in data:
         if data['state'] not in ('FREE','SLOW','JAM'):raise ValueError('Trạng thái giao thông không hợp lệ')
         if source.state_verified:metrics['state']=data['state']
@@ -177,6 +178,12 @@ def mapped_reading(source,raw):
             if not math.isfinite(interval) or not 1<=interval<=86400:raise ValueError('Khoảng đếm phương tiện không hợp lệ')
             metrics.update(interval_seconds=interval,flow_per_minute=metrics['count']*60/interval)
     elif 'count' in metrics:metrics['count_kind']='occupancy'
+    if 'interval_seconds' in data and 'interval_seconds' not in metrics:
+        interval=float(data['interval_seconds'])
+        if not math.isfinite(interval) or not 1<=interval<=86400:raise ValueError('Khoảng quan trắc không hợp lệ')
+        metrics['interval_seconds']=interval
+    if source.count_method=='occupancy' and 'count' in metrics:metrics.setdefault('present_count',metrics['count'])
+    if source.count_method=='crossings' and 'count' in metrics:metrics.setdefault('crossing_count',metrics['count'])
     if not metrics:raise ValueError('Chưa có chỉ số hợp lệ sau ánh xạ và kiểm tra phương pháp đo')
     return {'observed_at':at.isoformat(),'segment_id':source.segment_id,'direction':source.direction,'metrics':metrics}
 

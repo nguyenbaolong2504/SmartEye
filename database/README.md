@@ -2,6 +2,8 @@
 
 Runtime dùng MongoDB/PyMongo. Không cần tạo database/collection bằng tay: `init_db.py` tạo collection, validators/index và seed. [Lệnh local/Docker/Atlas đầy đủ](../docs/RUNNING.md).
 
+Luồng phân tích/dự báo có phép đo giao thông bổ sung **traffic_windows** (ô 5 phút theo đường và chiều, chỉ số và nhãn độc lập) và **traffic_forecast_outcomes** (dự báo đã phát hành và đối chiếu thực tế). Index khóa theo đường/chiều/thời điểm; không nhập video demo thành quan trắc thật. [Công thức, nhập CSV và huấn luyện](../docs/TRAFFIC-PIPELINE.md). Cơ sở dữ liệu cũ cập nhật validator bằng `docker compose exec backend python scripts/migrate_traffic_schema.py`; không xóa dữ liệu.
+
 ## Khởi tạo
 
 MongoDB chạy và `.env` đúng trước khi thực hiện:

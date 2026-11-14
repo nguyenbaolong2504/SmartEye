@@ -227,6 +227,7 @@ class ForecastRun(Document):
     start_at: str
     end_at: str
     epochs: int = 25
+    direction: str = 'forward'
     status: str = 'queued'
     running: bool = True
     lock_key: str = 'training'
@@ -256,6 +257,32 @@ class ForecastRegistry(Document):
     activated_at: str = field(default_factory=timestamp)
 
 
+@dataclass(kw_only=True)
+class TrafficWindow(Document):
+    collection: ClassVar[str] = 'traffic_windows'
+    primary: ClassVar[str] = 'window_key'
+    window_key: str
+    segment_id: int
+    direction: str
+    window_end: str
+    metrics: dict
+    usable: bool
+    is_demo: bool = False
+
+
+@dataclass(kw_only=True)
+class TrafficForecastOutcome(Document):
+    collection: ClassVar[str] = 'traffic_forecast_outcomes'
+    primary: ClassVar[str] = 'forecast_key'
+    forecast_key: str
+    segment_id: int
+    direction: str
+    issue_at: str
+    predicted_at: str
+    run_id: str
+    evaluated: bool = False
+
+
 ALL_MODELS = (User, LoginSession, ResetToken, PasswordOTP, Segment, Camera, Observation,
               VideoJob, Favorite, AlertRule, Notification, Audit, TrafficSample,
-              ForecastRun, TrafficLabel, ForecastRegistry)
+              ForecastRun, TrafficLabel, ForecastRegistry, TrafficWindow, TrafficForecastOutcome)

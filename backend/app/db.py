@@ -6,7 +6,7 @@ concurrent cancellation. No SQL engine, embedded SQLite or mock in production.
 from copy import deepcopy
 from datetime import datetime, timezone
 from pymongo import MongoClient, ReturnDocument, ASCENDING, DESCENDING
-from pymongo.errors import CollectionInvalid
+from pymongo.errors import CollectionInvalid,OperationFailure
 from .config import MONGODB_URI, MONGODB_DB
 
 _client = None
@@ -89,6 +89,17 @@ def initialize_database():
     database.traffic_labels.create_index([('segment_id',1),('observed_at',1)],unique=True)
     database.forecast_runs.create_index('lock_key',unique=True,partialFilterExpression={'running':True},name='one_training_job')
     database.forecast_runs.create_index([('created_at',-1)])
+    database.traffic_windows.create_index([('segment_id',1),('direction',1),('window_end',1)],unique=True)
+    database.traffic_forecast_outcomes.create_index([('evaluated',1),('predicted_at',1)])
+    # The existing collection needs the added target as well as fresh databases.
+    if 'forecast_runs' in existing and database.__class__.__module__.startswith('pymongo'):
+        options=database.forecast_runs.options()
+        if options.get('validator')!=SCHEMAS['forecast_runs']:
+            try:database.command('collMod','forecast_runs',validator=SCHEMAS['forecast_runs'])
+            except OperationFailure as error:
+                if error.code!=13:raise
+                import logging
+                logging.getLogger('smarteye.db').warning('Run scripts/migrate_traffic_schema.py to enable measured-traffic training on this existing database.')
     database.password_otps.create_index('challenge_hash',unique=True,name='unique_recovery_challenge')
     database.password_otps.create_index('user_id')
     for model in (LoginSession,ResetToken,PasswordOTP):

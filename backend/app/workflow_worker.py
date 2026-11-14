@@ -1,6 +1,7 @@
 """Recover deliveries and receive only explicitly enabled, tested API sources."""
 import asyncio
 import os
+import time
 from datetime import timedelta
 from .db import SessionLocal, stamp, now
 from .business_models import DataSource, SourceReceipt
@@ -10,11 +11,20 @@ from .business_common import log_event
 async def work():
     from .sources import source_request, decode_rows, receive
     from .warnings import deliver_publications, expire_publications
+    physical_checked=0.
     while True:
         try:
             with SessionLocal() as db:
                 await asyncio.to_thread(expire_publications,db)
                 await asyncio.to_thread(deliver_publications,db.database)
+                if time.monotonic()-physical_checked>=60:
+                    from .traffic_aggregation import aggregate_sources
+                    from .traffic_forecast import refresh_active
+                    from .traffic_windows import reconcile
+                    await asyncio.to_thread(aggregate_sources,db.database)
+                    await asyncio.to_thread(refresh_active,db.database)
+                    await asyncio.to_thread(reconcile,db.database)
+                    physical_checked=time.monotonic()
                 sources=db.find(DataSource,{'active':True,'tested':True,'kind':'api',
                     '$or':[{'next_poll_at':None},{'next_poll_at':{'$lte':stamp()}}]},limit=10)
                 for source in sources:

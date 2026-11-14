@@ -97,6 +97,8 @@ def detect_clip(path,config,checkpoint):
     from .camera_counting import cumulative_tracks,VERSION as COUNTING_VERSION
     output=cumulative_tracks(output,raw['fps'])
     output=motion_evidence(output)
+    from .camera_measurements import measurement_frames
+    output,measurements=measurement_frames(output,config,raw['fps'])
     # Keep one sample per second for existing archive APIs; the viewer uses all frames.
     samples=[];last_second=-1
     for frame in output:
@@ -105,6 +107,7 @@ def detect_clip(path,config,checkpoint):
     score=float(np.median([frame['score'] for frame in output]))
     return {'detection_version':VERSION,'frames':output,'samples':samples,'fps':raw['fps'],
         'capacity_version':CAPACITY_VERSION,'road_geometry':geometry(config),
+        'measurement_version':measurements['version'],'measurements':measurements,
         'counting_version':COUNTING_VERSION,'counting_method':'ByteTrack',
         'total_unique_count':output[-1]['cumulative_count'],
         'total_unique_vehicle_counts':output[-1]['cumulative_vehicle_counts'],

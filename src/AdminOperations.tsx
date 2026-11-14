@@ -8,7 +8,7 @@ import {type Direction, type Source, Feedback, History, Loading, RoadFields, Sta
 const sourceKinds: Record<string, string> = {file:'Tệp lịch sử', api:'Dịch vụ dữ liệu', camera:'Camera'};
 const roles: Record<User['role'],string> = {user:'Người dùng', analyst:'Quản lý', admin:'Quản trị viên'};
 const permissionGroups:Record<string,string>={cameras:'Camera giao thông',traffic:'Tình trạng và bản đồ',forecast:'Dự báo',routes:'Tìm đường',favorites:'Hành trình đã lưu',warnings:'Cảnh báo công khai',alerts:'Thông báo cá nhân',reports:'Phản ánh của mình',monitor:'Giám sát',incidents:'Xử lý phản ánh',publication:'Phát hành cảnh báo',rules:'Quy tắc cảnh báo',analytics:'Báo cáo giao thông',sources:'Nguồn dữ liệu',network:'Đoạn đường và camera',models:'Dữ liệu và mô hình',diagnostics:'Dịch vụ và nhật ký'};
-const fieldNames: Record<string,string> = {observed_at:'Thời điểm quan sát', segment_id:'Mã tuyến', direction:'Chiều đường', count:'Số phương tiện', interval_seconds:'Khoảng đo (giây)', speed_kmh:'Vận tốc', score:'Chỉ số mật độ', density:'Mức mật độ', state:'Tình trạng ùn tắc'};
+const fieldNames: Record<string,string> = {observed_at:'Thời điểm quan sát', segment_id:'Mã tuyến', direction:'Chiều đường', count:'Số phương tiện', interval_seconds:'Khoảng đo (giây)', speed_kmh:'Vận tốc', score:'Chỉ số mật độ', density:'Mức mật độ', state:'Tình trạng ùn tắc',present_count:'Số xe trung bình đang có trong đoạn',crossing_count:'Lượt xe qua vạch',rain_mm:'Mưa (mm)',visibility_km:'Tầm nhìn (km)'};
 const mandatory = new Set(['observed_at','segment_id','direction']);
 const receiptEmpty: Receipt[] = [];
 type Receipt = {id:number; source_version:number; accepted:number; rejected:number; duplicates:number; errors:{row?:number;reason:string}[]; received_at:string};
@@ -44,6 +44,7 @@ export function SourcesPanel({segments, focus}: {segments: Segment[]; focus?: nu
 }
 
 function SourceForm({source, segments, onSave, onClose}: {source: Source | null; segments: Segment[]; onSave: (value: Source) => void; onClose: () => void}) {
+  const [trafficProfile,setTrafficProfile]=useState<{observed_length_m:number;lanes:number;free_flow_speed_kmh:number;length_verified:boolean;training_allowed:boolean;interval_averages:boolean}|null>(source?.traffic_profile||null);
   const [fields, setFields] = useState({
     name: source?.name || '', kind: source?.kind || 'file', segment_id: source?.segment_id || segments.find(s => s.active)?.id || 0,
     direction: source?.direction || 'forward' as Direction, format: source?.format || 'csv', url: source?.url || '',
@@ -59,7 +60,7 @@ function SourceForm({source, segments, onSave, onClose}: {source: Source | null;
     event.preventDefault();
     void action.run(async () => {
       if(fields.kind==='camera'&&Boolean(latitude)!==Boolean(longitude))throw new Error('Nhập đủ vĩ độ và kinh độ của camera.');
-      const payload={...fields,public_preview:fields.kind==='camera'&&fields.public_preview,
+      const payload={...fields,traffic_profile:fields.kind!=='camera'?trafficProfile:null,public_preview:fields.kind==='camera'&&fields.public_preview,
         position:fields.kind==='camera'&&latitude&&longitude?[Number(latitude),Number(longitude)]:null};
       const data = await api<Source>(source ? `/management/sources/${source.id}` : '/management/sources',
         json(source ? {...payload, revision: source.revision} : payload, source ? 'PATCH' : 'POST'));
@@ -86,6 +87,15 @@ function SourceForm({source, segments, onSave, onClose}: {source: Source | null;
       <label className="field">Phương pháp đếm<select value={fields.count_method} onChange={e => update('count_method',e.target.value)}><option value="occupancy">Đếm xe tại thời điểm</option><option value="crossings">Đếm xe đi qua trong một khoảng đo</option></select></label>
       <label className="check"><input type="checkbox" checked={fields.speed_verified} onChange={e => update('speed_verified',e.target.checked)}/>Nguồn có phương pháp đo vận tốc đã kiểm chứng</label>
       <label className="check"><input type="checkbox" checked={fields.state_verified} onChange={e => update('state_verified',e.target.checked)}/>Nguồn có tiêu chí phân loại ùn tắc đã kiểm chứng</label>
+      <details className="help-details"><summary>Tự tổng hợp quan trắc 5 phút để dự báo</summary>
+        <label className="check"><input type="checkbox" checked={!!trafficProfile} onChange={e=>setTrafficProfile(e.target.checked?{observed_length_m:100,lanes:2,free_flow_speed_kmh:40,length_verified:false,training_allowed:false,interval_averages:false}:null)}/>Khai báo phạm vi đo của nguồn số liệu</label>
+        {trafficProfile&&<><div className="two-columns"><label className="field">Chiều dài quan sát (m)<input type="number" required min={5} max={5000} value={trafficProfile.observed_length_m} onChange={e=>setTrafficProfile({...trafficProfile,observed_length_m:Number(e.target.value)})}/></label><label className="field">Số làn<input type="number" required min={1} max={12} value={trafficProfile.lanes} onChange={e=>setTrafficProfile({...trafficProfile,lanes:Number(e.target.value)})}/></label><label className="field">Tốc độ thông thoáng (km/h)<input type="number" required min={1} max={160} value={trafficProfile.free_flow_speed_kmh} onChange={e=>setTrafficProfile({...trafficProfile,free_flow_speed_kmh:Number(e.target.value)})}/></label></div>
+          <label className="check"><input type="checkbox" checked={trafficProfile.length_verified} onChange={e=>setTrafficProfile({...trafficProfile,length_verified:e.target.checked})}/>Đã đo chiều dài vùng đường</label>
+          <label className="check"><input type="checkbox" checked={trafficProfile.training_allowed} onChange={e=>setTrafficProfile({...trafficProfile,training_allowed:e.target.checked})}/>Nguồn được phép lưu và dùng để huấn luyện</label>
+          <label className="check"><input type="checkbox" checked={trafficProfile.interval_averages} onChange={e=>setTrafficProfile({...trafficProfile,interval_averages:e.target.checked})}/>Mỗi bản ghi là số liệu trong một khoảng đo, thời điểm là lúc kết thúc khoảng</label>
+          <p className="micro">Ánh xạ thêm khoảng đo, số xe đang hiện diện và tốc độ đã kiểm chứng. Có thể thêm lượt qua vạch, mưa, tầm nhìn và nhãn độc lập. Chỉ tổng hợp ô có ít nhất 240 giây không chồng lấn; mỗi chiều đường cần một nguồn đang bật. Không tự điền khoảng thời gian bị thiếu.</p>
+        </>}
+      </details>
     </>}
     {fields.kind==='camera'&&<>
       <label className="field">Vị trí hoặc giao lộ<input maxLength={160} value={fields.location_name} onChange={e=>update('location_name',e.target.value)} placeholder="Ví dụ ngã tư Hoàng Quốc Việt – Phạm Văn Đồng"/></label>

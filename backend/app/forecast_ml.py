@@ -130,6 +130,15 @@ def train_run(run_id,database=None):
             raise InterruptedError('Huấn luyện đã hủy.')
         database.forecast_runs.update_one({'_id':run_id,'running':True},{'$set':{'message':message}})
     try:
+        if run['target']=='traffic':
+            from .traffic_forecast import train
+            folder=artifact_folder(run_id)
+            report=train(database,run,folder,check)
+            check('Đang lưu kết quả đánh giá giao thông')
+            database.forecast_runs.update_one({'_id':run_id,'running':True},{'$set':{
+                'status':'completed','running':False,'progress':100,'message':'Đã đánh giá tình trạng, xác suất và tốc độ giao thông.',
+                'report':report,'finished_at':stamp()}})
+            return
         start=datetime.fromisoformat(run['start_at']);end=datetime.fromisoformat(run['end_at'])
         readiness,datasets=prepare(database,run['segment_ids'],start,end,run['target'])
         if not readiness['ready']:
@@ -165,6 +174,9 @@ def train_run(run_id,database=None):
 
 
 def forecast(database,segment_id,target='density'):
+    if target=='traffic':
+        from .traffic_forecast import predict
+        return predict(database,segment_id)
     empty=lambda state,message:{'state':state,'message':message,'segment_id':segment_id,'target':target,'predictions':[]}
     registry=database.forecast_registry.find_one({'_id':target})
     if not registry: return empty('no_model','Quản lý chưa đưa mô hình vào sử dụng.')
