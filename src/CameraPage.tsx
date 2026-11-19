@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {ArrowRight,Camera,Expand,ExternalLink,MapPin,Minimize,Pause,Play,RefreshCw} from 'lucide-react';
+import {Camera,Expand,ExternalLink,MapPin,Minimize,Pause,Play,RefreshCw} from 'lucide-react';
 import {can} from './permissions';
 import {Empty,Notice,Spinner} from './components';
 import {useRemote} from './business';
@@ -14,8 +14,8 @@ const labels:Record<TrafficCamera['state'],string>={ready:'Sẵn sàng',stale:'C
 const cameraTime=(value:string)=>new Date(value).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const initial={cameras:[] as TrafficCamera[],generated_at:''};
 
-export default function CameraPage({user,tileUrl,onForecast}:{
-  user:User|null;tileUrl?:string;onForecast:(id:number,direction:'forward'|'reverse')=>void;
+export default function CameraPage({user,tileUrl}:{
+  user:User|null;tileUrl?:string;
 }){
   const {data,loading,error,reload}=useRemote('/traffic/cameras',initial);
   const [area,setArea]=useState('');
@@ -57,7 +57,7 @@ export default function CameraPage({user,tileUrl,onForecast}:{
           <CameraExperience key={`${selected.id}-${selected.video_url}-${selected.analysis_url}`} camera={selected} allowForecast={can(user,'forecast.view')}>
           <dl className="camera-information"><div><dt>Tuyến đường</dt><dd>{selected.segment_name} · {selected.direction==='reverse'?'Chiều về':'Chiều đi'}</dd></div><div><dt>Nguồn hình ảnh</dt><dd>{selected.source_name}{selected.source_host&&<small>{selected.source_host}</small>}</dd></div><div><dt>Thời điểm ghi hình</dt><dd>{selected.captured_at?cameraTime(selected.captured_at):'Nguồn chưa cung cấp thời điểm ghi hình'}</dd></div><div><dt>Kiểm tra kết nối</dt><dd>{selected.checked_at?cameraTime(selected.checked_at):'Chưa có lần kiểm tra gần đây'}</dd></div></dl>
           {!selected.position_exact&&<p className="micro">Ghim được đặt theo đoạn đường đã khai báo{selected.is_demo?' trong dữ liệu minh họa':''}.</p>}
-          <div className="camera-detail-actions">{can(user,'forecast.view')&&selected.segment_active&&<button className="button primary" onClick={()=>onForecast(selected.segment_id,selected.direction)}>Xem dự báo tuyến đường<ArrowRight size={16}/></button>}{selected.source_url&&<a className="button" href={selected.source_url} target="_blank" rel="noreferrer">Mở nguồn camera<ExternalLink size={15}/></a>}</div>
+          {selected.source_url&&<div className="camera-detail-actions"><a className="button" href={selected.source_url} target="_blank" rel="noreferrer">Mở nguồn camera<ExternalLink size={15}/></a></div>}
           </CameraExperience>
         </section>:<section className="card"><Empty><p>Chọn camera trong danh sách hoặc trên bản đồ để xem hình ảnh.</p></Empty></section>}
     </>}
@@ -70,7 +70,7 @@ function CameraExperience({camera,allowForecast,children}:{camera:TrafficCamera;
   const view=useCameraAnalysis(camera.analysis_url||undefined);
   const source=view.data.source;
   return <><div className={`camera-experience ${camera.analysis_url&&allowForecast?'with-analysis':''}`}><CameraViewer camera={camera} videoRef={videoRef} onTime={ignoreTime} analysis={view.data}/>
-    {camera.analysis_url&&<CameraAnalysis view={view} allowForecast={allowForecast} onExplain={()=>videoRef.current?.pause()} forecastUrl={camera.analysis_url.replace(/\/analysis(?:\?.*)?$/,'/forecast')}/>}</div>
+    {camera.analysis_url&&<CameraAnalysis view={view} allowForecast={allowForecast} forecastUrl={camera.analysis_url.replace(/\/analysis(?:\?.*)?$/,'/forecast')}/>}</div>
     <details className="camera-more"><summary>Thông tin camera và nguồn video</summary>{children}
       {source&&<div className="camera-video-credit"><b>Video minh họa</b><p>{source.location_note}</p>{source.scenario_note&&<p>{source.scenario_note}</p>}<p>{source.title} · {source.author}{source.published_date&&<> · Công bố {source.published_date}</>}</p><div><a href={source.page_url} target="_blank" rel="noreferrer">Video gốc<ExternalLink size={12}/></a><a href={source.license_url} target="_blank" rel="noreferrer">{source.license}</a>{source.reference_url&&<a href={source.reference_url} target="_blank" rel="noreferrer">Ghi nhận giờ cao điểm</a>}</div></div>}
     </details></>;
@@ -120,6 +120,9 @@ function CameraViewer({camera,videoRef,onTime,analysis}:{camera:TrafficCamera;vi
     return()=>{document.body.style.overflow=previous;window.removeEventListener('keydown',close);};
   },[expanded]);
   const hasMedia=Boolean(camera.image_url||camera.video_url);
+  const scenarioHour=analysis.source?.scenario_hour;
+  const scenarioAt=analysis.forecast?.reference_at;
+  const videoNote=scenarioHour?`Video minh họa khung ${scenarioHour}${analysis.source?.scenario_note?` · ${analysis.source.scenario_note}`:''}`:scenarioAt?`Tình huống video minh họa lúc ${cameraTime(scenarioAt)}`:'';
   return <div className={`camera-viewer ${expanded?'expanded':''}`}>
     <div className="camera-viewer-toolbar"><span>{camera.analysis_url?'Video minh họa':camera.media_kind==='recording'?'Ảnh/video đã lưu':camera.video_url?'Video từ nguồn':'Ảnh camera cập nhật'}</span><div>
       {!!analysis.frames?.length&&<button type="button" className="button small" aria-pressed={showDetection} onClick={()=>setShowDetection(value=>!value)}>{showDetection?'Ẩn ô nhận diện':'Hiện ô nhận diện'}</button>}
@@ -127,12 +130,12 @@ function CameraViewer({camera,videoRef,onTime,analysis}:{camera:TrafficCamera;vi
       {hasMedia&&<button className="icon-button" aria-label={expanded?'Thu gọn hình ảnh':'Phóng to hình ảnh'} onClick={()=>setExpanded(value=>!value)}>{expanded?<Minimize size={17}/>:<Expand size={17}/>}</button>}
     </div></div>
     <div className="camera-picture">
-      {camera.video_url?<div className="camera-video-stage" key={attempt}><video ref={videoRef} controls controlsList="nofullscreen" playsInline preload="auto" src={camera.video_url} poster={image||undefined} onTimeUpdate={event=>{if(!analysis.frames?.length)onTime(event.currentTarget.currentTime);}} onError={()=>setError('Không phát được video từ nguồn. Bạn có thể thử lại hoặc mở nguồn camera.')}/>
+      {camera.video_url?<div className="camera-video-stage" key={attempt}><video ref={videoRef} autoPlay muted loop controls controlsList="nofullscreen" playsInline preload="auto" src={camera.video_url} poster={image||undefined} onCanPlay={event=>{void event.currentTarget.play().catch(()=>{});}} onTimeUpdate={event=>{if(!analysis.frames?.length)onTime(event.currentTarget.currentTime);}} onError={()=>setError('Không phát được video từ nguồn. Bạn có thể thử lại hoặc mở nguồn camera.')}/>
         {!!analysis.frames?.length&&<CameraDetectionOverlay videoRef={videoRef} data={analysis} visible={showDetection} onTime={onTime}/>}</div>:
         image?<img src={image} alt={`Hình ảnh ${camera.name}`} onError={()=>setError('Không đọc được hình ảnh từ camera.')}/>:
         <Empty>{busy?<Spinner/>:<Camera size={40}/>}<p>{busy?'Đang lấy hình ảnh…':camera.state==='inactive'?'Camera đã ngừng hoạt động.':'Camera chưa có hình ảnh được chia sẻ.'}</p></Empty>}
     </div>
     {error&&<Notice kind="error">{error}</Notice>}
-    {hasMedia&&<div className="camera-viewer-foot"><span>{received?`Nhận ảnh từ nguồn lúc ${cameraTime(received)}`:camera.captured_at?`Ghi hình ${cameraTime(camera.captured_at)}`:camera.video_url?'Nhấn nút phát để xem video.':'Đang chờ hình ảnh từ nguồn.'}</span><button type="button" className="text-button" disabled={busy} onClick={()=>setAttempt(value=>value+1)}><RefreshCw size={14}/>{busy?'Đang tải':'Thử tải lại'}</button></div>}
+    {hasMedia&&<div className="camera-viewer-foot"><span>{received?`Nhận ảnh từ nguồn lúc ${cameraTime(received)}`:camera.captured_at?`Ghi hình ${cameraTime(camera.captured_at)}`:videoNote|| (camera.video_url?'Video minh họa đang phát lặp lại.':'Đang chờ hình ảnh từ nguồn.')}</span><button type="button" className="text-button" disabled={busy} onClick={()=>setAttempt(value=>value+1)}><RefreshCw size={14}/>{busy?'Đang tải':'Thử tải lại'}</button></div>}
   </div>;
 }

@@ -7,7 +7,7 @@ from .db import get_db
 from .models import Segment
 from .security import permit,audit
 from .business_common import check_segment_scope
-from .traffic_windows import WindowInput,save_windows,load,reconcile
+from .traffic_windows import WindowInput,save_windows,load,reconcile,forecast_quality
 
 router=APIRouter(prefix='/api/forecast/traffic',tags=['Traffic measurements'])
 
@@ -66,5 +66,9 @@ def outcomes(segment_id:int,direction:Literal['forward','reverse']='forward',use
     check_segment_scope(user,segment_id);reconcile(db.database)
     rows=list(db.database.traffic_forecast_outcomes.find({'segment_id':segment_id,'direction':direction},{'_id':0}).sort('issue_at',-1).limit(500))
     scored=[row for row in rows if row.get('evaluated')]
+    quality={}
+    for run_id,horizon in {(row.get('run_id'),row.get('horizon_minutes')) for row in rows if row.get('run_id') and row.get('horizon_minutes')}:
+        quality[str(horizon)]=forecast_quality(db.database,run_id,segment_id,direction,horizon)
     return {'issued':len(rows),'evaluated':len(scored),'accuracy':sum(row['correct'] for row in scored)/len(scored) if scored else None,
+        'quality_by_horizon':quality,
         'message':'Chỉ chấm khi có quan trắc và nhãn độc lập đúng mốc dự báo. Tối đa 500 lượt gần nhất.','rows':rows[:50]}

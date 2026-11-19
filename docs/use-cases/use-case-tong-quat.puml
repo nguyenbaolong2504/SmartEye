@@ -1,0 +1,32 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Segoe UI
+skinparam actorStyle stickman
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+actor "Người dùng" as ND
+actor "Quản lý" as QL
+actor "Admin" as AD
+QL -|> ND
+AD -|> QL
+rectangle "HỆ THỐNG SMARTEYE" {
+  usecase "UC01. Quản lý tài khoản cá nhân" as UC01
+  usecase "UC02. Theo dõi và phân tích giao thông" as UC02
+  usecase "UC03. Lập kế hoạch hành trình" as UC03
+  usecase "UC04. Quản lý hành trình\nvà cảnh báo cá nhân" as UC04
+  usecase "UC05. Quản lý dữ liệu giao thông\nvà đánh giá dự báo" as UC05
+  usecase "UC06. Quản lý tài khoản và phân quyền" as UC06
+  usecase "UC07. Quản trị và vận hành hệ thống" as UC07
+}
+ND -- UC01
+ND -- UC02
+ND -- UC03
+ND -- UC04
+QL -- UC05
+AD -- UC06
+AD -- UC07
+@enduml

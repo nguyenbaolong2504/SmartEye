@@ -142,7 +142,7 @@ def test_density_model_has_purged_time_splits_and_never_writes_real_observations
     output=camera_forecast.predict_samples(database,1,[{'second':0,'count':4,'score':.1},
         {'second':1,'count':25,'score':.9}],{'low_threshold':.25,'high_threshold':.6})
     assert output['is_demo'] and output['target']=='density_and_congestion' and output['synthetic_context_slots']==11
-    assert output['probability_kind']=='calibrated_synthetic' and not output['real_world_validated']
+    assert output['probability_kind']=='calibrated_synthetic_binary_video_history' and not output['real_world_validated']
     assert {item['horizon_minutes'] for item in output['timeline'][0]['predictions']}=={15,30,60}
     selected=camera_forecast.predict_samples(database,1,[{'second':0,'count':4,'score':.1}],
         {'low_threshold':.25,'high_threshold':.6},horizons=(30,))
@@ -241,7 +241,7 @@ def test_duplicate_camera_worker_does_not_delete_another_runs_video(client,tmp_p
     assert path.read_bytes()==b'owned-by-another-invocation'
 
 
-def test_camera_explanation_uses_only_prior_days_at_the_matching_hour_and_weekday(client):
+def test_camera_explanation_uses_only_prior_days_at_the_matching_hour_and_day_type(client):
     from datetime import datetime
     database=get_database();active={'run_id':str(uuid.uuid4())}
     issue=datetime(2026,11,12,17,0,tzinfo=LOCAL)
@@ -249,9 +249,10 @@ def test_camera_explanation_uses_only_prior_days_at_the_matching_hour_and_weekda
         database.demo_profiles.insert_one({'dataset_id':active['run_id'],'segment_id':1,'date':day,
             'slots':[{'minute':17*60+15,'state':'JAM'},{'minute':17*60+30,'state':'FREE'}]})
     evidence=camera_forecast.history_evidence(database,active,1,issue)
-    assert evidence[15]['matching_days']==evidence[15]['jam_days']==1
-    assert evidence[15]['hour']=='17:15' and evidence[15]['lookback_days']==100
-    assert evidence[30]['matching_days']==1 and evidence[30]['jam_days']==0
+    assert evidence[15]['matching_days']==evidence[15]['jam_days']==2
+    assert evidence[15]['hour']=='17:15' and evidence[15]['lookback_days']==30
+    assert evidence[30]['matching_days']==2 and evidence[30]['jam_days']==0
+    assert evidence[15]['day_type']=='Ngày làm việc'
 
 
 @pytest.mark.parametrize('score,expected',[(.1,.125),(.4,.425),(.9,.9)])

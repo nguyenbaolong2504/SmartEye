@@ -6,11 +6,18 @@ import numpy as np
 from .db import now,stamp
 from .history import parse_timestamp,LOCAL
 from .forecast_data import STEP,LOOKBACK,DataNotReady
-from .traffic_windows import load
+from .traffic_windows import load,forecast_quality
 from .traffic_learning import STATES,FIELDS,sequence_features,partition,fit_models
 from .traffic_metrics import quantities
 
 HORIZONS=(15,30,60)
+HISTORY_DAYS=(7,14,21,28)
+# A road's rush-hour pattern cannot be considered stable after a handful of
+# clips. These gates deliberately prefer "not ready" over a made-up forecast.
+MIN_OBSERVED_DAYS=30
+MIN_DENSE_DAYS=24
+MIN_DAILY_LABELLED_WINDOWS=24
+MIN_EXAMPLES_PER_SEGMENT=720
 _cache={}
 
 
@@ -35,7 +42,7 @@ def examples(series,ids,horizon):
         label=future.get('verified_state');present=row.get('verified_state')
         if label not in STATES or present not in STATES:continue
         vfree=row['free_flow_speed_kmh']
-        history=[samples.get(issue+timedelta(minutes=horizon)-timedelta(days=day),{}).get('verified_state') for day in (7,14,21,28)]
+        history=[samples.get(issue+timedelta(minutes=horizon)-timedelta(days=day),{}).get('verified_state') for day in HISTORY_DAYS]
         votes=[state for state in history if state in STATES]
         previous=Counter(votes).most_common(1)[0][0] if votes else present
         features=sequence_features(rows,ids,sid)
@@ -52,16 +59,31 @@ def examples(series,ids,horizon):
 
 def prepare(database,ids,start,end,direction='forward'):
     series,raw=dataset(database,ids,start,end,direction)
-    days={at.astimezone(LOCAL).date() for rows in series.values() for at in rows}
     labels=sum(row.get('verified_state') in STATES for rows in series.values() for row in rows.values())
+    coverage={}
+    for sid in ids:
+        by_day=Counter(at.astimezone(LOCAL).date() for at,row in series.get(sid,{}).items()
+                       if row.get('verified_state') in STATES)
+        classes=Counter(row['verified_state'] for row in series.get(sid,{}).values()
+                        if row.get('verified_state') in STATES)
+        coverage[str(sid)]={'labelled_windows':sum(by_day.values()),'observed_days':len(by_day),
+            'days_with_at_least_2_hours':sum(count>=MIN_DAILY_LABELLED_WINDOWS for count in by_day.values()),
+            'class_counts':{state:classes[state] for state in STATES}}
     report={'ready':True,'raw_samples':raw,'usable_slots':sum(len(rows) for rows in series.values()),
-        'observed_days':len(days),'label_count':labels,'horizons':{},
-        'requirements':'Ít nhất 7 ngày; mỗi ô 5 phút có ≥240 giây quan trắc, chiều đường riêng, tốc độ/kích thước đã đo và quyền huấn luyện. Cần 60 phút liên tiếp và nhãn thực tế độc lập. Bốn phần thời gian train/validation/calibration/test có khoảng cách bằng mốc dự báo.'}
+        'observed_days':max((row['observed_days'] for row in coverage.values()),default=0),'label_count':labels,
+        'segment_coverage':coverage,'horizons':{},
+        'requirements':'Mỗi tuyến/chiều cần ít nhất 30 ngày có nhãn độc lập, trong đó 24 ngày có tối thiểu 2 giờ quan trắc; mỗi mốc cần 720 cửa sổ học có 60 phút lịch sử liên tục. Mỗi ô 5 phút có ≥240 giây quan trắc, tốc độ/kích thước đã đo và quyền huấn luyện. Bốn phần train/validation/calibration/test chia theo thời gian, có khoảng cách bằng mốc dự báo.'}
     datasets={}
     for horizon in HORIZONS:
         data=examples(series,ids,horizon);reason=None
         try:
-            if len(days)<7 or len(data['y'])<180:raise DataNotReady('Cần ít nhất 7 ngày và 180 cửa sổ có nhãn thực tế, tốc độ đã hiệu chuẩn.')
+            insufficient=[]
+            for sid in ids:
+                row=coverage[str(sid)]
+                examples_for_road=int(np.sum(data['roads']==sid))
+                if row['observed_days']<MIN_OBSERVED_DAYS or row['days_with_at_least_2_hours']<MIN_DENSE_DAYS or examples_for_road<MIN_EXAMPLES_PER_SEGMENT:
+                    insufficient.append(str(sid))
+            if insufficient:raise DataNotReady('Cần đủ 30 ngày, 24 ngày có ≥2 giờ nhãn xác minh và 720 cửa sổ học cho từng tuyến/chiều: '+', '.join(insufficient)+'.')
             partition(data,horizon)
         except DataNotReady as exc:reason=str(exc);report['ready']=False
         report['horizons'][str(horizon)]={'windows':len(data['y']),'ready':reason is None,'reason':reason,
@@ -76,7 +98,7 @@ def train(database,run,folder,check):
     folder.mkdir(parents=True,exist_ok=True)
     report={'version':1,'feature_set':'physical_5min_v1','target':'traffic','classes':list(STATES),
         'direction':run.get('direction','forward'),'fields':list(FIELDS),'is_demo':False,'horizons':{},'data':readiness,
-        'quality_policy':'Nhãn độc lập, bốn phần theo thời gian và purge. XGBoost phải vượt cả giữ nguyên trạng thái và lịch sử cùng giờ trên validation và test; Recall ùn tắc ≥50%, đủ lớp trên từng đường, ECE ≤0,1 và Brier <2/3. Tốc độ cần MAE tốt hơn giữ nguyên tốc độ trên validation và test từng đường. Không cam kết độ chính xác 80–90%.'}
+        'quality_policy':'Chỉ dùng dữ liệu thực, nhãn độc lập và tối thiểu 30 ngày cho từng tuyến/chiều. Chia bốn phần theo thời gian và purge. XGBoost phải vượt cả giữ nguyên trạng thái và lịch sử cùng giờ trên validation/test, đạt Accuracy test ≥80%, Macro-F1 ≥70%, Recall ùn tắc ≥60%, đủ lớp từng đường, ECE ≤0,1 và Brier <2/3. Tốc độ cần MAE tốt hơn giữ nguyên tốc độ trên validation/test từng đường. Không công bố 80–90% nếu báo cáo kiểm thử độc lập không đạt.'}
     import hashlib
     for horizon,data in datasets.items():
         check(f'Đang huấn luyện tình trạng và tốc độ sau {horizon} phút')
@@ -89,7 +111,8 @@ def train(database,run,folder,check):
 
 
 def predict(database,sid,direction='forward'):
-    empty=lambda state,message:{'state':state,'message':message,'segment_id':sid,'direction':direction,'target':'traffic','predictions':[]}
+    empty=lambda state,message,**extra:{'state':state,'message':message,'segment_id':sid,'direction':direction,
+                                        'target':'traffic','predictions':[],**extra}
     registry=database.forecast_registry.find_one({'_id':f'traffic:{direction}'})
     run=database.forecast_runs.find_one({'_id':registry['run_id'],'status':'completed'}) if registry else None
     if not run:return empty('no_model','Chưa có mô hình giao thông được đưa vào sử dụng.')
@@ -104,16 +127,20 @@ def predict(database,sid,direction='forward'):
     from .forecast_ml import artifact_folder
     from .camera_forecast import probabilities
     from xgboost import XGBClassifier,XGBRegressor
-    past_times=[(issue+timedelta(minutes=h)-timedelta(days=day)).isoformat() for h in HORIZONS for day in (7,14,21,28)]
+    past_times=[(issue+timedelta(minutes=h)-timedelta(days=day)).isoformat() for h in HORIZONS for day in HISTORY_DAYS]
     past={row['window_end']:row['verified_state'] for row in database.traffic_windows.find({'segment_id':sid,'direction':direction,
         'window_end':{'$in':past_times},'usable':True,'is_demo':False,'verified_state':{'$in':list(STATES)}},{'window_end':1,'verified_state':1})}
     folder=artifact_folder(run['_id']);report=run['report']
     features=sequence_features(rows,run['segment_ids'],sid)
-    predictions=[]
+    predictions=[];held=[]
     for horizon in HORIZONS:
         info=report.get('horizons',{}).get(str(horizon),{})
         if not info.get('deployable') or sid not in info.get('supported_segment_ids',[]):continue
-        votes=[past.get((issue+timedelta(minutes=horizon)-timedelta(days=day)).isoformat()) for day in (7,14,21,28)]
+        live_quality=forecast_quality(database,run['_id'],sid,direction,horizon)
+        if live_quality['state']=='hold':
+            held.append({'horizon_minutes':horizon,**live_quality})
+            continue
+        votes=[past.get((issue+timedelta(minutes=horizon)-timedelta(days=day)).isoformat()) for day in HISTORY_DAYS]
         votes=[state for state in votes if state in STATES]
         x=np.concatenate([features,[sum(v=='JAM' for v in votes)/len(votes) if votes else 0.,len(votes)/4]])[None]
         cache_key=(run['_id'],horizon)
@@ -126,8 +153,8 @@ def predict(database,sid,direction='forward'):
         predicted_at=(issue+timedelta(minutes=horizon)).isoformat()
         value={'horizon_minutes':horizon,'predicted_at':predicted_at,'label':STATES[int(p.argmax())],'model':'XGBoost',
             'probabilities':dict(zip(STATES,map(float,p))),'jam_probability':float(p[2]),'probability_calibrated':True,
-            'history':{'matching_days':len(votes),'jam_days':votes.count('JAM'),'lookback_days':28,'same_weekday':True},
-            'test_macro_f1':info['test']['XGBoost']['macro_f1']}
+            'history':{'matching_days':len(votes),'jam_days':votes.count('JAM'),'lookback_days':max(HISTORY_DAYS),'same_weekday':True},
+            'test_macro_f1':info['test']['XGBoost']['macro_f1'],'live_quality':live_quality}
         if info.get('speed_deployable') and sid in info.get('speed_supported_segment_ids',[]):
             speed=float(min(160,np.clip(reg.predict(x)[0],0,2)*rows[-1]['free_flow_speed_kmh']))
             metrics=quantities(speed_kmh=speed,speed_verified=True,free_flow_speed_kmh=rows[-1]['free_flow_speed_kmh'])
@@ -136,9 +163,12 @@ def predict(database,sid,direction='forward'):
         ident=f"{run['_id']}:{sid}:{direction}:{issue.isoformat()}:{horizon}"
         database.traffic_forecast_outcomes.update_one({'_id':ident},{'$setOnInsert':{**value,'segment_id':sid,
             'direction':direction,'run_id':run['_id'],'issue_at':issue.isoformat(),'evaluated':False,'created_at':stamp()}},upsert=True)
+    if not predictions and held:
+        return empty('quality_hold','Tạm dừng dự báo vì chất lượng kiểm chứng thực tế chưa đạt ngưỡng an toàn.',monitoring=held)
     return {'state':'ready' if predictions else 'unsupported','segment_id':sid,'direction':direction,'target':'traffic',
         'issue_at':issue.isoformat(),'run_id':run['_id'],'model_version':'physical_5min_v1','is_demo':False,
-        'current':rows[-1]['metrics'],'predictions':predictions,'message':'Dự báo từ quan trắc đã đạt chất lượng; chỉ phục vụ các mốc vượt kiểm tra độc lập.'}
+        'current':rows[-1]['metrics'],'predictions':predictions,'monitoring':held,
+        'message':'Dự báo từ quan trắc đã đạt chất lượng; chỉ phục vụ các mốc vượt kiểm tra độc lập.'}
 
 
 def refresh_active(database):

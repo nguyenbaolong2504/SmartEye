@@ -72,10 +72,10 @@ def test_examples_use_future_labels_but_only_past_features_and_preserve_gaps():
 
 def test_training_real_xgboost_regression_and_calibration_are_chronological(analyst_client,tmp_path,monkeypatch):
     from backend.app import forecast_ml
-    sid=real_road();end=now().replace(hour=0,minute=0,second=0,microsecond=0);start=end-timedelta(days=8)
+    sid=real_road();end=now().replace(hour=0,minute=0,second=0,microsecond=0);start=end-timedelta(days=32)
     docs=[]
     # A deliberately synthetic TEST fixture, isolated from deployed observations.
-    for i in range(8*288):
+    for i in range(32*288):
         at=start+timedelta(minutes=5*i)
         phase=(i//12)%3;state=('FREE','SLOW','JAM')[phase];speed=(36,20,8)[phase]
         data=observation(sid,at);data.update(avg_speed_kmh=speed,verified_state=state,present_count=(4,10,30)[phase])

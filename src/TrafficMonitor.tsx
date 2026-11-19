@@ -12,7 +12,7 @@ const normalized=(text:string)=>text.normalize('NFD').replace(/[\u0300-\u036f]/g
 const color=(row:TrafficStats)=>row.average_score===null?'#e8edf0':(row.high_share||0)>=.5?'#db6674':(row.low_share||0)>=.5?'#59ab91':'#e3b25f';
 const stateLabels={LOW:'Thông thoáng',NORMAL:'Đông xe',HIGH:'Dễ ùn tắc'};
 type Period='day'|'month'|'year';
-export default function TrafficMonitor({segments,dataMode,demo,onFindRoute,user,onUpdated,initialRoad,onForecast,tileUrl}:{segments:Segment[];dataMode:DataMode;demo:DemoStatus|null;onFindRoute:()=>void;user:User|null;onUpdated:()=>void;initialRoad?:number;onForecast:(id:number)=>void;tileUrl?:string}){
+export default function TrafficMonitor({segments,dataMode,demo,onFindRoute,user,onUpdated,initialRoad,tileUrl}:{segments:Segment[];dataMode:DataMode;demo:DemoStatus|null;onFindRoute:()=>void;user:User|null;onUpdated:()=>void;initialRoad?:number;tileUrl?:string}){
   const[road,setRoad]=useState(String(initialRoad||segments.find(s=>s.name==='Hoàng Quốc Việt')?.id||segments.find(s=>s.active)?.id||''));
   const[query,setQuery]=useState('');const[period,setPeriod]=useState<Period>('year');const[value,setValue]=useState(today());const[report,setReport]=useState<HistoryReport|null>(null);const[error,setError]=useState('');const[loading,setLoading]=useState(false);
   const ready=dataMode!=='demo'||demo?.planning_ready;
@@ -22,7 +22,7 @@ export default function TrafficMonitor({segments,dataMode,demo,onFindRoute,user,
     return()=>{current=false;};
   },[road,period,value,dataMode,ready,demo?.generated_at]);
   function changePeriod(next:Period){setPeriod(next);setValue(next==='year'?today():next==='month'?value.slice(0,7):value.length===7?value+'-01':value);}
-  return <><div className="page-heading"><div><div className="eyebrow">HIỂU GIỜ CAO ĐIỂM · CHỌN GIỜ ĐI PHÙ HỢP</div><h1>Tình trạng & thống kê<span>.</span></h1><p>Xem giao thông trong một năm qua và tìm những giờ thường đông xe.</p></div>{can(user,'forecast.view')&&<button className="button" onClick={()=>onForecast(Number(road))}>Xem dự báo tuyến này<ArrowRight size={16}/></button>}</div>
+  return <><div className="page-heading"><div><div className="eyebrow">HIỂU GIỜ CAO ĐIỂM · CHỌN GIỜ ĐI PHÙ HỢP</div><h1>Tình trạng & thống kê<span>.</span></h1><p>Xem giao thông trong một năm qua và tìm những giờ thường đông xe.</p></div></div>
     {segments.find(s=>s.id===Number(road))&&<RoadObservation segment={segments.find(s=>s.id===Number(road))!} tileUrl={tileUrl}/>}
     {!ready?<DemoSetup demo={demo} user={user} onUpdated={onUpdated}/>:<div className="traffic-workspace">
       <aside className="card road-browser"><label className="road-search"><Search size={17}/><input aria-label="Tìm tuyến đường thống kê" placeholder="Tìm tên đường…" value={query} onChange={e=>setQuery(e.target.value)}/></label><p className="micro">{roads.length} tuyến đường</p><div className="road-list">{roads.map(s=><button key={s.id} className={`road-list-item ${String(s.id)===road?'selected':''}`} onClick={()=>setRoad(String(s.id))}><b>{s.name}</b><span className={`density ${s.observation?.density||'unknown'}`}><i/>{s.observation?stateLabels[s.observation.density]:'Chưa có theo dõi mới'}</span></button>)}</div>{!roads.length&&<p className="muted">Không tìm thấy tuyến đường.</p>}</aside>

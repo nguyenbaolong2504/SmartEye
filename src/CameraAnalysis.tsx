@@ -6,8 +6,6 @@ import {ConditionsSummary} from './CameraConditions';
 import type {CameraAnalysisData,CameraForecast,CameraPrediction} from './cameraAnalysisData';
 
 const states=['FREE','SLOW','JAM'] as const;
-type TrafficState=typeof states[number];
-const trafficText:Record<TrafficState,string>={FREE:'Thông thoáng',SLOW:'Di chuyển chậm',JAM:'Ùn tắc'};
 // Keep a value below the 80% threshold below 80% when displaying it, too.
 const percentage=(value:number)=>value>0&&value<.001?'<0.1%':`${Math.floor((value*100+1e-7)*10)/10}%`;
 const timeText=(second:number)=>`${String(Math.floor(second/60)).padStart(2,'0')}:${String(Math.floor(second%60)).padStart(2,'0')}`;
@@ -18,8 +16,8 @@ function distribution(item:CameraPrediction){
   return p;
 }
 
-export default function CameraAnalysis({view,onExplain,forecastUrl,allowForecast}:{
-  view:{data:CameraAnalysisData;error:string;reload:()=>void};onExplain:()=>void;forecastUrl?:string;allowForecast:boolean;
+export default function CameraAnalysis({view,forecastUrl,allowForecast}:{
+  view:{data:CameraAnalysisData;error:string;reload:()=>void};forecastUrl?:string;allowForecast:boolean;
 }){
   const [horizon,setHorizon]=useState(15);
   const [result,setResult]=useState<CameraForecast|null>(null);
@@ -34,7 +32,7 @@ export default function CameraAnalysis({view,onExplain,forecastUrl,allowForecast
   async function analyze(){
     if(!forecastUrl||!data.analysis_id)return;
     request.current?.abort();const controller=new AbortController();request.current=controller;
-    setBusy(true);setError('');setResult(null);onExplain();
+    setBusy(true);setError('');setResult(null);
     try{
       const value=await api<CameraForecast>(forecastUrl.replace(/^\/api(?=\/)/,''),{
         ...json({horizon_minutes:horizon,analysis_id:data.analysis_id,whole_video:true}),signal:controller.signal,
@@ -54,7 +52,12 @@ export default function CameraAnalysis({view,onExplain,forecastUrl,allowForecast
   const item=result?.timeline[0].predictions[0];
   const p=item?distribution(item):null;
   const winner=p?states.reduce((best,key)=>p[key]>p[best]?key:best):'FREE';
-  const high=!!p&&p[winner]>=.8;
+  const decision=item?.decision;
+  const finalState=decision?.state||winner;
+  const finalProbability=decision?.probability??(p?p[finalState]:0);
+  // The backend turns the available evidence into one actionable FREE/JAM
+  // result.  Older saved analyses still use the former threshold fallback.
+  const high=decision?true:!!p&&finalState!=='SLOW'&&finalProbability>=.8;
   const basis=result?.basis;
   const summary=result?.summary;
   const geometry=result?.road_geometry;
@@ -66,18 +69,18 @@ export default function CameraAnalysis({view,onExplain,forecastUrl,allowForecast
     <button type="button" className="button primary camera-analyze-button" disabled={busy||!data.analysis_id||!forecastUrl} onClick={()=>void analyze()}>{busy?<><Spinner/>Đang phân tích…</>:<>Phân tích<ArrowRight size={16}/></>}</button>
     {error&&<Notice kind="error">{error}</Notice>}
     {!result&&!error&&!busy&&<p className="camera-analysis-hint">Nhấn Phân tích để xem khả năng thông thoáng hoặc ùn tắc sau {horizon===60?'1 giờ':`${horizon} phút`}.</p>}
-    {result&&item&&p&&<div className={`camera-result ${high?winner:'uncertain'}`} role="status" aria-live="polite">
+    {result&&item&&p&&<div className={`camera-result ${high?finalState:'uncertain'}`} role="status" aria-live="polite">
       <div className="camera-result-kicker">Sau {horizon===60?'1 giờ':`${horizon} phút`}{result.reference_at&&<> · {new Date(new Date(result.reference_at).getTime()+horizon*60000).toLocaleTimeString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'})}</>}</div>
-      <div className="camera-result-signal">{high?(winner==='FREE'?<CheckCircle2 size={18}/>:<TriangleAlert size={18}/>):<HelpCircle size={18}/>}<span>{high?'Khả năng cao':'Xu hướng chưa rõ'}</span></div>
-      <h4>{trafficText[winner]}</h4><strong className="camera-result-percentage">{percentage(p[winner])}</strong>
-      <p>{high?(winner==='FREE'?'Nhiều khả năng đường sẽ thông thoáng.':winner==='SLOW'?'Nên dự trù thêm thời gian di chuyển.':'Nên cân nhắc giờ đi hoặc tuyến đường khác.'):'Chưa có trạng thái nào đạt 80%. Nên kiểm tra lại trước khi đi.'}</p>
-      <div className="camera-probability-breakdown" aria-label="Khả năng từng tình trạng">{states.map(state=><div key={state} className={state}><span>{trafficText[state]}</span><progress aria-label={`Khả năng ${trafficText[state].toLowerCase()}`} max={1} value={p[state]}/><b>{percentage(p[state])}</b></div>)}</div>
-      <button type="button" className="text-button camera-why" onClick={()=>{onExplain();setExplaining(true);}}><HelpCircle size={15}/>Vì sao?</button>
+      <div className="camera-result-signal">{high?(finalState==='FREE'?<CheckCircle2 size={18}/>:<TriangleAlert size={18}/>):<HelpCircle size={18}/>}<span>{high?'Kết quả dự báo':'Chưa đủ căn cứ'}</span></div>
+      <h4>{high?(finalState==='FREE'?'Khả năng thông thoáng':'Khả năng ùn tắc'):'Chưa kết luận'}</h4>
+      {high&&<strong className="camera-result-percentage">{percentage(finalProbability)}</strong>}
+      <p>{high?(finalState==='FREE'?'Xe đang di chuyển và lịch sử cùng giờ thuận lợi. Bạn có thể chọn khung giờ này, nhưng vẫn nên kiểm tra lại trước khi xuất phát.':'Mật độ, chuyển động và lịch sử cùng giờ cho thấy nguy cơ tăng. Nên cân nhắc đổi giờ đi hoặc chọn tuyến khác.'):'Video và lịch sử chưa cùng tạo ra mức tin cậy từ 80% trở lên, nên hệ thống không đưa ra dự báo chắc chắn.'}</p>
+      <button type="button" className="text-button camera-why" onClick={()=>setExplaining(true)}><HelpCircle size={15}/>Xem vì sao</button>
     </div>}
-    <p className="camera-analysis-note">Ước tính từ video minh họa, chưa kiểm chứng với giao thông thực tế.</p>
+    <p className="camera-analysis-note">Bản chạy thử dùng video minh họa. Tỷ lệ là khả năng dự báo của tình huống đang xem, không phải cam kết độ chính xác ngoài thực tế.</p>
     {explaining&&result&&item&&p&&<Modal title={`Vì sao có kết quả sau ${horizon===60?'1 giờ':`${horizon} phút`}?`} onClose={()=>setExplaining(false)}>
       <div className="camera-forecast-explanation">
-        <p><b>{trafficText[winner]}: {percentage(p[winner])}.</b> {high?'Đây là trạng thái có khả năng cao nhất và đã đạt ngưỡng thông báo 80%.':'Đây là trạng thái có tỷ lệ cao nhất, nhưng chưa đạt ngưỡng thông báo 80%.'} Ba khả năng được tính riêng và cộng lại bằng khoảng 100%.</p>
+        <p>{high?<><b>{finalState==='FREE'?'Khả năng thông thoáng':'Khả năng ùn tắc'}: {percentage(finalProbability)}.</b> Đây là kết luận duy nhất để bạn quyết định có nên đi vào khung giờ này hay không.</>:<>Chưa có kết luận đủ chắc chắn. Hệ thống không hiển thị các tỷ lệ nhỏ lẻ để tránh khiến người xem hiểu nhầm.</>}</p>
         <h3>Video đã cho thấy gì?</h3>
         {summary&&<p>Xem đoạn {timeText(summary.start_second)}–{timeText(summary.end_second)} ở cuối video ({summary.frames} khung hình). Số xe điển hình là {summary.median_count}; mức mật độ điển hình {Math.round(summary.median_score*100)}%. Lấy trung vị của đoạn này để giảm ảnh hưởng của một khung hình bất thường.</p>}
         {basis&&<p>Khung hình đại diện lúc {timeText(basis.second)} có {basis.count} xe: {basis.vehicle_counts.car} ô tô, {basis.vehicle_counts.motorcycle} xe máy, {basis.vehicle_counts.bus} xe buýt, {basis.vehicle_counts.truck} xe tải. Số này minh họa một khung hình; kết quả phân tích dùng cả đoạn nêu trên.</p>}
@@ -93,13 +96,14 @@ export default function CameraAnalysis({view,onExplain,forecastUrl,allowForecast
         {item.predicted_speed_kmh!=null&&<><h3>Dự tính sau {horizon} phút</h3><p>Tốc độ khoảng <b>{show(item.predicted_speed_kmh,' km/h')}</b>; mức giảm tốc khoảng <b>{show((item.predicted_congestion_index??0)*100,'%')}</b> so với mức thông thoáng {item.free_flow_speed_kmh} km/h. {item.predicted_travel_time_index!=null&&`Thời gian đi qua cùng đoạn đường khoảng ${item.predicted_travel_time_index.toLocaleString('vi-VN',{maximumFractionDigits:1})} lần khi thông thoáng.`}</p><p>Đây là dự tính từ lịch sử minh họa. Tốc độ được dự báo riêng; mức giảm tốc không phải xác suất ùn tắc {percentage(p.JAM)}.</p></>}
         {geometry&&<><h3>Đã xét đường rộng hay hẹp thế nào?</h3><p>Vùng quan sát rộng {geometry.road_width_m} m, dài {geometry.observed_length_m} m; sức chứa ước tính {geometry.capacity_pcu} ô tô quy đổi.</p><p>Xe quy đổi = ô tô + 0,25 × xe máy + 3 × xe buýt + 2,5 × xe tải. Sức chứa = diện tích mặt đường sử dụng ÷ {geometry.car_space_m2} m². Mức sử dụng = xe quy đổi ÷ sức chứa.</p>{summary?.median_load_ratio!=null&&<p>Mức sử dụng điển hình trong đoạn đã xem: {Math.round(summary.median_load_ratio*100)}%. {summary.motion_known?`Khoảng ${Math.round((summary.stopped_share??0)*100)}% xe đủ dữ liệu theo dõi đang đứng hoặc nhích chậm.`:'Chưa đủ dữ liệu để đánh giá chuyển động.'}</p>}<p>Đây là kích thước và hệ số chạy thử. Nhiều xe trên đường rộng chưa đủ để kết luận ùn tắc; cần xét cả chuyển động và diễn biến theo thời gian.</p></>}
         <h3>Lịch sử và điều kiện xung quanh</h3>
-        {item.history&&<p>Trong {item.history.lookback_days} ngày minh họa gần nhất, có {item.history.matching_days} ngày cùng thứ có dữ liệu lúc {item.history.hour}; {item.history.jam_days} ngày được gắn nhãn ùn tắc. Tần suất này là một căn cứ tham khảo, không phải chính tỷ lệ dự báo.</p>}
+        {item.history&&<p>Trong {item.history.lookback_days} ngày trước mốc dự báo, có {item.history.matching_days} {item.history.day_type?.toLowerCase()||'ngày tương tự'} có dữ liệu lúc {item.history.hour}: {item.history.free_days??0} ngày thông thoáng, {item.history.slow_days??0} ngày di chuyển chậm và {item.history.jam_days} ngày ùn tắc. Lịch sử chỉ hỗ trợ kết luận, không thể thay thế hình ảnh đang xem.</p>}
+      {decision&&<p>Mức nguy cơ được tổng hợp từ: mô hình {percentage(decision.evidence.model_jam)} ùn tắc, lịch sử cùng giờ {percentage(decision.evidence.monthly_jam)}, video hiện tại {percentage(decision.evidence.video_congestion)} và điều kiện đường/thời tiết {percentage(decision.evidence.conditions)}. {decision.evidence.stopped_share!=null&&`Xe đứng hoặc nhích chậm trong video: ${percentage(decision.evidence.stopped_share)}.`}</p>}
         <ConditionsSummary value={result.conditions}/>
-        <details className="camera-explanation-details"><summary>Cách tính tỷ lệ và giới hạn</summary><p>Mô hình XGBoost nhận mức mật độ đã chuẩn hóa theo sức chứa đường, diễn biến lịch sử, chuyển động, thời tiết và sự cố có thông tin. Với mỗi trạng thái, điểm mô hình được hiệu chỉnh trên dữ liệu riêng theo công thức p(k) = exp(z(k)/T) ÷ Σ exp(z(j)/T). T là hệ số hiệu chỉnh, z là điểm của từng trạng thái. Không đặt sẵn tỷ lệ 80% hay 90%.</p><p>Khả năng thông thoáng lấy từ trạng thái Thông thoáng, không lấy 100% trừ khả năng ùn tắc, vì còn trạng thái Di chuyển chậm.</p>
+        <details className="camera-explanation-details"><summary>Cách tính tỷ lệ và giới hạn</summary><p>Mô hình XGBoost nhận mật độ đã chuẩn hóa theo sức chứa đường, lịch sử, chuyển động, thời tiết và sự cố có thông tin. Bản chạy thử tính nguy cơ ùn tắc từ 32% điểm mô hình, 28% lịch sử 30 ngày cùng giờ, 27% video hiện tại và 13% điều kiện đường/thời tiết.</p><p>Nếu nhiều nguồn cùng chỉ ra đường sắp quá tải, hệ thống cộng thêm mức đồng thuận; nếu video ít xe và đang di chuyển thì nguy cơ ùn tắc giảm mạnh. Tỷ lệ không được đặt sẵn thành 80% hay 90%.</p>
           {result.evaluation?.[String(horizon)]&&<p>Trên phần dữ liệu minh họa giữ riêng để kiểm tra, mô hình sau {horizon} phút phân loại đúng khoảng {Math.round(result.evaluation[String(horizon)].test.accuracy*100)}% trường hợp. Đây là kết quả thử mô hình, không phải độ chính xác của riêng lượt phân tích này.</p>}
           {result.evaluation?.[String(horizon)]?.speed&&<p>Sai số tốc độ trung bình trên dữ liệu minh họa giữ riêng: {show(result.evaluation[String(horizon)].speed!.test_mae_kmh,' km/h')}. So với giữ nguyên tốc độ hiện tại: {show(result.evaluation[String(horizon)].speed!.persistence_mae_kmh,' km/h')}.</p>}
           <p>Lịch sử 60 phút dùng 11 mốc minh họa và mốc mới nhất được tổng hợp từ video. Tỷ lệ của cách ghép này chưa được kiểm chứng ngoài đường; không khẳng định đếm đúng mọi xe hoặc dự báo thực tế chính xác 80–90%.</p>
-          {result.reference_at&&<p>Mốc thời gian chạy thử: {new Date(result.reference_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}. Đây không phải thời điểm quay đã xác minh.</p>}
+          {result.reference_at&&<p>Mốc tình huống video chạy thử: {new Date(result.reference_at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}. Đây không phải thời điểm quay đã xác minh.</p>}
         </details>
       </div>
     </Modal>}

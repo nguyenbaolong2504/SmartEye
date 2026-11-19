@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1410" viewBox="0 0 1440 1410" role="img" aria-labelledby="title desc">
+<title id="title">Use Case tổng quát của hệ thống SmartEye</title>
+<desc id="desc">Ba tác nhân Người dùng, Quản lý, Admin và bảy nhóm nghiệp vụ. Quản lý kế thừa Người dùng; Admin kế thừa Quản lý.</desc>
+<defs><marker id="generalization" markerWidth="20" markerHeight="18" refX="18" refY="9" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L18 9 L1 17 Z" fill="white" stroke="#222" stroke-width="1.8"/></marker></defs>
+<style>text{font-family:'Segoe UI',Arial,sans-serif;fill:#171717} .edge{fill:none;stroke:#333;stroke-width:2} .case{fill:white;stroke:#222;stroke-width:2} .actor{fill:none;stroke:#222;stroke-width:2.5;stroke-linecap:round}</style>
+<rect width="1440" height="1410" fill="white"/>
+<text x="720" y="58" font-size="34" font-weight="700" text-anchor="middle">USE CASE TỔNG QUÁT – SMARTEYE</text>
+<rect x="350" y="140" width="1060" height="1160" rx="0" fill="white" stroke="#222" stroke-width="2"/>
+<text x="880" y="187" font-size="29" font-weight="650" text-anchor="middle">HỆ THỐNG SMARTEYE</text>
+<text x="880" y="222" font-size="23" text-anchor="middle">Phân tích, dự báo ùn tắc và hỗ trợ lựa chọn hành trình</text>
+
+<path class="edge" d="M208 448 L285 448 L412 310 L510 310"/>
+<path class="edge" d="M208 448 L510 450"/>
+<path class="edge" d="M208 448 L412 590 L510 590"/>
+<path class="edge" d="M208 448 L412 730 L510 730"/>
+<path class="edge" d="M208 878 L510 880"/>
+<path class="edge" d="M208 1142 L412 1030 L510 1030"/>
+<path class="edge" d="M208 1142 L510 1180"/>
+<path class="edge" d="M132 878 H50 V448 H132" marker-end="url(#generalization)"/>
+<path class="edge" d="M132 1142 H85 V878 H132" marker-end="url(#generalization)"/>
+<g aria-label="Người dùng">
+<circle class="actor" cx="170" cy="405" r="21" fill="white"/>
+<path class="actor" d="M170 429 V486 M132 448 H208 M170 486 L146 520 M170 486 L194 520"/>
+<text x="170" y="562" font-size="30" font-weight="500" text-anchor="middle">Người dùng</text></g>
+<g aria-label="Quản lý">
+<circle class="actor" cx="170" cy="835" r="21" fill="white"/>
+<path class="actor" d="M170 859 V916 M132 878 H208 M170 916 L146 950 M170 916 L194 950"/>
+<text x="170" y="992" font-size="30" font-weight="500" text-anchor="middle">Quản lý</text></g>
+<g aria-label="Admin">
+<circle class="actor" cx="170" cy="1099" r="21" fill="white"/>
+<path class="actor" d="M170 1123 V1180 M132 1142 H208 M170 1180 L146 1214 M170 1180 L194 1214"/>
+<text x="170" y="1256" font-size="30" font-weight="500" text-anchor="middle">Admin</text></g>
+<ellipse class="case" cx="880" cy="310" rx="370" ry="58"/>
+<text x="880" y="320" font-size="28" text-anchor="middle">UC01. Quản lý tài khoản cá nhân</text>
+<ellipse class="case" cx="880" cy="450" rx="370" ry="58"/>
+<text x="880" y="460" font-size="28" text-anchor="middle">UC02. Theo dõi và phân tích giao thông</text>
+<ellipse class="case" cx="880" cy="590" rx="370" ry="58"/>
+<text x="880" y="600" font-size="28" text-anchor="middle">UC03. Lập kế hoạch hành trình</text>
+<ellipse class="case" cx="880" cy="730" rx="370" ry="58"/>
+<text x="880" y="724" font-size="28" text-anchor="middle">UC04. Quản lý hành trình</text>
+<text x="880" y="758" font-size="28" text-anchor="middle">và cảnh báo cá nhân</text>
+<ellipse class="case" cx="880" cy="880" rx="370" ry="58"/>
+<text x="880" y="874" font-size="28" text-anchor="middle">UC05. Quản lý dữ liệu giao thông</text>
+<text x="880" y="908" font-size="28" text-anchor="middle">và đánh giá dự báo</text>
+<ellipse class="case" cx="880" cy="1030" rx="370" ry="58"/>
+<text x="880" y="1040" font-size="28" text-anchor="middle">UC06. Quản lý tài khoản và phân quyền</text>
+<ellipse class="case" cx="880" cy="1180" rx="370" ry="58"/>
+<text x="880" y="1190" font-size="28" text-anchor="middle">UC07. Quản trị và vận hành hệ thống</text>
+<path class="edge" d="M365 1343 H425"/><text x="442" y="1350" font-size="21">Tham gia nghiệp vụ</text>
+<path class="edge" d="M825 1343 H887" marker-end="url(#generalization)"/><text x="906" y="1350" font-size="21">Kế thừa vai trò</text>
+<text x="720" y="1390" font-size="20" text-anchor="middle">Quản lý có các quyền của Người dùng; Admin có các quyền của Quản lý.</text></svg>

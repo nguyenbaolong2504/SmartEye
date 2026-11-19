@@ -54,10 +54,14 @@ def fit_models(data,folder,horizon,estimators=180):
     from .camera_forecast import fit_temperature,probabilities,negative_log_loss,calibration_error
     train,early,calibration,test=partition(data,horizon)
     x=data['x'];y=data['y'];speed=data['speed_ratio']
+    # Keep rare but important congestion periods visible to the learner. The
+    # later validation/test gates still decide whether this actually improves
+    # prediction quality; weighting alone never makes a model deployable.
+    class_weights=len(train)/(3*np.maximum(np.bincount(y[train],minlength=3),1))
     model=XGBClassifier(n_estimators=estimators,max_depth=5,learning_rate=.06,subsample=.9,colsample_bytree=.9,
         objective='multi:softprob',num_class=3,tree_method='hist',n_jobs=1,random_state=42,
         eval_metric='mlogloss',early_stopping_rounds=12)
-    model.fit(x[train],y[train],eval_set=[(x[early],y[early])],verbose=False)
+    model.fit(x[train],y[train],sample_weight=class_weights[y[train]],eval_set=[(x[early],y[early])],verbose=False)
     temperature=fit_temperature(y[calibration],model.predict_proba(x[calibration]))
     reg=XGBRegressor(n_estimators=estimators,max_depth=5,learning_rate=.06,subsample=.9,colsample_bytree=.9,
         objective='reg:squarederror',tree_method='hist',n_jobs=1,random_state=42,early_stopping_rounds=12)
@@ -75,14 +79,18 @@ def fit_models(data,folder,horizon,estimators=180):
     beats=lambda scores:scores['XGBoost']['macro_f1']>=max(scores['Persistence']['macro_f1'],scores['Historical']['macro_f1'])+.01
     ece=calibration_error(y[test],p)
     brier=float(np.mean(np.sum((p-np.eye(3)[y[test]])**2,axis=1)))
-    eligible=beats(val) and beats(test_scores) and candidate['high_recall']>=.5 and min(candidate['class_counts'])>=5 and ece<=.1 and brier<2/3
+    def passes_quality(scores):
+        candidate=scores['XGBoost']
+        return (candidate['accuracy']>=.80 and candidate['macro_f1']>=.70
+                and candidate['high_recall']>=.60 and min(candidate['class_counts'])>=10)
+    eligible=beats(val) and beats(test_scores) and passes_quality(val) and passes_quality(test_scores) and ece<=.1 and brier<2/3
     supported=[];speed_supported=[]
     for sid in np.unique(data['roads'][test]):
         tm=data['roads'][test]==sid;vm=data['roads'][early]==sid
         if not tm.any() or not vm.any():continue
         local={name:metrics(y[test][tm],pred[tm]) for name,pred in predictions['test'].items()}
         vlocal={name:metrics(y[early][vm],pred[vm]) for name,pred in predictions['validation'].items()}
-        if eligible and min(local['XGBoost']['class_counts'])>=5 and beats(local) and beats(vlocal) and local['XGBoost']['high_recall']>=.5:supported.append(int(sid))
+        if eligible and passes_quality(local) and passes_quality(vlocal) and beats(local) and beats(vlocal):supported.append(int(sid))
         local_speed=float(np.mean(np.abs(predicted_speed[tm]-actual_speed[tm])))
         local_baseline=float(np.mean(np.abs(data['current_speed'][test][tm]-actual_speed[tm])))
         validation_speed=np.clip(reg.predict(x[early][vm]),0,2)*data['free_speed'][early][vm]

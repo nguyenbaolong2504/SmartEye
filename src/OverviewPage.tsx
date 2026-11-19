@@ -1,11 +1,11 @@
 import {useState} from 'react';
-import {Activity,ArrowRight,ArrowUpRight,BrainCircuit,Camera,ChartNoAxesCombined,ChevronRight,Clock3,MapPin,Navigation,Route} from 'lucide-react';
+import {Activity,ArrowRight,ArrowUpRight,Camera,ChartNoAxesCombined,ChevronRight,Clock3,MapPin,Navigation,Route} from 'lucide-react';
 import {type Segment,type DataMode,type User,dateTime} from './types';
 import PublicWarnings from './PublicWarnings';
 import {can} from './permissions';
 import './overview.css';
 
-type Destination='monitor'|'forecast'|'routes'|'alerts'|'cameras';
+type Destination='monitor'|'routes'|'alerts'|'cameras';
 const densityText={LOW:'Ít xe',NORMAL:'Vừa phải',HIGH:'Đông xe'};
 const priority={HIGH:0,NORMAL:1,LOW:2,unknown:3};
 
@@ -21,14 +21,13 @@ export default function OverviewPage({user,segments,onNavigate,onRoad,dataMode}:
     priority[a.observation?.density||'unknown']-priority[b.observation?.density||'unknown']||a.name.localeCompare(b.name,'vi'));
   const shortcuts=[
     {permission:'cameras.view',tab:'cameras' as const,icon:Camera,tone:'green',title:'Nhìn đường trước khi đi',description:'Xem video và phân tích tình hình tại camera.',action:'Xem camera'},
-    {permission:'forecast.view',tab:'forecast' as const,icon:BrainCircuit,tone:'blue',title:'Chọn giờ đi phù hợp',description:'Tham khảo giao thông vào ngày và giờ bạn dự định.',action:'Xem dự báo'},
     {permission:'traffic.view',tab:'monitor' as const,icon:ChartNoAxesCombined,tone:'amber',title:'Hiểu nhịp giao thông',description:'Xem những khung giờ thường đông xe trên từng tuyến.',action:'Xem thống kê'},
   ].filter(item=>can(user,item.permission));
   return <div className="home-page">
     <div className="home-topline"><span><span className="home-live-dot"/>Cùng bạn trên mọi hành trình</span><time dateTime={new Date().toISOString().slice(0,10)}>{new Date().toLocaleDateString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</time></div>
     <section className="home-hero" aria-labelledby="home-heading">
       <div className="home-hero-copy"><div className="home-eyebrow"><Route size={15}/>DI CHUYỂN THÔNG MINH HƠN</div><h1 id="home-heading">Hiểu đường đi.<br/><span>Chủ động giờ đến.</span></h1><p>Một chút chuẩn bị, một hành trình nhẹ nhàng hơn. Xem đường, chọn giờ và tìm lối đi phù hợp với bạn.</p>
-        <div className="home-hero-actions">{can(user,'routes.search')&&<button className="button home-primary" onClick={()=>onNavigate('routes')}><Navigation size={17}/>Tìm đường phù hợp<ArrowRight size={17}/></button>}{can(user,'forecast.view')&&<button className="home-secondary" onClick={()=>onNavigate('forecast')}>Xem dự báo trước khi đi<ArrowUpRight size={16}/></button>}</div>
+        <div className="home-hero-actions">{can(user,'routes.search')&&<button className="button home-primary" onClick={()=>onNavigate('routes')}><Navigation size={17}/>Tìm đường phù hợp<ArrowRight size={17}/></button>}{can(user,'cameras.view')&&<button className="home-secondary" onClick={()=>onNavigate('cameras')}>Xem camera trước khi đi<ArrowUpRight size={16}/></button>}</div>
       </div>
       <div className="home-journey-art" aria-hidden="true"><div className="home-art-label"><span><Navigation size={14}/></span>Hành trình của bạn</div>
         <svg viewBox="0 0 420 260" fill="none"><g stroke="#a8d6cb" strokeOpacity=".14" strokeWidth="13" strokeLinecap="round"><path d="M-30 48H450M-30 127H450M-30 221H450M66-30V290M184-30V290M318-30V290"/><path d="M-15 264L249-12M214 284L442 52"/></g><g fill="#bde3d7" fillOpacity=".08"><rect x="85" y="65" width="80" height="43" rx="8"/><rect x="204" y="65" width="95" height="43" rx="8"/><rect x="85" y="146" width="80" height="56" rx="8"/><rect x="337" y="146" width="65" height="56" rx="8"/></g><path d="M66 48H184V127H318V221" stroke="#0a3f3c" strokeWidth="23" strokeLinecap="round" strokeLinejoin="round"/><path d="M66 48H184V127H318V221" stroke="#83dfb7" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/><path d="M66 48H184V127H318V221" stroke="#c3f7db" strokeWidth="2" strokeDasharray="2 10" strokeLinecap="round"/><circle cx="66" cy="48" r="19" fill="#d6f8e5" fillOpacity=".12"/><circle cx="66" cy="48" r="9" fill="#eefcf5"/><circle cx="66" cy="48" r="4" fill="#178775"/><circle cx="318" cy="221" r="22" fill="#83dfb7" fillOpacity=".17"/><circle cx="318" cy="221" r="12" fill="#d6f8e5"/><path d="m313 221 4 4 7-8" stroke="#126458" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>

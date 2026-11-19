@@ -34,19 +34,28 @@ def aggregate_sources(database):
             def average(field):
                 if any(m.get(field) is None for _,_,m in rows):return None
                 return sum(m[field]*(last-first).total_seconds() for first,last,m in rows)/seconds
+            def active_event(field):
+                values=[m[field] for _,_,m in rows if m.get(field) is not None]
+                # Unknown remains unknown. A confirmed event during any part of
+                # the five-minute window remains relevant to its traffic state.
+                return bool(any(values)) if values else None
             states=[(m.get('state'),(last-first).total_seconds()) for first,last,m in rows]
             valid=all(state in ('FREE','SLOW','JAM') for state,_ in states)
             votes=Counter()
             for state,duration in states:votes[state]+=duration
             state=votes.most_common(1)[0][0] if valid and source.get('state_verified') else None
             profile=source['traffic_profile']
+            stopped_share=average('stopped_share')
             body=WindowInput(segment_id=source['segment_id'],direction=source['direction'],window_end=boundary,
                 present_count=average('present_count'),crossing_count=int(sum(m['crossing_count'] for _,_,m in rows)) if all(m.get('crossing_count') is not None for _,_,m in rows) else None,
                 avg_speed_kmh=average('speed_kmh'),free_flow_speed_kmh=profile['free_flow_speed_kmh'],
                 observed_length_m=profile['observed_length_m'],lanes=profile['lanes'],coverage_seconds=seconds,
                 speed_calibrated=True,length_verified=True,training_allowed=profile.get('training_allowed',False),
                 verified_state=state,verification_note=f"Nhãn độc lập từ nguồn đã xác nhận {source['_id']} phiên bản {source['version']}" if state else '',
-                source=f"source:{source['_id']}:v{source['version']}",rain_mm=average('rain_mm'),visibility_km=average('visibility_km'))
+                source=f"source:{source['_id']}:v{source['version']}",rain_mm=average('rain_mm'),visibility_km=average('visibility_km'),
+                stopped_share=stopped_share,motion_known=stopped_share is not None,
+                accident=active_event('accident'),roadwork=active_event('roadwork'),
+                obstruction=active_event('obstruction'),flood=active_event('flood'))
             doc=body.document(source['created_by']);doc.update(source_id=source['_id'],source_version=source['version'])
             existing=database.traffic_windows.find_one({'_id':key(doc)})
             if existing and existing.get('source_id')!=source['_id']:continue  # Preserve reviewed imports.

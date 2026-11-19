@@ -35,7 +35,7 @@ function forecast(horizon:number,p:{FREE:number;SLOW:number;JAM:number}){
     conditions:{weather:{known:true,rain_mm:7,visibility_km:2,wind_kmh:10,source:'Open-Meteo'},
       road:{checked:true,accident:true,source:'published_warnings',message:'Cảnh báo đã công bố.'},location_note:'Điều kiện theo tuyến chạy thử.'},
     timeline:[{second:5.5,predictions:[{horizon_minutes:horizon,label:'HIGH',congestion_probabilities:p,
-      history:{lookback_days:100,matching_days:14,jam_days:12,hour:'17:00',is_demo:true}}]}]};
+      history:{lookback_days:30,matching_days:14,jam_days:12,slow_days:1,free_days:1,day_type:'Ngày làm việc',hour:'17:00',is_demo:true}}]}]};
 }
 
 test('explanation separates measured flow, density, speed loss and forecast probability',async({page})=>{
@@ -52,7 +52,7 @@ test('explanation separates measured flow, density, speed loss and forecast prob
   await page.goto('/#cameras');await page.getByRole('button',{name:'Phân tích',exact:true}).click();
   await expect(page.locator('.camera-result-percentage')).toHaveText('90%');
   await expect(page.getByRole('table')).toHaveCount(0);
-  await page.getByRole('button',{name:'Vì sao?',exact:true}).click();
+  await page.getByRole('button',{name:'Xem vì sao',exact:true}).click();
   const dialog=page.getByRole('dialog');
   await expect(dialog.getByRole('row').filter({hasText:'Lưu lượng quy đổi'})).toContainText('1.800 xe/giờ');
   await expect(dialog.getByRole('row').filter({hasText:'Mật độ trên đoạn đường'})).toContainText('160 xe/km');
@@ -63,7 +63,7 @@ test('explanation separates measured flow, density, speed loss and forecast prob
   await page.keyboard.press('Escape');await expect(page.locator('.camera-result-percentage')).toHaveText('90%');
 });
 
-test('one requested result highlights free, jam and slow equally; explanation and video remain usable',async({page},info)=>{
+test('only high-confidence free or jam is shown; explanation and video remain usable',async({page},info)=>{
   await setup(page);const requests:number[]=[];
   await page.route('**/recordings/1/forecast',route=>{
     const body=route.request().postDataJSON();requests.push(body.horizon_minutes);
@@ -80,9 +80,10 @@ test('one requested result highlights free, jam and slow equally; explanation an
   await analyze.click();
   const result=page.locator('.camera-result');
   await expect(result).toHaveClass(/FREE/);
-  await expect(result.locator('h4')).toHaveText('Thông thoáng');
+  await expect(result.locator('h4')).toHaveText('Khả năng thông thoáng');
   await expect(result.locator('.camera-result-percentage')).toHaveText('90%');
-  await expect(result.getByRole('progressbar',{name:'Khả năng thông thoáng'})).toHaveAttribute('value','0.9');
+  await expect(result.getByRole('progressbar')).toHaveCount(0);
+  await expect(result.locator('.camera-probability-breakdown')).toHaveCount(0);
   await expect(result).toContainText('Khả năng cao');
   await page.locator('video').evaluate(v=>{v.currentTime=.6;});
   await expect(page.locator('canvas.camera-detection-overlay')).toHaveAttribute('data-box-count','3');
@@ -95,22 +96,23 @@ test('one requested result highlights free, jam and slow equally; explanation an
   await expect.poll(painted).toBe(false);
   await page.getByRole('button',{name:'Hiện ô nhận diện',exact:true}).click();
   await expect.poll(painted).toBe(true);
-  await result.getByRole('button',{name:'Vì sao?',exact:true}).click();
+  await result.getByRole('button',{name:'Xem vì sao',exact:true}).click();
   await expect(page.getByRole('dialog')).toContainText('18 xe: 3 ô tô, 15 xe máy');
   await expect(page.getByRole('dialog')).toContainText('Số xe điển hình là 10');
   await expect(page.getByRole('dialog')).toContainText('3.5 m');
-  await expect(page.getByRole('dialog')).toContainText('14 ngày cùng thứ');
+  await expect(page.getByRole('dialog')).toContainText('14 ngày làm việc');
   await expect(page.getByRole('dialog')).toContainText('Mưa lớn');
   await expect(page.getByRole('dialog')).toContainText('Tai nạn');
   await page.getByText('Cách tính tỷ lệ và giới hạn',{exact:true}).click();
-  await expect(page.getByRole('dialog')).toContainText('Không đặt sẵn tỷ lệ 80% hay 90%');
+  await expect(page.getByRole('dialog')).toContainText('Mức 80% là ngưỡng thông báo');
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'30 phút',exact:true}).click();
   await expect(result).toHaveCount(0);await analyze.click();
-  await expect(result).toHaveClass(/JAM/);await expect(result.locator('h4')).toHaveText('Ùn tắc');
+  await expect(result).toHaveClass(/JAM/);await expect(result.locator('h4')).toHaveText('Khả năng ùn tắc');
   await expect(result.locator('.camera-result-percentage')).toHaveText('90%');
   await page.getByRole('button',{name:'1 giờ',exact:true}).click();await analyze.click();
-  await expect(result).toHaveClass(/SLOW/);await expect(result.locator('.camera-result-percentage')).toHaveText('85%');
+  await expect(result).toHaveClass(/uncertain/);await expect(result.locator('h4')).toHaveText('Chưa kết luận');
+  await expect(result.locator('.camera-result-percentage')).toHaveCount(0);
   expect(requests).toEqual([15,30,60]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:`test-results/camera-simple-${info.project.name}.png`,fullPage:true});
@@ -130,13 +132,12 @@ test('errors can retry; weak evidence and a value below 80% never trigger a high
   await button.click();await expect(page.getByText('Chưa phân tích được. Vui lòng thử lại.')).toBeVisible();
   await button.click();await expect(page.getByText('Chưa có tỷ lệ phù hợp cho video này. Vui lòng thử phân tích lại.')).toBeVisible();
   await button.click();await expect(page.locator('.camera-result')).toHaveClass(/uncertain/);
-  await expect(page.locator('.camera-result')).toContainText('53%');
-  await expect(page.locator('.camera-result')).toContainText('Xu hướng chưa rõ');
+  await expect(page.locator('.camera-result')).toContainText('Chưa kết luận');
   await button.click();await expect(page.locator('.camera-result')).toHaveClass(/uncertain/);
-  await expect(page.locator('.camera-result-percentage')).toHaveText('79.9%');
+  await expect(page.locator('.camera-result-percentage')).toHaveCount(0);
   await button.click();await expect(page.locator('.camera-result')).toHaveClass(/FREE/);
   await expect(page.locator('.camera-result-percentage')).toHaveText('80%');
-  await expect(page.locator('.camera-probability-breakdown .JAM b')).toHaveText('<0.1%');
+  await expect(page.locator('.camera-probability-breakdown')).toHaveCount(0);
 });
 
 test('changing horizon or camera cancels old work so an obsolete result cannot overwrite the screen',async({page})=>{

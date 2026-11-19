@@ -13,10 +13,10 @@ def source(database,sid,ident):
     database.data_sources.insert_one(value)
 
 
-def reading(database,sid,at,ident,source_id=99,seconds=60):
+def reading(database,sid,at,ident,source_id=99,seconds=60,**changes):
     database.road_readings.insert_one({'_id':ident,'sample_key':str(uuid.uuid4()),'source_id':source_id,'source_version':1,
         'segment_id':sid,'direction':'forward','observed_at':at.isoformat(),
-        'metrics':{'interval_seconds':seconds,'present_count':10,'crossing_count':30,'speed_kmh':20,'state':'SLOW'}})
+        'metrics':{'interval_seconds':seconds,'present_count':10,'crossing_count':30,'speed_kmh':20,'state':'SLOW',**changes}})
 
 
 def test_aggregate_intervals_preserves_units_and_avoids_duplicated_sources(analyst_client):
@@ -31,6 +31,20 @@ def test_aggregate_intervals_preserves_units_and_avoids_duplicated_sources(analy
     source(database,sid,98)
     database.traffic_windows.delete_many({})
     assert aggregate_sources(database)==0 and database.traffic_windows.count_documents({})==0
+
+
+def test_aggregate_keeps_confirmed_weather_and_road_conditions(analyst_client):
+    database=get_database();sid=real_road();source(database,sid,99)
+    end=(now()-timedelta(minutes=10)).replace(minute=0,second=0,microsecond=0)
+    for i in range(5):
+        reading(database,sid,end-timedelta(minutes=4-i),100+i,rain_mm=4,visibility_km=3,
+                stopped_share=.4,accident=i==2,roadwork=False,obstruction=False,flood=False)
+    assert aggregate_sources(database)==1
+    row=database.traffic_windows.find_one({'segment_id':sid})
+    assert row['rain_mm']==4 and row['visibility_km']==3
+    assert row['stopped_share']==.4 and row['motion_known'] is True
+    assert row['accident'] is True and row['roadwork'] is False
+    assert row['obstruction'] is False and row['flood'] is False
 
 
 def test_aggregate_rejects_overlap_and_point_samples(analyst_client):

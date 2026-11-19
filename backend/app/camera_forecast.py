@@ -18,6 +18,8 @@ VERSION=5
 FOLDER=DATA/'camera-density'
 _models={}
 MOTION_FEATURES=('stopped_share','motion_known','load_ratio')
+HISTORY_LOOKBACK_DAYS=30
+HIGH_CONFIDENCE=.8
 
 
 def motion_vector(row):
@@ -170,16 +172,75 @@ def prepare_models(database,estimators=160):
 
 def history_evidence(database,active,segment_id,issue):
     cutoff=issue.date();documents=list(database.demo_profiles.find({'dataset_id':active['run_id'],
-        'segment_id':segment_id,'date':{'$gte':(cutoff-timedelta(days=100)).isoformat(),'$lt':cutoff.isoformat()}},
+        'segment_id':segment_id,'date':{'$gte':(cutoff-timedelta(days=HISTORY_LOOKBACK_DAYS)).isoformat(),'$lt':cutoff.isoformat()}},
         {'date':1,'slots':1}))
     output={}
     for horizon in HORIZONS:
         target=issue+timedelta(minutes=horizon);minute=target.hour*60+target.minute
-        values=[slot for doc in documents if datetime.fromisoformat(doc['date']).weekday()==target.weekday()
+        # Compare workdays with workdays, and weekends with weekends.  This gives a
+        # useful one-month pattern without pretending that an arbitrary Tuesday and
+        # a Sunday have the same traffic behaviour.
+        is_workday=target.weekday()<5
+        values=[slot for doc in documents if (datetime.fromisoformat(doc['date']).weekday()<5)==is_workday
                 for slot in doc['slots'] if slot['minute']==minute]
-        output[horizon]={'is_demo':True,'lookback_days':100,'matching_days':len(values),
-            'jam_days':sum(row['state']=='JAM' for row in values),'same_weekday':True,'hour':target.strftime('%H:%M')}
+        states={state:sum(row['state']==state for row in values) for state in ('FREE','SLOW','JAM')}
+        total=len(values)
+        output[horizon]={'is_demo':True,'lookback_days':HISTORY_LOOKBACK_DAYS,'matching_days':total,
+            'jam_days':states['JAM'],'slow_days':states['SLOW'],'free_days':states['FREE'],
+            'state_probabilities':{state:states[state]/total for state in states} if total else None,
+            'same_day_type':True,'day_type':'Ngày làm việc' if is_workday else 'Cuối tuần',
+            'hour':target.strftime('%H:%M')}
     return output
+
+
+def video_congestion_signal(sample,config):
+    """Return the current congestion signal from normalized load and movement."""
+    pressure=normalized_score(float(sample['score']),config['low_threshold'],config['high_threshold'])
+    stopped=float(sample.get('stopped_share') or 0) if sample.get('motion_known') else 0.
+    # The load is already normalized by the configured width, lanes and storage
+    # of the observed road.  A crowded narrow road therefore scores higher than
+    # the same vehicle count on a broad road.
+    density=max(0.,min(1.,(pressure-.45)/.35))
+    value=.65*density+.35*stopped if sample.get('motion_known') else density
+    return max(0.,min(1.,value)),pressure,stopped
+
+
+def condition_congestion_signal(conditions):
+    weather=conditions.get('weather',{}) if conditions else {}
+    road=conditions.get('road',{}) if conditions else {}
+    rain=float(weather.get('rain_mm') or 0)
+    weather_risk=max(0.,min(1.,rain/12)) if weather.get('known') else 0.
+    road_risk=1. if any(road.get(key) for key in ('accident','roadwork','obstruction','flood')) else .35 if road.get('wet_surface') else 0.
+    return max(weather_risk,road_risk)
+
+
+def fuse_probabilities(model_probability,history,sample,config,conditions=None):
+    """Make one actionable JAM/FREE forecast from the available evidence.
+
+    The current clip, 30-day matching-time history, XGBoost output and confirmed
+    road/weather conditions each contribute to a single congestion risk.  This
+    avoids presenting a vague third state when a user asked whether to travel.
+    """
+    video_risk,pressure,stopped=video_congestion_signal(sample,config)
+    historical=history.get('state_probabilities')
+    history_risk=float(historical['JAM']) if historical else float(model_probability[2])
+    model_risk=float(model_probability[2])
+    condition_risk=condition_congestion_signal(conditions)
+    risk=.32*model_risk+.28*history_risk+.27*video_risk+.13*condition_risk
+    # When independent evidence agrees that the road is close to saturation, the
+    # risk rises slightly rather than being washed out by a simple average.
+    if sum(value>=.6 for value in (model_risk,history_risk,video_risk,condition_risk))>=2:risk+=.08
+    # Keep the demonstrator's published range realistic: a short camera clip
+    # should not claim mathematical certainty, even in a severe queue.
+    risk=max(.08,min(.92,risk))
+    state='JAM' if risk>=.5 else 'FREE'
+    probability=risk if state=='JAM' else 1-risk
+    result=np.asarray([1-risk,0.,risk])
+    decision={'state':state,'probability':float(probability),'threshold':HIGH_CONFIDENCE,'eligible':True,
+              'video_pressure':float(pressure),'weights':{'model':.32,'monthly_history':.28,'current_video':.27,'conditions':.13},
+              'evidence':{'model_jam':model_risk,'monthly_jam':history_risk,'video_congestion':video_risk,
+                          'stopped_share':stopped if sample.get('motion_known') else None,'conditions':condition_risk}}
+    return result,decision
 
 
 def normalized_score(score,low,high):
@@ -225,11 +286,13 @@ def predict_samples(database,segment_id,samples,config,issue=None,conditions=Non
         info=metadata['horizons'][str(horizon)][target]
         x=((raw-np.asarray(info['mean']))/np.asarray(info['std'])).astype(np.float32)
         p=probabilities(models[(horizon,target)].predict_proba(x),info['temperature'])
-        for row,values in zip(predictions,p):
+        for row,values,sample in zip(predictions,p,samples):
+            if target=='congestion':
+                values,decision=fuse_probabilities(values,evidence[horizon],sample,config,conditions)
             distribution={name:round(float(value),6) for name,value in zip(CLASSES[target],values)}
             label=CLASSES[target][int(values.argmax())]
             if target=='density':row.update(label=label,probabilities=distribution)
-            else:row.update(congestion_label=label,congestion_probability=distribution['JAM'],congestion_probabilities=distribution)
+            else:row.update(congestion_label=label,congestion_probability=distribution['JAM'],congestion_probabilities=distribution,decision=decision)
       info=metadata['horizons'][str(horizon)]['congestion']
       x=((raw-np.asarray(info['mean']))/np.asarray(info['std'])).astype(np.float32)
       future_speed=np.clip(models[(horizon,'speed')].predict(x),0,2)*(32+segment_id%4*3)
@@ -243,7 +306,7 @@ def predict_samples(database,segment_id,samples,config,issue=None,conditions=Non
         ('test','test_calibration_error','accuracy_target_met')},'speed':metadata['speed_horizons'][str(h)]} for h in horizons}
     return {'version':VERSION,'is_demo':True,'target':'density_and_congestion','model':'XGBoost','run_id':active['run_id'],
         'reference_at':issue.isoformat(),'context_minutes':60,'synthetic_context_slots':11,
-        'probability_kind':'calibrated_synthetic','real_world_validated':False,
+        'probability_kind':'calibrated_synthetic_binary_video_history','real_world_validated':False,
         'conditions':conditions,
         'evaluation':evaluation,'accuracy_target':.8,
         'message':'Xét lượng xe, lịch sử cùng giờ, sự cố, điều kiện đường và thời tiết có thông tin.','timeline':output}

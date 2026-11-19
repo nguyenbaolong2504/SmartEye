@@ -25,6 +25,18 @@ from .security import admin, permit
 router=APIRouter()
 MAX_BYTES=2*1024*1024
 CAMERA_TYPES={'image': {'image/jpeg', 'image/png', 'image/webp'}, 'video': {'video/mp4', 'video/webm'}}
+EVENT_FIELDS=('accident','roadwork','obstruction','flood')
+
+
+def boolean_measurement(value):
+    """Accept explicit boolean values from an authorised source, never guesses."""
+    if isinstance(value,bool):return value
+    if isinstance(value,(int,float)) and not isinstance(value,bool) and value in (0,1):return bool(value)
+    if isinstance(value,str):
+        text=value.strip().casefold()
+        if text in ('true','1','yes','y','co','có'):return True
+        if text in ('false','0','no','n','khong','không'):return False
+    raise ValueError('Cờ sự cố phải là đúng/sai hoặc 1/0')
 
 
 def source_data(source):
@@ -153,7 +165,8 @@ def mapped_reading(source,raw):
     if at>now():raise ValueError('Thời gian quan sát nằm ở tương lai')
     if int(data['segment_id'])!=source.segment_id or data['direction']!=source.direction:raise ValueError('Dữ liệu khác tuyến hoặc chiều đường')
     metrics={}
-    for field,maximum in (('count',100000),('speed_kmh',200),('score',1),('present_count',10000),('crossing_count',10000),('rain_mm',300),('visibility_km',100)):
+    for field,maximum in (('count',100000),('speed_kmh',200),('score',1),('present_count',10000),('crossing_count',10000),
+                          ('rain_mm',300),('visibility_km',100),('stopped_share',1)):
         if field not in data:continue
         value=float(data[field])
         if field=='speed_kmh':
@@ -171,6 +184,8 @@ def mapped_reading(source,raw):
     if 'density' in data:
         if data['density'] not in ('LOW','NORMAL','HIGH'):raise ValueError('Mật độ không hợp lệ')
         metrics['density']=data['density']
+    for field in EVENT_FIELDS:
+        if field in data:metrics[field]=boolean_measurement(data[field])
     if 'count' in metrics and source.count_method=='crossings':
         metrics['count_kind']='crossings'
         if 'interval_seconds' in data:

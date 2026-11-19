@@ -11,7 +11,9 @@ export type DetectionFrame={second:number;frame_index?:number;count:number;score
 export type RoadGeometry=RoadProfile&{usable_area_m2:number;capacity_pcu:number;car_space_m2:number;equivalents:VehicleCounts;high_density_pcu:number;calibration_note:string};
 export type CameraPrediction={horizon_minutes:number;label:Density;congestion_label?:'FREE'|'SLOW'|'JAM';congestion_probability?:number;
   predicted_speed_kmh?:number;predicted_congestion_index?:number;predicted_travel_time_index?:number|null;free_flow_speed_kmh?:number;numeric_prediction_source?:string;
-  congestion_probabilities?:Record<'FREE'|'SLOW'|'JAM',number>;history?:{lookback_days:number;matching_days:number;jam_days:number;hour:string;is_demo:boolean}};
+  congestion_probabilities?:Record<'FREE'|'SLOW'|'JAM',number>;
+  decision?:{state:'FREE'|'JAM';probability:number;threshold:number;eligible:boolean;video_pressure:number;weights:{model:number;monthly_history:number;current_video:number;conditions:number};evidence:{model_jam:number;monthly_jam:number;video_congestion:number;stopped_share:number|null;conditions:number}};
+  history?:{lookback_days:number;matching_days:number;jam_days:number;slow_days?:number;free_days?:number;hour:string;is_demo:boolean;day_type?:string;same_day_type?:boolean;state_probabilities?:Record<'FREE'|'SLOW'|'JAM',number>|null}};
 export type CameraConditions={weather:{known:boolean;rain_mm?:number|null;visibility_km?:number|null;wind_kmh?:number|null;source:string;source_url?:string;at?:string|null;message?:string};
   road:{checked:boolean;accident?:boolean;roadwork?:boolean;obstruction?:boolean;flood?:boolean;wet_surface?:boolean;source:string;notice_count?:number;message?:string};
   reference_at?:string;location_note?:string;overrides?:{weather?:string;road_condition?:string;incident?:string}};

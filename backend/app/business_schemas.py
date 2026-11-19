@@ -146,7 +146,8 @@ class MappingInput(Revision):
     @classmethod
     def mapping_valid(cls,value):
         supported={'observed_at','segment_id','direction','count','speed_kmh','score','density','state','interval_seconds',
-                   'present_count','crossing_count','rain_mm','visibility_km'}
+                   'present_count','crossing_count','rain_mm','visibility_km','stopped_share',
+                   'accident','roadwork','obstruction','flood'}
         if not {'observed_at','segment_id','direction'}<=set(value) or set(value)-supported:raise ValueError('Ánh xạ cần thời gian, tuyến, chiều và chỉ số được hỗ trợ')
         if len(set(value.values()))!=len(value) or any(not v or len(v)>80 for v in value.values()):raise ValueError('Mỗi trường nguồn chỉ được ánh xạ một lần')
         return value

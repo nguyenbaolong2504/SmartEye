@@ -1,0 +1,276 @@
+<mxfile host="app.diagrams.net" agent="Codex">
+  <diagram id="smarteye-class-model" name="Biểu đồ lớp SmartEye">
+    <mxGraphModel dx="2285" dy="3071" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="3000" pageHeight="1900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="user" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#dbeafe;padding:6px;&quot;&gt;TàiKhoản&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- email, username: String&lt;br&gt;- name, phone: String?&lt;br&gt;- password: String&lt;br&gt;- role: VaiTrò&lt;br&gt;- active: Boolean&lt;br&gt;- created_at: DateTime&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ đăngKý()&lt;br&gt;+ đăngNhập()&lt;br&gt;+ cậpNhậtHồSơ()&lt;br&gt;+ đổiMậtKhẩu()&lt;br&gt;+ yêuCầuĐặtLạiMậtKhẩu()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="245" width="290" x="1390" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="favorite" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#dbeafe;padding:6px;&quot;&gt;HànhTrìnhYêuThích&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- user_id: int&lt;br&gt;- name: String&lt;br&gt;- request: RouteRequest&lt;br&gt;- created_at: DateTime&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ lưu()&lt;br&gt;+ dùngLại()&lt;br&gt;+ xóa()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="285" x="1000" y="-70" as="geometry" />
+        </mxCell>
+        <mxCell id="alertRule" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#dbeafe;padding:6px;&quot;&gt;QuyTắcTheoDõi&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- user_id, segment_id: int&lt;br&gt;- density: LOW | NORMAL | HIGH&lt;br&gt;- active: Boolean&lt;br&gt;- last_sent: DateTime?&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ tạo()&lt;br&gt;+ bậtTắt()&lt;br&gt;+ kiểmTraĐiềuKiện()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="205" width="290" x="1790" y="275" as="geometry" />
+        </mxCell>
+        <mxCell id="notification" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#dbeafe;padding:6px;&quot;&gt;ThôngBáo&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- user_id: int&lt;br&gt;- warning_id: int?&lt;br&gt;- message: String&lt;br&gt;- read: Boolean&lt;br&gt;- created_at: DateTime&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ gửi()&lt;br&gt;+ đánhDấuĐãĐọc()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="270" x="2250" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="audit" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#dbeafe;padding:6px;&quot;&gt;NhậtKýHệThống&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- user_id: int?&lt;br&gt;- action, detail: String&lt;br&gt;- service, level: String&lt;br&gt;- created_at: DateTime&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ ghiNhậtKý()&lt;br&gt;+ traCứu()&lt;br&gt;+ lọc()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="270" x="1620" y="-90" as="geometry" />
+        </mxCell>
+        <mxCell id="segment" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#dcfce7;padding:6px;&quot;&gt;ĐoạnĐường&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- name: String&lt;br&gt;- start_node, end_node: String&lt;br&gt;- distance_km: Decimal&lt;br&gt;- geometry: GeoPoint[*]&lt;br&gt;- area, one_way, active&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ thêm()&lt;br&gt;+ cậpNhật()&lt;br&gt;+ ngừngTheoDõi()&lt;br&gt;+ khôiPhục()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="230" width="300" x="820" y="537" as="geometry" />
+        </mxCell>
+        <mxCell id="camera" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#dcfce7;padding:6px;&quot;&gt;Camera&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- name, segment_id: String, int&lt;br&gt;- roi: RegionOfInterest&lt;br&gt;- capacity: int&lt;br&gt;- road_profile: RoadProfile?&lt;br&gt;- low_threshold, high_threshold&lt;br&gt;- active: Boolean&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ cấuHìnhROI()&lt;br&gt;+ cấuHìnhNăngLực()&lt;br&gt;+ bậtTắt()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="230" width="300" x="620" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="observation" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#dcfce7;padding:6px;&quot;&gt;QuanSátGiaoThông&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- segment_id, user_id: int&lt;br&gt;- camera_id, job_id: int?&lt;br&gt;- density, score, count&lt;br&gt;- source, note: String&lt;br&gt;- observed_at, created_at&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ ghiNhận()&lt;br&gt;+ côngBố()&lt;br&gt;+ traCứu()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="225" width="310" x="1100" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="sample" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#dcfce7;padding:6px;&quot;&gt;MẫuGiaoThông&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- sample_key: String&lt;br&gt;- segment_id: int&lt;br&gt;- camera_id, observation_id, job_id?&lt;br&gt;- score, density, count&lt;br&gt;- occupancy, vehicle_counts&lt;br&gt;- observed_at: DateTime&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ lưuMẫu()&lt;br&gt;+ tínhMậtĐộ()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="200" width="300" x="630" y="970" as="geometry" />
+        </mxCell>
+        <mxCell id="trafficLabel" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#fef3c7;padding:6px;&quot;&gt;NhãnGiaoThôngThựcTế&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- segment_id: int&lt;br&gt;- observed_at: DateTime&lt;br&gt;- state: String&lt;br&gt;- reviewer_id: int&lt;br&gt;- note, updated_at&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ gánNhãn()&lt;br&gt;+ hiệuChỉnh()&lt;br&gt;+ dùngĐánhGiá()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="300" x="700" y="1320" as="geometry" />
+        </mxCell>
+        <mxCell id="source" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#fae8ff;padding:6px;&quot;&gt;NguồnDữLiệu&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- name, kind, format&lt;br&gt;- segment_id, direction&lt;br&gt;- created_by: int&lt;br&gt;- url, credential_env&lt;br&gt;- interval_seconds, stale_minutes&lt;br&gt;- mapping, units, traffic_profile&lt;br&gt;- active, tested, connection_state&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ kiểmTraKếtNối()&lt;br&gt;+ ánhXạDữLiệu()&lt;br&gt;+ đồngBộ()&lt;br&gt;+ bậtTắt()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="280" width="320" x="1810" y="535" as="geometry" />
+        </mxCell>
+        <mxCell id="roadReading" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#fae8ff;padding:6px;&quot;&gt;BảnGhiĐường&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- sample_key: String&lt;br&gt;- source_id, source_version&lt;br&gt;- segment_id, direction&lt;br&gt;- observed_at: DateTime&lt;br&gt;- metrics: JSON&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ tiếpNhận()&lt;br&gt;+ chuẩnHóa()&lt;br&gt;+ loạiBảnGhiTrùng()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="205" width="320" x="1810" y="875" as="geometry" />
+        </mxCell>
+        <mxCell id="managedRule" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:15px;font-weight:bold;text-align:center;background:#fae8ff;padding:6px;&quot;&gt;QuyTắcCảnhBáo&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- name, segment_id, direction&lt;br&gt;- metric, operator, threshold, unit&lt;br&gt;- window_minutes, start_hour, end_hour&lt;br&gt;- severity, created_by&lt;br&gt;- active, tested, deleted&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ tạo()&lt;br&gt;+ thửQuyTắc()&lt;br&gt;+ bậtTắt()&lt;br&gt;+ ngừngÁpDụng()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="255" width="310" x="2370" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="incident" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#fee2e2;padding:6px;&quot;&gt;PhảnÁnhSựCố&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- user_id, segment_id&lt;br&gt;- assignee_id: int?&lt;br&gt;- direction, kind, position&lt;br&gt;- occurred_at, content&lt;br&gt;- status, verification&lt;br&gt;- attachments, history&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ gửi()&lt;br&gt;+ tiếpNhận()&lt;br&gt;+ xácMinh()&lt;br&gt;+ hoànTất()/từChối()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="240" width="290" x="1465" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="warning" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size:16px;font-weight:bold;text-align:center;background:#fee2e2;padding:6px;&quot;&gt;CảnhBáoGiaoThông&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;- id: int&lt;br&gt;- segment_id, direction, position&lt;br&gt;- kind, severity, content&lt;br&gt;- start_at, end_at&lt;br&gt;- created_by, incident_id?&lt;br&gt;- rule_id?, status, verification&lt;br&gt;- origin, versions, history&lt;/div&gt;&lt;div style=&quot;border-top:1px solid #334155;padding:6px;&quot;&gt;+ tạo()&lt;br&gt;+ xácMinh()&lt;br&gt;+ côngBố()&lt;br&gt;+ kếtThúc()/hủy()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="245" width="330" x="1950" y="1140" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-fav" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="favorite" value="1 — lưu — 0..*">
+          <mxGeometry relative="1" x="-0.2265" as="geometry">
+            <Array as="points">
+              <mxPoint x="1460" y="260" />
+              <mxPoint x="1130" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-rule" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="alertRule" value="thiết lập">
+          <mxGeometry relative="1" x="0.0074" as="geometry">
+            <Array as="points">
+              <mxPoint x="1620" y="290" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-notification" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="notification" value="nhận">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2385" y="512.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-audit" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="audit" value="0..1 — thao tác — 0..*">
+          <mxGeometry relative="1" x="0.6462" as="geometry">
+            <Array as="points">
+              <mxPoint x="1570" y="50" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-observation" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="observation" value="1 — ghi nhận — 0..*">
+          <mxGeometry relative="1" x="-0.0538" as="geometry">
+            <Array as="points">
+              <mxPoint x="1350" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-incident" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="incident" value="1 — gửi / tiếp nhận — 0..*">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1535" y="880" />
+              <mxPoint x="1535" y="880" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-source" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="source" value="1 — khai báo — 0..*">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1790" y="600" />
+              <mxPoint x="1790" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-managed-rule" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="managedRule" value="1 — tạo — 0..*">
+          <mxGeometry relative="1" x="0.1262" as="geometry">
+            <Array as="points">
+              <mxPoint x="1535" y="180" />
+              <mxPoint x="2750" y="180" />
+              <mxPoint x="2750" y="720" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-user-warning" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="warning" value="1 — phát hành — 0..*">
+          <mxGeometry relative="1" x="-0.0285" as="geometry">
+            <Array as="points">
+              <mxPoint x="2150" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-camera" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=diamondThin;endFill=0;startArrow=none;fontSize=11;" target="camera" value="1 — có — 0..*">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-seg-observation" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="observation" value="1 — được quan sát bởi — 0..*">
+          <mxGeometry relative="1" x="0.0914" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="880" />
+              <mxPoint x="1220" y="880" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-sample" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="sample" value="có mẫu">
+          <mxGeometry relative="1" x="-0.1515" as="geometry">
+            <Array as="points">
+              <mxPoint x="850" y="810" />
+              <mxPoint x="850" y="810" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-label" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="trafficLabel" value="1 — có nhãn — 0..*">
+          <mxGeometry relative="1" x="0.0653" as="geometry">
+            <Array as="points">
+              <mxPoint x="610" y="730" />
+              <mxPoint x="610" y="1380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-source" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="source" value="nhận nguồn">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1300" y="675" />
+              <mxPoint x="1300" y="675" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-incident" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="incident" value="&amp;nbsp;xảy ra tại&amp;nbsp;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1610" y="740" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-warning" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="warning" value="1 — cảnh báo cho — 0..*">
+          <mxGeometry relative="1" x="0.5797" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="652" />
+              <mxPoint x="560" y="1560" />
+              <mxPoint x="2160" y="1560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-seg-managed" edge="1" parent="1" source="segment" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="managedRule" value="1 — đặt quy tắc — 0..*">
+          <mxGeometry relative="1" x="0.6345" as="geometry">
+            <Array as="points">
+              <mxPoint x="970" y="140" />
+              <mxPoint x="2560" y="140" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-camera-observation" edge="1" parent="1" source="camera" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;startArrow=none;fontSize=11;" target="observation" value="0..1 — tạo dữ liệu — 0..*">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-observation-sample" edge="1" parent="1" source="observation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;startArrow=none;fontSize=11;" target="sample" value="tạo">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1050" y="1012.5" />
+              <mxPoint x="1050" y="1200" />
+              <mxPoint x="780" y="1200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-source-reading" edge="1" parent="1" source="source" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=diamondThin;endFill=0;startArrow=none;fontSize=11;" target="roadReading" value="1 — tiếp nhận — 0..*">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-incident-warning" edge="1" parent="1" source="incident" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;endFill=1;startArrow=none;fontSize=11;" target="warning" value="1 — có thể tạo — 0..*">
+          <mxGeometry relative="1" x="-0.3829" as="geometry">
+            <Array as="points">
+              <mxPoint x="1850" y="1100" />
+              <mxPoint x="1850" y="1222.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-managed-warning" edge="1" parent="1" source="managedRule" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;endArrow=block;endFill=1;startArrow=none;fontSize=11;" target="warning" value="0..1 — gợi ý — 0..*">
+          <mxGeometry relative="1" x="-0.1374" as="geometry">
+            <Array as="points">
+              <mxPoint x="2320" y="770" />
+              <mxPoint x="2320" y="820" />
+              <mxPoint x="2250" y="820" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-warning-notification" edge="1" parent="1" source="warning" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=diamondThin;endFill=0;startArrow=none;fontSize=11;" target="notification" value="1 — phát sinh — 0..*">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2220" y="787.5" />
+              <mxPoint x="2265" y="787.5" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size: 16px; font-weight: bold; text-align: center; background: rgb(220, 252, 231); padding: 6px;&quot;&gt;&lt;font face=&quot;Times New Roman&quot;&gt;TácVụPhânTíchVideo&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;border-top: 1px solid rgb(51, 65, 85); padding: 6px;&quot;&gt;&lt;pre dir=&quot;ltr&quot;&gt;&lt;code&gt;&lt;font face=&quot;Times New Roman&quot;&gt;- id: String&lt;br&gt;- user_id: int&lt;br&gt;- camera_id: int&lt;br&gt;- filename: String&lt;br&gt;- camera_config: JSON&lt;br&gt;- status: String&lt;br&gt;- progress: int&lt;br&gt;- error: String [0..1]&lt;br&gt;- result: JSON [0..1]&lt;br&gt;- observed_at: DateTime [0..1]&lt;br&gt;- created_at: DateTime&lt;/font&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div style=&quot;border-top: 1px solid rgb(51, 65, 85); padding: 6px;&quot;&gt;&lt;pre dir=&quot;ltr&quot;&gt;&lt;code&gt;&lt;font face=&quot;Times New Roman&quot;&gt;+ tạoYêuCầu(): void&lt;br/&gt;+ cậpNhậtTiếnTrình(): void&lt;br/&gt;+ hủy(): boolean&lt;br/&gt;+ côngBốQuanSát(): QuanSátGiaoThông&lt;/font&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="320" width="290" x="250" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;overflow=fill;align=left;verticalAlign=top;spacing=0;" value="&lt;div style=&quot;font-size: 16px; font-weight: bold; text-align: center; background: rgb(220, 252, 231); padding: 6px;&quot;&gt;&lt;font face=&quot;Times New Roman&quot;&gt;DựBáoGiaoThông&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;border-top: 1px solid rgb(51, 65, 85); padding: 6px;&quot;&gt;&lt;pre dir=&quot;ltr&quot;&gt;&lt;code&gt;&lt;font face=&quot;Times New Roman&quot;&gt;- forecast_key: String&lt;br&gt;- segment_id: int&lt;br&gt;- direction: String&lt;br&gt;- issue_at: DateTime&lt;br&gt;- predicted_at: DateTime&lt;br&gt;- horizon_minutes: int&lt;br&gt;- predicted_state: String&lt;br&gt;- congestion_probability: Decimal&lt;br&gt;- run_id: String&amp;nbsp;&lt;/font&gt;&lt;/code&gt;&lt;/pre&gt;&lt;pre dir=&quot;ltr&quot;&gt;&lt;font face=&quot;Times New Roman&quot;&gt;- evaluated: Boolean&lt;/font&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div style=&quot;border-top: 1px solid rgb(51, 65, 85); padding: 6px;&quot;&gt;&lt;pre dir=&quot;ltr&quot;&gt;&lt;code&gt;&lt;font face=&quot;Times New Roman&quot;&gt;+ tạoDựBáo(): void&lt;br&gt;+ đốiChiếuThựcTế(): void&lt;br&gt;+ xemGiảiThích(): String&lt;/font&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="320" width="290" x="1175" y="1220" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-4" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="đánh giá" vertex="1">
+          <mxGeometry height="30" width="60" x="1056" y="1350" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-5" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="982" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="1130" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-8" edge="1" parent="1" source="HQeHDp5iN3D_wGn8eIl9-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.993;entryY=0.316;entryDx=0;entryDy=0;entryPerimeter=0;defaultLabelBackgroundColor=page;labelPadding=0 4;" target="trafficLabel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-9" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="1100" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-10" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="n" vertex="1">
+          <mxGeometry height="30" width="60" x="1590" y="925" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-11" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="730" y="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-12" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="1060" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="830" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-14" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="n" vertex="1">
+          <mxGeometry height="30" width="60" x="830" y="940" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-15" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="1760" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-16" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="n" vertex="1">
+          <mxGeometry height="30" width="60" x="1100" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="1" vertex="1">
+          <mxGeometry height="30" width="60" x="1660" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-18" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="n" vertex="1">
+          <mxGeometry height="30" width="60" x="2370" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="n" vertex="1">
+          <mxGeometry height="30" width="60" x="1600" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="HQeHDp5iN3D_wGn8eIl9-20" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="n" vertex="1">
+          <mxGeometry height="30" width="60" x="1730" y="260" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
